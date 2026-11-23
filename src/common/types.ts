@@ -2871,6 +2871,8 @@ export type TeamSeasonWithoutKey = {
 	lastGameDay?: number;
 	// scheduleLoad setting: day of the game before that one, for 3 games in 4 nights
 	prevGameDay?: number;
+	// scheduleLoad setting: the city (region of the host) of the team's most recent game, for the next trip
+	lastGameSite?: string;
 	tid: number;
 	season: number;
 	gpHome: number; // Includes playoff games! Used for attendance average

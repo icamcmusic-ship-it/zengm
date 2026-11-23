@@ -133,6 +133,8 @@ import {
 	tiredInjuryWeight,
 	travelDistance,
 	travelEndurance,
+	travelRestFactor,
+	tripKm,
 } from "./scheduleLoad.ts";
 import {
 	COMPETE_MARGIN,
@@ -825,6 +827,11 @@ class GameSim extends GameSimBase {
 	foulMult: [number, number] = [1, 1];
 	// The away team's trip in km (undefined without the regions' coordinates)
 	travelKm: number | undefined;
+	// Each team's trip to this game, softened by rest (km; undefined: none known)
+	travelLoadKm: [number | undefined, number | undefined] = [
+		undefined,
+		undefined,
+	];
 	// Advanced Tracking Stats (League extras, see advTracking.ts): records play types, defense, on/off, lineups and clutch stats. It never
 	// changes a game (no random numbers, nothing the sim reads). Off: undefined, and nothing is recorded. advTransition/advQuick: the
 	// realistic possession model's transition and quick putback chances for this possession segment, noted for the classifier only
@@ -1296,9 +1303,9 @@ class GameSim extends GameSimBase {
 			const F = SIM_FIX_FATIGUE;
 			for (const t of teamNums) {
 				let deficit = (this.team[t] as any).backToBack ? F.b2bEnergy : 0;
-				if (t === 1 && this.travelKm !== undefined) {
-					deficit +=
-						F.travelEnergy * Math.min(1, this.travelKm / LOAD.travelKm);
+				const travelLoad = this.travelLoadKm[t];
+				if (travelLoad !== undefined) {
+					deficit += F.travelEnergy * Math.min(1, travelLoad / LOAD.travelKm);
 				}
 				if (deficit > 0) {
 					for (const p of this.team[t].player) {
@@ -1363,32 +1370,40 @@ class GameSim extends GameSimBase {
 			this.foulMult[1] * (1 + lean),
 		];
 		// College mode: campus to campus (the region is the school's name)
-		this.travelKm =
-			g.get("leagueType") === "college"
-				? schoolDistanceKm(
-						(this.team[1] as any).region,
-						(this.team[0] as any).region,
-					)
-				: travelDistance(
-						(this.team[1] as any).region,
-						(this.team[0] as any).region,
-					);
-		let travel = travelEndurance(this.travelKm);
-		// Front Office Budget: the visitors' Travel & Sports Science scales the travel penalty (undefined when off), measured for the season
-		// review
-		const foTravelScale: number | undefined = (this.team[1] as any)
-			.foTravelScale;
-		if (foTravelScale !== undefined && travel < 1) {
-			const neutral = travel;
-			travel = 1 - (1 - neutral) * foTravelScale;
-			const t1 = this.team[1] as any;
-			t1.foFatigue ??= { penalty: 0, saved: 0 };
-			t1.foFatigue.penalty += 100 * (1 - neutral);
-			t1.foFatigue.saved += 100 * (1 - neutral) * (1 - foTravelScale);
-		}
-		for (const p of this.team[1].player) {
-			if (p.compositeRating.endurance !== undefined) {
-				p.compositeRating.endurance *= travel;
+		const dist =
+			g.get("leagueType") === "college" ? schoolDistanceKm : travelDistance;
+		const venue: string | undefined = (this.team[0] as any).region;
+		// Each team's trip, from the city of its previous game (see scheduleLoad.ts LOAD.travelKm), softened by rest days; without one,
+		// the visitors' trip from home
+		for (const t of teamNums) {
+			const team = this.team[t] as any;
+			const km = tripKm(team.lastSite, team.region, venue, dist);
+			if (t === 1) {
+				this.travelKm = km;
+			}
+			const load =
+				km === undefined
+					? undefined
+					: km *
+						(team.lastSite === undefined ? 1 : travelRestFactor(team.restDays));
+			this.travelLoadKm[t] = load;
+			let travel = travelEndurance(load);
+			// Front Office Budget: the team's Travel & Sports Science scales the travel penalty (undefined when off), measured for the
+			// season review
+			const foTravelScale: number | undefined = team.foTravelScale;
+			if (foTravelScale !== undefined && travel < 1) {
+				const neutral = travel;
+				travel = 1 - (1 - neutral) * foTravelScale;
+				team.foFatigue ??= { penalty: 0, saved: 0 };
+				team.foFatigue.penalty += 100 * (1 - neutral);
+				team.foFatigue.saved += 100 * (1 - neutral) * (1 - foTravelScale);
+			}
+			if (travel < 1) {
+				for (const p of this.team[t].player) {
+					if (p.compositeRating.endurance !== undefined) {
+						p.compositeRating.endurance *= travel;
+					}
+				}
 			}
 		}
 		return homeCourtModifier(

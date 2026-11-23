@@ -208,6 +208,11 @@ const play = async (
 					if (teamSeason && teamSeason.lastGameDay !== result.day) {
 						if (scheduleLoad) {
 							teamSeason.prevGameDay = teamSeason.lastGameDay;
+							// (the host's city, for the next trip)
+							const site = g.get("teamInfoCache")[result.team[0].id]?.region;
+							if (site !== undefined) {
+								teamSeason.lastGameSite = site;
+							}
 						}
 						teamSeason.lastGameDay = result.day;
 						await idb.cache.teamSeasons.put(teamSeason);

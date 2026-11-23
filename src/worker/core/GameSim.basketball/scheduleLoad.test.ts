@@ -14,6 +14,8 @@ import {
 	tiredInjuryWeight,
 	travelDistance,
 	travelEndurance,
+	travelRestFactor,
+	tripKm,
 } from "./scheduleLoad.ts";
 import { setSimDay } from "../player/injuryDepth.ts";
 import { PHASE } from "../../../common/constants.ts";
@@ -56,6 +58,8 @@ const game = (
 	seed: number,
 	settings: Record<string, unknown>,
 	neutralSite = false,
+	// (set on the loaded teams, before the sim starts)
+	teamProps?: [Record<string, unknown>, Record<string, unknown>],
 ) =>
 	withSeededRandom(seed, async () => {
 		await genTeams();
@@ -64,6 +68,10 @@ const game = (
 			g.setWithoutSavingToDB(key as any, value as any);
 		}
 		const teams = await loadTeams([0, 1], {});
+		if (teamProps) {
+			Object.assign(teams[0]!, teamProps[0]);
+			Object.assign(teams[1]!, teamProps[1]);
+		}
 		const sim: any = new GameSim({
 			gid: seed,
 			teams: [teams[0]!, teams[1]!],
@@ -333,6 +341,55 @@ test("travel: by distance between the teams' regions, nothing without coordinate
 	assert.strictEqual(travelEndurance(undefined), 1);
 	assert.closeTo(travelEndurance(10000), 1 - LOAD.travelMax, 1e-12);
 	assert.isAbove(travelEndurance(500), travelEndurance(3000));
+});
+
+test("travel from the previous game's city, softened by rest", async () => {
+	// the trip: from the last game's city when known, else from home
+	assert.strictEqual(tripKm("Boston", "Boston", "Boston", travelDistance), 0);
+	assert.closeTo(
+		tripKm(undefined, "Boston", "Los Angeles", travelDistance)!,
+		travelDistance("Boston", "Los Angeles")!,
+		1e-9,
+	);
+	assert.closeTo(
+		tripKm("Philadelphia", "Boston", "Los Angeles", travelDistance)!,
+		travelDistance("Philadelphia", "Los Angeles")!,
+		1e-9,
+	);
+	// back home from a road trip is a trip too
+	assert.isAbove(tripKm("Miami", "Boston", "Boston", travelDistance)!, 1500);
+	assert.isUndefined(
+		tripKm("Nowhere Town", "Boston", "Boston", travelDistance),
+	);
+	// rest: the second night of a back-to-back gets all of it, then less, bounded
+	assert.strictEqual(travelRestFactor(1), 1);
+	assert.isBelow(travelRestFactor(2), 1);
+	assert.isBelow(travelRestFactor(3), travelRestFactor(2));
+	assert.strictEqual(travelRestFactor(10), travelRestFactor(3));
+	assert.strictEqual(travelRestFactor(undefined), 1);
+	assert.strictEqual(travelRestFactor(0), 1);
+
+	// in the sim: both teams' endurance, from where each played last
+	const home = "Boston";
+	const away = "Los Angeles";
+	const sim = await game(9, { scheduleLoad: true }, false, [
+		{ region: home, lastSite: "Miami", restDays: 1 },
+		{ region: away, lastSite: home, restDays: 3 },
+	]);
+	assert.closeTo(sim.travelLoadKm[0], travelDistance("Miami", home)!, 1e-6);
+	// (the visitors played here last time: no trip)
+	assert.strictEqual(sim.travelLoadKm[1], 0);
+	const rested = await game(9, { scheduleLoad: true }, false, [
+		{ region: home, lastSite: "Miami", restDays: 3 },
+		{ region: away },
+	]);
+	assert.closeTo(
+		rested.travelLoadKm[0],
+		travelDistance("Miami", home)! * travelRestFactor(3),
+		1e-6,
+	);
+	// no previous game this season: the visitors' trip from home, as before
+	assert.strictEqual(rested.travelLoadKm[1], travelDistance(away, home));
 });
 
 test("on: the home team draws more free throws, games still sane, with the other sim extras too", async () => {

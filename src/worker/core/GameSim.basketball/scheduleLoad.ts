@@ -36,9 +36,13 @@ export const LOAD = {
 	// The crowd: 0.5 + hype (0.5 for an empty building, 1.5 for a sold-out, hyped one), times this in the playoffs
 	crowdPlayoffs: 1.5,
 
-	// Travel: the visitors' endurance, by the distance from home (km), up to travelMax at travelKm
+	// Travel: each team's endurance, by the distance of its trip to this game (km), up to travelMax at travelKm. The trip is from the
+	// city of the team's previous game this season (home or away; teamSeason.lastGameSite), so a home team back from a road trip has one
+	// too, and a visitor on a road trip comes from the last stop, not from home. The first game of a season (no previous game) is the
+	// trip from home, as before. travelRest scales it by the days since that game (1: the second night of a back-to-back, 2, 3 or more)
 	travelMax: 0.03,
 	travelKm: 4000,
+	travelRest: [1, 0.8, 0.6],
 
 	// Referee variance (option): each game's crew calls fouls times exp(sd z), one normal draw per game
 	refSd: 0.07,
@@ -99,6 +103,29 @@ export const travelDistance = (
 			Math.cos(b.latitude * rad) *
 			Math.sin(dLon / 2) ** 2;
 	return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+};
+
+// How much of a trip's load is left after this many days since the team's last game (undefined: unknown, all of it)
+export const travelRestFactor = (days: number | undefined) => {
+	if (days === undefined || !Number.isFinite(days)) {
+		return 1;
+	}
+	const rest = LOAD.travelRest;
+	return rest[Math.max(0, Math.min(rest.length - 1, Math.round(days) - 1))]!;
+};
+
+// The trip to this game (km): from the previous game's city if known, else from home. undefined if a city has no coordinates
+export const tripKm = (
+	lastSite: string | undefined,
+	home: string | undefined,
+	venue: string | undefined,
+	dist: (a: string | undefined, b: string | undefined) => number | undefined,
+) => {
+	const from = lastSite ?? home;
+	if (from !== undefined && from === venue) {
+		return 0;
+	}
+	return dist(from, venue);
 };
 
 // The visitors' endurance multiplier for a trip of this many km

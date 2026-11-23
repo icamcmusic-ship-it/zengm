@@ -198,6 +198,7 @@ export const processTeam = async (
 	teamSeason: {
 		lastGameDay?: number;
 		prevGameDay?: number;
+		lastGameSite?: string;
 		hype?: number;
 		won: number;
 		lost: number;
@@ -737,6 +738,13 @@ export const processTeam = async (
 		if (scheduleLoad) {
 			t.crowdHype = teamSeason.hype ?? 0.5;
 			t.region = (teamInput as { region?: string }).region;
+			// (travel from the previous game's city, and the days since it)
+			t.lastSite = teamSeason.lastGameSite;
+			const simDay = getSimDay();
+			t.restDays =
+				teamSeason.lastGameDay === undefined || simDay === undefined
+					? undefined
+					: simDay - teamSeason.lastGameDay;
 			// (only with the realistic schedule length: in the old compact schedule, and in college mode, teams play nearly every day, so
 			// almost every game would be one)
 			const realisticDays = scheduleDaysSpread();
