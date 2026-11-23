@@ -61,7 +61,6 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	careerAging: "League extras: Players",
 	archetypes: "League extras: Players",
 	generationPresets: "League extras: Players",
-	skillBadges: "League extras: Players",
 	twoKBadges: "League extras: Players",
 	unretire: "League extras: Players",
 	hyphenatedNames: "League extras: Players",

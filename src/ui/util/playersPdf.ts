@@ -233,7 +233,7 @@ export const drawOverview = (
 
 	const tags = [
 		p.skills.length > 0 ? `Skills: ${p.skills.join(", ")}` : "",
-		p.badges.length > 0 ? `Skill badges: ${p.badges.join(", ")}` : "",
+		p.badges.length > 0 ? `Badges: ${p.badges.join(", ")}` : "",
 		p.seasonStats && Object.keys(p.seasonStats).length > 0
 			? `${p.season}: ${statsLine(p.seasonStats)}`
 			: "",

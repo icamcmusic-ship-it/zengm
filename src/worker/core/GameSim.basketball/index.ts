@@ -5624,7 +5624,8 @@ class GameSim extends GameSimBase {
 			const x =
 				1 -
 				BADGE_SIM.ballSecurity *
-					(meanScale(o, BI.ballSecurity) + 0.5 * meanScale(o, BI.handles));
+					(meanScale(o, BI.ballSecurity) + 0.5 * meanScale(o, BI.handles)) -
+				BADGE_SIM.unpluckable * meanScale(o, BI.unpluckable);
 			if (BADGE_DIAG.on) {
 				badgeDiag("tov", x);
 			}
@@ -5712,10 +5713,13 @@ class GameSim extends GameSimBase {
 		if (this.allStarGame) {
 			prob2 *= ALL_STAR_SIM.stl;
 		}
-		// 2K Badges: the defense's best Glove (centered)
+		// 2K Badges: the defense's best Glove and best Interceptor (centered)
 		if (this.badgeSim) {
+			const d = this.playersOnCourt[this.d];
 			const x =
-				1 + BADGE_SIM.glove * maxScale(this.playersOnCourt[this.d], BI.glove);
+				1 +
+				BADGE_SIM.glove * maxScale(d, BI.glove) +
+				BADGE_SIM.interceptor * maxScale(d, BI.interceptor);
 			if (BADGE_DIAG.on) {
 				badgeDiag("stl", x);
 			}
@@ -7077,7 +7081,8 @@ class GameSim extends GameSimBase {
 			k.boxoutBeast * maxScale(d, BI.boxoutBeast) +
 			k.reboundChaser * maxScale(d, BI.reboundChaser) -
 			k.putbackBossOrb * maxScale(o, BI.putbackBoss) -
-			k.reboundChaser * maxScale(o, BI.reboundChaser);
+			k.reboundChaser * maxScale(o, BI.reboundChaser) -
+			k.hustleRebounder * maxScale(o, BI.hustleRebounder);
 		if (BADGE_DIAG.on) {
 			badgeDiag("drb", x);
 		}
@@ -7877,7 +7882,9 @@ class GameSim extends GameSimBase {
 			this.ga.ftAccuracyFactor * (p.compositeRating.shootingFT * 0.6 + 0.45);
 		// 2K Badges: Free-Throw Ace (centered)
 		if (this.badgeSim) {
-			const x = BADGE_SIM.freeThrowAce * tierScale(p, BI.freeThrowAce);
+			const x =
+				BADGE_SIM.freeThrowAce * tierScale(p, BI.freeThrowAce) +
+				BADGE_SIM.setShotSpecialist * tierScale(p, BI.setShotSpecialist);
 			if (BADGE_DIAG.on) {
 				badgeDiag("ft", x);
 			}

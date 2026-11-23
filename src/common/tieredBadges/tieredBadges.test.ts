@@ -9,6 +9,8 @@ import {
 	badgeWhyLine,
 	computeCutoffs,
 	enforceLegendLimit,
+	keepBest,
+	MAX_BADGES,
 	parseBadgeToken,
 	progressToNext,
 	quantileSorted,
@@ -18,7 +20,7 @@ import {
 	tieredBadgeScore,
 	withTierEntry,
 	type Tier,
-} from "../tieredBadges/index.ts";
+} from "./index.ts";
 import { NUM_SUBS, SUB_INDEX } from "../subRatings.ts";
 import { makeSeededRandom } from "../random.ts";
 
@@ -61,10 +63,11 @@ const genRows = (n: number, seed: number, withSubs: boolean) => {
 };
 
 describe("2K Badges definitions", () => {
-	test("27 badges in the five categories, unique keys and short labels", () => {
-		assert.strictEqual(TIERED_BADGES.length, 27);
-		assert.strictEqual(new Set(TIERED_BADGES.map((d) => d.key)).size, 27);
-		assert.strictEqual(new Set(TIERED_BADGES.map((d) => d.short)).size, 27);
+	test("68 badges in the seven categories, unique keys and short labels", () => {
+		assert.strictEqual(TIERED_BADGES.length, 68);
+		assert.strictEqual(CATEGORIES.length, 7);
+		assert.strictEqual(new Set(TIERED_BADGES.map((d) => d.key)).size, 68);
+		assert.strictEqual(new Set(TIERED_BADGES.map((d) => d.short)).size, 68);
 		for (const cat of CATEGORIES) {
 			assert.isAtLeast(
 				TIERED_BADGES.filter((d) => d.category === cat).length,
@@ -112,9 +115,12 @@ describe("2K Badges tiers", () => {
 				assert.isAbove(cuts[i]!, cuts[i - 1]!);
 			}
 			const scores = rows.map((r) => tieredBadgeScore(r, def));
-			const atLeastBronze = scores.filter((s) => s >= cuts[0]!).length;
-			// 15% of the rotation reaches Bronze (by score alone)
-			assert.approximately(atLeastBronze / 300, 0.15, 0.01);
+			// Bronze starts at the 85th percentile (by score alone): 15% of the rotation reaches it, give or take the players tied
+			// at the cutoff (some scores read few distinct values in these generated rows)
+			const below = scores.filter((s) => s < cuts[0]!).length;
+			const above = scores.filter((s) => s > cuts[0]!).length;
+			assert.isAtMost(below / 300, 0.86, def.key);
+			assert.isAtMost(above / 300, 0.16, def.key);
 			// One player at most reaches Legend
 			assert.isAtMost(scores.filter((s) => s >= cuts[4]!).length, 1);
 		}
@@ -155,7 +161,12 @@ describe("2K Badges tiers", () => {
 	test("hysteresis keeps a tier just under its cutoff, and a badge drops at most one tier a season", () => {
 		const def = TIERED_BADGES.find((d) => d.key === "freeThrowAce")!;
 		const cuts = cutoffs.c[def.key]!;
+		// A player with nothing but his free throws (so no better badges push this one out of his best MAX_BADGES)
 		const r: Record<string, any> = { ...rows[0]!, ovr: 80 };
+		for (const k of BASE) {
+			r[k] = 20;
+		}
+		r.sub = r.sub.map(() => 20);
 		// Just below Gold
 		r.ft = cuts[2]! - 0.3;
 		assert.strictEqual(assignTiers(r, 80, cutoffs).t[def.key], 2);
@@ -214,7 +225,7 @@ describe("2K Badges tiers", () => {
 });
 
 describe("2K Badges display helpers", () => {
-	test("tokens round trip, sorted by tier", () => {
+	test("tokens round trip, sorted by tier (then the stored order: furthest into the tier first)", () => {
 		const parsed = parseBadgeToken(badgeToken("catchShoot", 4));
 		assert.strictEqual(parsed?.def.name, "Catch & Shoot");
 		assert.strictEqual(parsed?.tier, 4);
@@ -222,7 +233,40 @@ describe("2K Badges display helpers", () => {
 		assert.isUndefined(parseBadgeToken("2k:nope:3"));
 		assert.deepEqual(
 			sortedBadges({ glove: 1, clamps: 3, dimer: 3 }).map((b) => b.key),
-			["dimer", "clamps", "glove"],
+			["clamps", "dimer", "glove"],
+		);
+	});
+
+	test("a player keeps his best MAX_BADGES: highest tier, then furthest into it", () => {
+		const t: Record<string, Tier> = {
+			glove: 1,
+			clamps: 3,
+			dimer: 3,
+			handles: 2,
+			acrobat: 4,
+			riseUp: 1,
+			pogoStick: 2,
+			brickWall: 5,
+		};
+		const progress = new Map([
+			["clamps", 0.2],
+			["dimer", 0.7],
+			["handles", 0.1],
+			["pogoStick", 0.9],
+		]);
+		const kept = keepBest(t, progress);
+		assert.strictEqual(MAX_BADGES, 6);
+		assert.deepEqual(Object.keys(kept), [
+			"brickWall",
+			"acrobat",
+			"dimer",
+			"clamps",
+			"pogoStick",
+			"handles",
+		]);
+		assert.deepEqual(
+			sortedBadges(kept).map((b) => b.key),
+			Object.keys(kept),
 		);
 	});
 

@@ -1,9 +1,11 @@
 // 2K Badges: league cutoffs, tiers with the badge-point cap, hysteresis and the one-tier-a-season drop. Pure (no worker imports, no
 // randomness), shared by the worker and the UI.
 import {
+	MAX_BADGES,
 	MEDIAN_GATE_KEYS,
 	TIERED_BADGES,
 	TIERED_BADGES_BY_KEY,
+	TIERED_BADGE_INDEX,
 	TIER_NAMES,
 	TIER_PERCENTILES,
 	TIER_POINTS,
@@ -29,7 +31,10 @@ export type TieredBadgeCutoffs = {
 // lowered or removed
 export type TieredBadgeEntry = {
 	season: number;
+	// The sim's tiers, from his true ratings (never shown)
 	t: Record<string, Tier>;
+	// The shown tiers, from his ratings as scouted (fuzz), when they differ from t
+	d?: Record<string, Tier>;
 	capped?: string[];
 };
 
@@ -37,8 +42,6 @@ export type TieredBadgeEntry = {
 export const ROTATION_SIZE = 10;
 // Seasons of cutoffs kept
 export const CUTOFF_HISTORY = 40;
-// Below this many rotation players, the cutoffs come from a built-in reference (a tiny league would give noisy quantiles)
-export const MIN_ROTATION = 60;
 
 /** Linear-interpolation quantile of sorted (ascending) values. */
 export const quantileSorted = (sorted: readonly number[], q: number) => {
@@ -86,8 +89,12 @@ export const gatesMet = (
 	cutoffs: TieredBadgeCutoffs,
 ) =>
 	(def.gates ?? []).every((gate) => {
+		const value = tbValue(r, gate.key);
 		const min = gate.min === "median" ? (cutoffs.med[gate.key] ?? 0) : gate.min;
-		return tbValue(r, gate.key) >= min;
+		return (
+			(min === undefined || value >= min) &&
+			(gate.max === undefined || value <= gate.max)
+		);
 	});
 
 /** The highest tier whose cutoff the score reaches (0 = none). */
@@ -189,7 +196,8 @@ export const tierCandidates = (
 
 /**
  * A player's tiers for a season: the candidates under the badge-point cap (the deepest ones first; one that doesn't fit at its tier
- * takes what points are left), then no badge drops more than one tier from last season (that can go a little over the cap).
+ * takes what points are left), then no badge drops more than one tier from last season (that can go a little over the cap), then only
+ * his best MAX_BADGES are kept (highest tier, then furthest into it; the others are "next up" on the player page, not earned).
  */
 export const assignTiers = (
 	r: Row,
@@ -199,6 +207,9 @@ export const assignTiers = (
 ): { t: Record<string, Tier>; capped: string[] } => {
 	const candidates = tierCandidates(r, cutoffs, prev).sort(
 		(a, b) => b.depth - a.depth || a.key.localeCompare(b.key),
+	);
+	const progressByKey = new Map(
+		candidates.map((c) => [c.key, c.depth - c.tier]),
 	);
 	let left = badgePointCap(ovr);
 	const t: Record<string, Tier> = {};
@@ -226,7 +237,33 @@ export const assignTiers = (
 			}
 		}
 	}
-	return { t, capped };
+	const kept = keepBest(t, progressByKey);
+	// "Capped": the cap lowered or removed it, and the one-tier floor didn't restore it
+	const tierByKey = new Map(candidates.map((c) => [c.key, c.tier]));
+	return {
+		t: kept,
+		capped: capped.filter((key) => (t[key] ?? 0) < (tierByKey.get(key) ?? 0)),
+	};
+};
+
+/**
+ * The best MAX_BADGES of a set of tiers: highest tier, then furthest into it (progress), then definition order. The result's keys are
+ * in that order (kept when stored), so displays can show them best first.
+ */
+export const keepBest = (
+	t: Record<string, Tier>,
+	progressByKey?: ReadonlyMap<string, number>,
+): Record<string, Tier> => {
+	const keys = Object.keys(t).filter((key) => t[key]);
+	const kept = keys
+		.toSorted(
+			(a, b) =>
+				t[b]! - t[a]! ||
+				(progressByKey?.get(b) ?? 0) - (progressByKey?.get(a) ?? 0) ||
+				(TIERED_BADGE_INDEX[a] ?? 0) - (TIERED_BADGE_INDEX[b] ?? 0),
+		)
+		.slice(0, MAX_BADGES);
+	return Object.fromEntries(kept.map((key) => [key, t[key]!]));
 };
 
 /** Total badge points of a set of tiers. */
@@ -297,12 +334,13 @@ export const withTierEntry = (
 	return out;
 };
 
-/** Badges sorted for display: tier, then definition order. */
+/** Badges sorted for display: tier, then the stored order (furthest into the tier first, see keepBest). */
 export const sortedBadges = (t: Partial<Record<string, Tier>>) =>
-	TIERED_BADGES.map((def, i) => ({ def, i, tier: t[def.key] ?? 0 }))
-		.filter((x) => x.tier > 0)
+	Object.entries(t)
+		.map(([key, tier], i) => ({ key, i, tier: tier ?? 0 }))
+		.filter((x) => x.tier > 0 && TIERED_BADGES_BY_KEY[x.key])
 		.sort((a, b) => b.tier - a.tier || a.i - b.i)
-		.map((x) => ({ key: x.def.key, tier: x.tier as Tier }));
+		.map((x) => ({ key: x.key, tier: x.tier as Tier }));
 
 /** The archetype why line's citation of his best badges (Gold or better, up to 3), or undefined. */
 export const badgeWhyLine = (t: Partial<Record<string, Tier>> | undefined) => {
@@ -341,5 +379,14 @@ export const parseBadgeToken = (
 	}
 	return { def, tier: tier as Tier };
 };
-// The player page and tables show the top few next to the skills
-export const MAX_TOKENS = 5;
+/** A display token as text ("Catch & Shoot (Gold)"), for exports; anything else as is. */
+export const badgeTokenText = (token: string) => {
+	const parsed = parseBadgeToken(token);
+	return parsed ? `${parsed.def.name} (${TIER_NAMES[parsed.tier]})` : token;
+};
+
+// Pills in tables and the player page header: all his badges (at most MAX_BADGES), best first
+export const MAX_TOKENS = MAX_BADGES;
+
+/** The tiers to show for an entry: from the ratings as scouted (d), which are the sim's (t) when they agree. */
+export const displayTiersOf = (e: TieredBadgeEntry) => e.d ?? e.t;

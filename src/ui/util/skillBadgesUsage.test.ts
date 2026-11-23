@@ -1,5 +1,5 @@
-// Every place the UI shows a player's skills also passes the extended skill badges (shown when that League Extra is
-// on), except the few that show players from outside the league's database
+// Every place the UI shows a player's skills also passes his badges (basketball shows only the 2K badges, never the stock
+// skill labels), except the few that show players from outside the league's database
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { assert, test } from "vitest";

@@ -1,27 +1,33 @@
-// 2K Badges (the twoKBadges League Extra, basketball): the worker side. Cutoffs are computed from the rotation players and saved per
-// season (game attribute tieredBadgeCutoffs), and every player's tiers are stored per season in p.badges2k, at each preseason after
-// development (and once when the setting is first used in a league). Nothing here draws a random number. See common/tieredBadges.
+// 2K Badges (basketball, always on: the only badges players show): the worker side. Cutoffs are computed from the rotation players and
+// saved per season (game attribute tieredBadgeCutoffs), and every player's tiers are stored per season in p.badges2k, at each preseason
+// after development (and once in a league that has none for the season, e.g. an old league). Only the game sim effects are a League
+// Extra (twoKBadges, "2K Badge Effects in Sim"). Nothing here draws a random number. See common/tieredBadges.
 import { PLAYER } from "../../../common/constants.ts";
 import {
-	CATEGORIES,
 	CATEGORY_NAMES,
+	BADGE_TRAIT_KEYS,
 	CUTOFF_HISTORY,
-	MIN_ROTATION,
+	MAX_BADGES,
 	NUM_TIERED_BADGES,
 	ROTATION_SIZE,
 	TIERED_BADGES,
 	TIERED_BADGES_BY_KEY,
 	TIERED_BADGE_INDEX,
 	TIER_NAMES,
+	TRAIT_PREFIX,
 	assignTiers,
 	badgeDrivers,
 	badgePointCap,
 	badgePoints,
 	computeCutoffs,
+	displayTiersOf,
 	enforceLegendLimit,
+	gatesMet,
 	entryForSeason,
 	progressToNext,
+	sortedBadges,
 	tbValue,
+	tierCandidates,
 	tieredBadgeScore,
 	withTierEntry,
 	type Tier,
@@ -36,11 +42,80 @@ import { g } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import setGameAttributes from "../league/setGameAttributes.ts";
 import { fuzzedSkillRow } from "./skills.ts";
+import {
+	getBadgeTraits,
+	getPlayerTraitScores,
+	getTraitExperience,
+	traitsEnabled,
+} from "./traits.ts";
+import {
+	SEASONS_TO_REVEAL,
+	TRAIT_DEFINITIONS,
+	type TraitKey,
+} from "../../../common/playerTraits/index.ts";
 
-export const tieredBadgesOn = () =>
+// Badges themselves: every basketball league
+export const tieredBadgesOn = () => __SPORT === "basketball";
+
+// Their game sim effects: the League Extra (off in existing leagues, so they play exactly as before)
+export const tieredBadgeSimOn = () =>
 	__SPORT === "basketball" && featureOn("twoKBadges");
 
-const rowOf = (p: Player) => last(p.ratings) as Record<string, any>;
+/**
+ * The row a badge score reads: his ratings row plus his known traits ("tr_<key>", with Player Traits on). Known means the same for
+ * every user: visible traits, and hidden ones once he has played SEASONS_TO_REVEAL seasons (their scouting uncertainty is gone then).
+ * A trait left out reads a rating-based stand-in (common/tieredBadges TRAIT_FALLBACK).
+ */
+export const badgeRowOf = (
+	p: Player,
+	r: Record<string, any> = last(p.ratings) as Record<string, any>,
+	season: number = r.season ?? g.get("season"),
+): Record<string, any> => {
+	if (!traitsEnabled() || p.tid === PLAYER.UNDRAFTED) {
+		return r;
+	}
+	const scores = getPlayerTraitScores(p as any, season);
+	const revealed = getTraitExperience(p as any, season) >= SEASONS_TO_REVEAL;
+	const out: Record<string, any> = { ...r };
+	for (const key of BADGE_TRAIT_KEYS) {
+		const k = key as TraitKey;
+		if (TRAIT_DEFINITIONS[k].visibility === "visible" || revealed) {
+			out[`${TRAIT_PREFIX}${key}`] = scores[k];
+		}
+	}
+	return out;
+};
+
+// The row as the user sees it (fuzzed ratings, traits as scouted), for the player page's progress
+const shownBadgeRow = (p: Player, pr: Record<string, any>, season: number) => {
+	const shown: Record<string, any> = { ...fuzzedSkillRow(pr as any, false, p) };
+	const traits = traitsEnabled() ? getBadgeTraits(p as any, season) : undefined;
+	if (traits) {
+		for (const key of BADGE_TRAIT_KEYS) {
+			const v = traits[key as TraitKey];
+			if (v !== undefined) {
+				shown[`${TRAIT_PREFIX}${key}`] = v;
+			}
+		}
+	}
+	return shown;
+};
+
+const rowOf = (p: Player) => badgeRowOf(p);
+
+// The same row as his scouts see it (the row's fuzz always applied, like the stored skills), with the same known traits (known traits
+// are exact for every user, so they are not fuzzed). Display tiers are computed from it
+const scoutedRowOf = (p: Player) => {
+	const r = last(p.ratings) as Record<string, any>;
+	const fuzzed = fuzzedSkillRow(r, true, p);
+	const withTraits = badgeRowOf(p, r);
+	for (const key of Object.keys(withTraits)) {
+		if (key.startsWith(TRAIT_PREFIX)) {
+			fuzzed[key] = withTraits[key];
+		}
+	}
+	return fuzzed;
+};
 
 /** The rotation players' rows: the top ROTATION_SIZE by ovr on each team. */
 export const rotationRows = (players: readonly Player[]) => {
@@ -66,7 +141,7 @@ export const getTieredBadgeCutoffs = (
 ): TieredBadgeCutoffs | undefined => g.get("tieredBadgeCutoffs")?.[season];
 
 // The latest saved cutoffs at or before a season (a player page for a past season, or a league that skipped a recompute)
-const cutoffsAtOrBefore = (season: number) => {
+export const cutoffsAtOrBefore = (season: number) => {
 	const all = g.get("tieredBadgeCutoffs");
 	if (!all) {
 		return undefined;
@@ -91,18 +166,11 @@ const saveCutoffs = async (cutoffs: TieredBadgeCutoffs) => {
 	await setGameAttributes({ tieredBadgeCutoffs: all });
 };
 
-// Last season's tiers (the latest entry before this season), for hysteresis and the one-tier drop
-const prevTiers = (p: Player, season: number) => {
-	const entries = p.badges2k;
-	if (!entries) {
-		return undefined;
-	}
-	for (let i = entries.length - 1; i >= 0; i--) {
-		if (entries[i]!.season < season) {
-			return entries[i]!.t;
-		}
-	}
-	return undefined;
+// Last season's tiers (only an entry of the season before: an older one says nothing about now), for hysteresis and the one-tier
+// drop. display: the tiers shown (from the scouted ratings) instead of the sim's
+const prevTiers = (p: Player, season: number, display = false) => {
+	const e = entryForSeason(p.badges2k, season - 1);
+	return e ? (display ? displayTiersOf(e) : e.t) : undefined;
 };
 
 /**
@@ -119,15 +187,23 @@ export const updateTieredBadges = async () => {
 		Infinity,
 	]);
 	const rotation = rotationRows(players);
+	// From this season's pool whenever there is one (a tiny league's quantiles are noisy, but frozen ones drift away from the
+	// league); a copy of the latest saved ones only for a league with no rotation players at all
+	const latest = cutoffsAtOrBefore(season);
 	const cutoffs =
-		rotation.length >= MIN_ROTATION
+		rotation.length > 0 || !latest
 			? computeCutoffs(rotation, season)
-			: (cutoffsAtOrBefore(season) ?? computeCutoffs(rotation, season));
-	if (cutoffs.season !== season) {
-		cutoffs.season = season;
-	}
+			: { ...latest, season };
 	await saveCutoffs(cutoffs);
 
+	const scoresOf = (r: Record<string, any>, t: Record<string, Tier>) => {
+		const scores: Record<string, number> = {};
+		for (const key of Object.keys(t)) {
+			scores[key] = tieredBadgeScore(r, TIERED_BADGES_BY_KEY[key]!);
+		}
+		return scores;
+	};
+	// The sim's tiers, from the true ratings
 	const assigned = players.map((p) => {
 		const r = rowOf(p);
 		const { t, capped } = assignTiers(
@@ -136,31 +212,54 @@ export const updateTieredBadges = async () => {
 			cutoffs,
 			prevTiers(p, season),
 		);
-		const scores: Record<string, number> = {};
-		for (const key of Object.keys(t)) {
-			scores[key] = tieredBadgeScore(r, TIERED_BADGES_BY_KEY[key]!);
-		}
-		return { p, pid: p.pid, t, capped, scores };
+		return { p, pid: p.pid, t, capped, scores: scoresOf(r, t) };
 	});
 	enforceLegendLimit(assigned);
-	for (const { p, t, capped } of assigned) {
+	// The shown tiers, from the ratings as scouted (fuzz), so the pills never give away a true rating
+	const shown = players.map((p) => {
+		const r = scoutedRowOf(p);
+		const { t } = assignTiers(
+			r,
+			r.ovr ?? 0,
+			cutoffs,
+			prevTiers(p, season, true),
+		);
+		return { pid: p.pid, t, scores: scoresOf(r, t) };
+	});
+	enforceLegendLimit(shown);
+	for (const [i, { p, t, capped }] of assigned.entries()) {
 		const entry: TieredBadgeEntry = { season, t };
 		if (capped.length > 0) {
 			entry.capped = capped;
+		}
+		const d = shown[i]!.t;
+		if (JSON.stringify(d) !== JSON.stringify(t)) {
+			entry.d = d;
 		}
 		p.badges2k = withTierEntry(p.badges2k, entry);
 		await idb.cache.players.put(p);
 	}
 };
 
-/** First use of the setting in a league (or a season the preseason skipped): compute this season's cutoffs and tiers once. */
+/** A league with no badges for this season (an older league, or a season the preseason skipped): compute its cutoffs and tiers once. Returns whether it did. */
 export const ensureTieredBadges = async () => {
 	if (tieredBadgesOn() && !getTieredBadgeCutoffs()) {
 		await updateTieredBadges();
+		return true;
 	}
+	return false;
 };
 
-/** His tiers for a season (stored), or undefined. */
+/** His shown tiers for a season (stored), or undefined. */
+export const shownTiersForSeason = (
+	p: Pick<Player, "badges2k">,
+	season: number,
+): TieredBadgeEntry["t"] | undefined => {
+	const e = entryForSeason(p.badges2k, season);
+	return e ? displayTiersOf(e) : undefined;
+};
+
+/** His tiers for a season (stored, the sim's: from true ratings, never shown), or undefined. */
 export const tiersForSeason = (
 	p: Pick<Player, "badges2k">,
 	season: number,
@@ -217,6 +316,7 @@ export type TieredBadgeView = {
 	short: string;
 	name: string;
 	meaning: string;
+	category: string;
 	tier: Tier;
 	tierName: string;
 	// The ratings that drive it (as scouted), with values unless ratings are hidden
@@ -235,12 +335,21 @@ export type PlayerTieredBadges = {
 	points: number;
 	// The ovr cap (undefined with ratings hidden)
 	cap?: number;
-	categories: { key: string; name: string; badges: TieredBadgeView[] }[];
+	max: number;
+	// His badges (at most MAX_BADGES), best first
+	earned: TieredBadgeView[];
+	// Not earned: the badges he is closest to (as scouted), with the tier he is working toward. tier is that target tier
+	nextUp: TieredBadgeView[];
 	history: {
 		season: number;
 		badges: { short: string; name: string; tier: Tier }[];
 	}[];
 };
+
+// "Next up" on the player page
+const NUM_NEXT_UP = 3;
+// Closer than this to Bronze (progress toward it, see progressToNext) to be listed
+const NEXT_UP_MIN_PROGRESS = 0.6;
 
 /** Everything the player page's Badges section shows. */
 export const tieredBadgesForPlayer = async (
@@ -258,60 +367,115 @@ export const tieredBadgesForPlayer = async (
 	}
 	const cutoffs = cutoffsAtOrBefore(season) ?? getTieredBadgeCutoffs();
 	const stored = entryForSeason(p.badges2k, season);
-	let t = stored?.t;
+	let t = stored ? displayTiersOf(stored) : undefined;
 	let live = false;
+	const shown = shownBadgeRow(p, pr as any, season);
 	if (!t && cutoffs && p.tid !== PLAYER.RETIRED) {
-		t = assignTiers(pr, (pr as any).ovr ?? 0, cutoffs, prevTiers(p, season)).t;
+		// A draft prospect: from his ratings as scouted (as in the tables, player format), never his true ones
+		// (always from his ratings as scouted, like the stored shown tiers: a draft prospect's or a stashed player's true ratings
+		// never show through)
+		t = assignTiers(
+			shown,
+			shown.ovr ?? 0,
+			cutoffs,
+			prevTiers(p, season, true),
+		).t;
 		live = true;
 	}
 	if (!t) {
 		return undefined;
 	}
-	const shown = fuzzedSkillRow(pr, false, p);
 	const capped = new Set(stored?.capped ?? []);
-	const categories = CATEGORIES.map((cat) => ({
-		key: cat,
-		name: CATEGORY_NAMES[cat],
-		badges: TIERED_BADGES.filter((def) => def.category === cat && t[def.key])
-			.map((def): TieredBadgeView => {
-				const tier = t[def.key]!;
-				const cuts = cutoffs?.c[def.key];
-				const score = tieredBadgeScore(shown, def);
-				const progress =
-					!hideRatings && cuts ? progressToNext(score, cuts, tier) : undefined;
-				return {
-					key: def.key,
-					short: def.short,
-					name: def.name,
-					meaning: def.meaning,
-					tier,
-					tierName: TIER_NAMES[tier],
-					drivers: badgeDrivers(def)
-						.slice(0, 3)
-						.map((key) => ({
-							name: inputName(key),
-							value: hideRatings ? undefined : Math.round(tbValue(shown, key)),
-						})),
-					progress,
-					nextTierName: tier < 5 ? TIER_NAMES[tier + 1] : undefined,
-					score: hideRatings ? undefined : Math.round(score),
-					capped: capped.has(def.key) || undefined,
-				};
-			})
-			.sort((a, b) => b.tier - a.tier),
-	})).filter((c) => c.badges.length > 0);
+	const view = (
+		key: string,
+		tier: Tier,
+		progressTier: Tier,
+	): TieredBadgeView => {
+		const def = TIERED_BADGES_BY_KEY[key]!;
+		const cuts = cutoffs?.c[def.key];
+		const score = tieredBadgeScore(shown, def);
+		const progress =
+			!hideRatings && cuts
+				? progressToNext(score, cuts, progressTier)
+				: undefined;
+		return {
+			key: def.key,
+			short: def.short,
+			name: def.name,
+			meaning: def.meaning,
+			category: CATEGORY_NAMES[def.category],
+			tier,
+			tierName: TIER_NAMES[tier],
+			drivers: badgeDrivers(def)
+				.slice(0, 3)
+				.map((k) => ({
+					name: inputName(k),
+					value: hideRatings ? undefined : Math.round(tbValue(shown, k)),
+				})),
+			progress,
+			nextTierName: progressTier < 5 ? TIER_NAMES[progressTier + 1] : undefined,
+			score: hideRatings ? undefined : Math.round(score),
+			capped: capped.has(def.key) || undefined,
+		};
+	};
+	const earned = sortedBadges(t).map(({ key, tier }) => view(key, tier, tier));
+
+	// Next up: from the ratings as scouted, badges he isn't credited with that he qualifies for (left out by the cap or the limit of
+	// MAX_BADGES) or is close to Bronze in. Only for the current season, and never for a retired player
+	let nextUp: TieredBadgeView[] = [];
+	if (cutoffs && p.tid !== PLAYER.RETIRED && season === g.get("season")) {
+		const qualified = new Map(
+			tierCandidates(shown, cutoffs).map((c) => [c.key, c]),
+		);
+		const options: { key: string; target: Tier; closeness: number }[] = [];
+		for (const def of TIERED_BADGES) {
+			if (t[def.key]) {
+				continue;
+			}
+			const c = qualified.get(def.key);
+			if (c) {
+				options.push({ key: def.key, target: c.tier, closeness: c.depth });
+				continue;
+			}
+			const cuts = cutoffs.c[def.key];
+			if (!cuts || !gatesMet(shown, def, cutoffs)) {
+				continue;
+			}
+			const progress = progressToNext(tieredBadgeScore(shown, def), cuts, 0);
+			if (progress !== undefined && progress >= NEXT_UP_MIN_PROGRESS) {
+				options.push({ key: def.key, target: 1, closeness: progress });
+			}
+		}
+		options.sort((a, b) => b.closeness - a.closeness);
+		nextUp = options
+			.slice(0, NUM_NEXT_UP)
+			// No visible ratings: no order that would rank his hidden ratings
+			.sort((a, b) =>
+				hideRatings
+					? TIERED_BADGE_INDEX[a.key]! - TIERED_BADGE_INDEX[b.key]!
+					: 0,
+			)
+			.map(({ key, target }) => {
+				const v = view(key, target, (target - 1) as Tier);
+				return { ...v, capped: undefined };
+			});
+	}
+
 	const history = (p.badges2k ?? []).map((e) => ({
 		season: e.season,
-		badges: TIERED_BADGES.filter((def) => e.t[def.key])
-			.map((def) => ({ short: def.short, name: def.name, tier: e.t[def.key]! }))
-			.sort((a, b) => b.tier - a.tier),
+		badges: sortedBadges(displayTiersOf(e)).map(({ key, tier }) => {
+			const def = TIERED_BADGES_BY_KEY[key]!;
+			return { short: def.short, name: def.name, tier };
+		}),
 	}));
 	return {
 		season,
 		live,
 		points: badgePoints(t),
-		cap: hideRatings ? undefined : badgePointCap((pr as any).ovr ?? 0),
-		categories,
+		cap: hideRatings ? undefined : badgePointCap(shown.ovr ?? 0),
+		max: MAX_BADGES,
+		earned,
+		nextUp,
 		history,
 	};
 };

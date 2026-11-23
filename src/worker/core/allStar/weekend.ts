@@ -4,14 +4,9 @@
 import { makeSeededRandom } from "../../../common/random.ts";
 import { saltedSeed } from "../../../common/leagueSalt.ts";
 import { SUB_INDEX } from "../../../common/subRatings.ts";
-import {
-	getSkillBadges,
-	pickBadgeRatings,
-} from "../../../common/skillBadges/index.ts";
 import { traitScores } from "../../../common/playerTraits/index.ts";
 import type { PlayerRatings } from "../../../common/types.basketball.ts";
 import type { Player } from "../../../common/types.ts";
-import { featureOn } from "../../util/nativeFeatures.ts";
 import { entryForSeason } from "../../../common/tieredBadges/compute.ts";
 
 const hashString = (s: string) => {
@@ -42,32 +37,13 @@ export const subOf = (r: PlayerRatings, key: string) => {
 	return typeof v === "number" ? v : undefined;
 };
 
-// The extended skill badges from his true ratings (only with the setting on; never shown from here). With 2K Badges on, the 2K
-// badges he holds this season stand in for the ones the contests read: Posterizer for Dunker (Dk), Pogo Stick for Athletic freak
-// (Af), Catch & Shoot for Catch-and-shoot (Cs), Limitless Range for Sharpshooter (Sp)
-const TWO_K_EQUIVALENTS: Record<string, string> = {
-	posterizer: "Dk",
-	pogoStick: "Af",
-	catchShoot: "Cs",
-	limitlessRange: "Sp",
-};
+// His 2K badges this season (keys, from the stored sim tiers: his true ratings, like everything else here, never shown)
 export const badgesOf = (
 	r: PlayerRatings,
 	p?: Pick<Player, "badges2k">,
 ): string[] => {
-	if (featureOn("twoKBadges")) {
-		const t = p ? entryForSeason(p.badges2k, r.season)?.t : undefined;
-		return t
-			? Object.keys(t)
-					.map((key) => TWO_K_EQUIVALENTS[key])
-					.filter((x): x is string => x !== undefined)
-			: [];
-	}
-	if (!featureOn("skillBadges")) {
-		return [];
-	}
-	const br = pickBadgeRatings(r as any);
-	return br ? getSkillBadges(br) : [];
+	const t = p ? entryForSeason(p.badges2k, r.season)?.t : undefined;
+	return t ? Object.keys(t).filter((key) => t[key]) : [];
 };
 
 // Player traits (0-100) when the player has them, else undefined
@@ -86,7 +62,7 @@ const mean = (xs: (number | undefined)[], fallback: number) => {
 };
 
 // Above-the-rim talent for the dunk contest: dunk and jumping, with max vertical, contact finishing and wingspan when there,
-// the Dunker / Athletic freak badges and a showman's ego
+// the Posterizer / Pogo Stick badges and a showman's ego
 export const dunkTalent = (p: Player) => {
 	const r = p.ratings.at(-1) as PlayerRatings;
 	let score = (r.dnk + 2 * r.jmp) / 3;
@@ -99,10 +75,10 @@ export const dunkTalent = (p: Player) => {
 		score += 0.1 * (r.wng - 50);
 	}
 	const badges = badgesOf(r, p);
-	if (badges.includes("Dk")) {
+	if (badges.includes("posterizer")) {
 		score += 4;
 	}
-	if (badges.includes("Af")) {
+	if (badges.includes("pogoStick")) {
 		score += 2;
 	}
 	const traits = traitsOf(p, r);
@@ -113,7 +89,7 @@ export const dunkTalent = (p: Player) => {
 };
 
 // Three-point shooting from a standstill for the three-point contest: the three-point rating, catch-and-shoot when there
-// (expanded ratings, or the Catch & Shoot 3 / Spot-Up / Range sub-ratings), the Catch-and-shoot / Sharpshooter badges
+// (expanded ratings, or the Catch & Shoot 3 / Spot-Up / Range sub-ratings), the Catch & Shoot / Limitless Range / Agent 3 badges
 export const threeTalent = (p: Player) => {
 	const r = p.ratings.at(-1) as PlayerRatings;
 	let score = r.tp;
@@ -125,7 +101,11 @@ export const threeTalent = (p: Player) => {
 		score = 0.6 * score + 0.4 * mean(subs, score);
 	}
 	const badges = badgesOf(r, p);
-	if (badges.includes("Cs") || badges.includes("Sp")) {
+	if (
+		badges.includes("catchShoot") ||
+		badges.includes("limitlessRange") ||
+		badges.includes("agent3")
+	) {
 		score += 3;
 	}
 	return score;

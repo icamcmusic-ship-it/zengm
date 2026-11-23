@@ -168,6 +168,7 @@ test.skipIf(!env.THREE_GRAD)(
 				pf: 0,
 				drb: 0,
 				blk: 0,
+				stl: 0,
 				min: 0,
 			};
 			for (const ts of await idb.cache.teamStats.getAll()) {
@@ -193,6 +194,7 @@ test.skipIf(!env.THREE_GRAD)(
 				poss: (sum.fga + 0.44 * sum.fta - sum.orb + sum.tov) / sum.gp,
 				drb: sum.drb / sum.gp,
 				blk: sum.blk / sum.gp,
+				stl: sum.stl / sum.gp,
 				min: sum.min / sum.gp,
 				homeWinPct: 0,
 				injuries: 0,
@@ -284,7 +286,7 @@ test.skipIf(!env.THREE_GRAD)(
 
 		const lines = [];
 		lines.push(
-			`LEAGUE pts ${mean(leagues.map((l) => l.pts)).toFixed(2)} 3P% ${f3(mean(leagues.map((l) => l.tpp)))} 3PA rate ${f3(mean(leagues.map((l) => l.tpaRate)))} FG% ${f3(mean(leagues.map((l) => l.fgp)))} TOV ${mean(leagues.map((l) => l.tov)).toFixed(2)} FTA ${mean(leagues.map((l) => l.fta)).toFixed(2)} AST ${mean(leagues.map((l) => l.ast)).toFixed(2)} ORB ${mean(leagues.map((l) => l.orb)).toFixed(2)} PF ${mean(leagues.map((l) => l.pf)).toFixed(2)} poss ${mean(leagues.map((l) => l.poss)).toFixed(2)} DRB ${mean(leagues.map((l) => l.drb)).toFixed(2)} BLK ${mean(leagues.map((l) => l.blk)).toFixed(2)} homeWin ${f3(mean(leagues.map((l) => l.homeWinPct)))} injuries/game ${f3(mean(leagues.map((l) => l.injuries)))} injuryGames/game ${f3(mean(leagues.map((l) => l.injuryGames)))}`,
+			`LEAGUE pts ${mean(leagues.map((l) => l.pts)).toFixed(2)} 3P% ${f3(mean(leagues.map((l) => l.tpp)))} 3PA rate ${f3(mean(leagues.map((l) => l.tpaRate)))} FG% ${f3(mean(leagues.map((l) => l.fgp)))} TOV ${mean(leagues.map((l) => l.tov)).toFixed(2)} FTA ${mean(leagues.map((l) => l.fta)).toFixed(2)} AST ${mean(leagues.map((l) => l.ast)).toFixed(2)} ORB ${mean(leagues.map((l) => l.orb)).toFixed(2)} PF ${mean(leagues.map((l) => l.pf)).toFixed(2)} poss ${mean(leagues.map((l) => l.poss)).toFixed(2)} DRB ${mean(leagues.map((l) => l.drb)).toFixed(2)} BLK ${mean(leagues.map((l) => l.blk)).toFixed(2)} STL ${mean(leagues.map((l) => l.stl)).toFixed(2)} homeWin ${f3(mean(leagues.map((l) => l.homeWinPct)))} injuries/game ${f3(mean(leagues.map((l) => l.injuries)))} injuryGames/game ${f3(mean(leagues.map((l) => l.injuryGames)))}`,
 		);
 		const shooters = players.filter((p) => p.tpa >= 100);
 		lines.push(

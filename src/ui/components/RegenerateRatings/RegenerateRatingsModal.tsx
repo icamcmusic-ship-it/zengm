@@ -120,14 +120,17 @@ const RowDetail = ({
 				}}
 			/>
 			<div className="d-flex flex-wrap align-items-center gap-3 mt-2">
-				<div className="d-flex align-items-center gap-2">
-					<span>Skills</span>
-					<span>
-						<SkillsBlock skills={row.skills[0]} />{" "}
-						<span className="text-body-secondary">{"→"}</span>{" "}
-						<SkillsBlock skills={row.skills[1]} />
-					</span>
-				</div>
+				{/* (basketball shows no skill labels, only badges) */}
+				{__SPORT !== "basketball" ? (
+					<div className="d-flex align-items-center gap-2">
+						<span>Skills</span>
+						<span>
+							<SkillsBlock skills={row.skills[0]} />{" "}
+							<span className="text-body-secondary">{"→"}</span>{" "}
+							<SkillsBlock skills={row.skills[1]} />
+						</span>
+					</div>
+				) : null}
 				{archetypes.length > 0 ? (
 					<label className="d-flex align-items-center gap-2">
 						<span>Archetype</span>

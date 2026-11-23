@@ -854,20 +854,11 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
-		id: "skillBadges",
-		key: "featureSkillBadges",
-		name: "Extended Skill Badges",
-		description:
-			"25 extra skill badges (Cs, Pu, Bk, Sw, ...) next to the original skills in player tables and on player pages, plus the Skill Badges page.",
-		default: true,
-		sports: BBGM,
-	},
-	{
 		id: "twoKBadges",
 		key: "featureTwoKBadges",
-		name: "2K Badges",
+		name: "2K Badge Effects in Sim",
 		description:
-			"NBA 2K-style tiered badges (Bronze, Silver, Gold, Hall of Fame, Legend) in five categories (Finishing, Shooting, Playmaking, Defense/Rebounding, Physicals), built on the sub-ratings. Tiers are league-relative (cutoffs saved each season from the rotation players' scores; at most one Legend per badge), badge points are capped by ovr, and badges are recomputed each preseason, dropping at most one tier a season. Shown as tier-colored pills next to the skills, a Badges section on the player page and on the Skill Badges page (in place of the extended skill badges). In the game sim they add small, bounded effects on top of the skills (Catch & Shoot on assisted threes, Clamps on the man he guards, Rim Protector at the rim, Boxout Beast on the glass, ...), calibrated so league averages stay the same. Off: the extended skill badges as before, and no change to the game.",
+			"The 2K badges every player shows (tiered Bronze to Legend in seven categories, at most 6 a player) also act in the game sim: small, bounded effects on top of the skills (Catch & Shoot on assisted threes, Clamps on the man he guards, Rim Protector at the rim, Boxout Beast on the glass, Interceptor on steals, ...), calibrated so league averages stay the same. Off: badges are shown but don't change the game.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

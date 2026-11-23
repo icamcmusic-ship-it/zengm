@@ -23,20 +23,64 @@ export const TierPill = ({
 	</span>
 );
 
-const TIER_LABEL = ["", "Bronze", "Silver", "Gold", "Hall of Fame", "Legend"];
+type BadgeView = Info["earned"][number];
 
-// 2K Badges (League Extra): his badges by category, with the tier, the ratings that drive each one and the progress to the next tier
-// (the numbers are left out by the worker under the no visible ratings challenge)
+const BadgeItem = ({ b, nextUp }: { b: BadgeView; nextUp?: boolean }) => (
+	<div
+		className={`mb-2${nextUp ? " badge2k-next" : ""}`}
+		title={b.meaning}
+		data-testid={nextUp ? "player-badge-next" : "player-badge"}
+	>
+		<span style={nextUp ? { opacity: 0.45 } : undefined}>
+			<TierPill short={b.short} name={b.name} tier={b.tier} />
+		</span>{" "}
+		<b className={nextUp ? "fw-normal" : undefined}>{b.name}</b>{" "}
+		<span className="text-body-secondary">
+			{nextUp ? `working toward ${b.tierName}` : b.tierName}
+			{b.capped ? " (capped)" : ""} · {b.category}
+		</span>
+		<div className="small text-body-secondary">
+			{b.drivers
+				.map((d) => (d.value !== undefined ? `${d.name} ${d.value}` : d.name))
+				.join(", ")}
+		</div>
+		{b.progress !== undefined && b.nextTierName ? (
+			<div
+				className="d-flex align-items-center gap-2 small"
+				title={`Score ${b.score}`}
+			>
+				<div
+					className="progress flex-grow-1"
+					style={{ height: 6, maxWidth: 160 }}
+				>
+					<div
+						className={`progress-bar${nextUp ? " bg-secondary" : ""}`}
+						style={{
+							width: `${Math.round(b.progress * 100)}%`,
+						}}
+					/>
+				</div>
+				<span className="text-body-secondary">
+					{Math.round(b.progress * 100)}% to {b.nextTierName}
+				</span>
+			</div>
+		) : null}
+	</div>
+);
+
+// 2K Badges: his badges (at most info.max, best first) with the tier, the ratings that drive each one and the progress to the next
+// tier, then the ones he is closest to earning ("next up", faded, not counted). The numbers are left out by the worker under the no
+// visible ratings challenge
 export const TieredBadgesSection = ({ info }: { info: Info }) => {
-	const numBadges = info.categories.reduce((a, c) => a + c.badges.length, 0);
+	const numBadges = info.earned.length;
 	const past = info.history.filter((h) => h.season !== info.season).slice(-6);
 	return (
 		<HideableSection
 			title="Badges"
 			description={
 				<>
-					{numBadges} badge{numBadges === 1 ? "" : "s"}, {info.points} badge
-					point{info.points === 1 ? "" : "s"}
+					{numBadges} of {info.max} badge{info.max === 1 ? "" : "s"},{" "}
+					{info.points} badge point{info.points === 1 ? "" : "s"}
 					{info.cap !== undefined ? ` (cap ${info.cap} for his ovr)` : ""}
 					{info.live ? " (live reading, set at the next preseason)" : ""}.{" "}
 					<a href={helpers.leagueUrl(["frivolities", "skill_badges"])}>
@@ -45,59 +89,29 @@ export const TieredBadgesSection = ({ info }: { info: Info }) => {
 				</>
 			}
 		>
-			{info.categories.length === 0 ? (
+			{numBadges === 0 ? (
 				<p className="text-body-secondary">No badges this season.</p>
 			) : (
-				<div className="row g-3 mb-2" data-testid="player-tiered-badges">
-					{info.categories.map((cat) => (
-						<div key={cat.key} className="col-12 col-sm-6 col-lg-4">
-							<h3 className="mb-1">{cat.name}</h3>
-							<ul className="list-unstyled mb-0">
-								{cat.badges.map((b) => (
-									<li key={b.key} className="mb-2" title={b.meaning}>
-										<TierPill short={b.short} name={b.name} tier={b.tier} />{" "}
-										<b>{b.name}</b>{" "}
-										<span className="text-body-secondary">
-											{TIER_LABEL[b.tier]}
-											{b.capped ? " (capped)" : ""}
-										</span>
-										<div className="small text-body-secondary">
-											{b.drivers
-												.map((d) =>
-													d.value !== undefined
-														? `${d.name} ${d.value}`
-														: d.name,
-												)
-												.join(", ")}
-										</div>
-										{b.progress !== undefined && b.nextTierName ? (
-											<div
-												className="d-flex align-items-center gap-2 small"
-												title={`Score ${b.score}`}
-											>
-												<div
-													className="progress flex-grow-1"
-													style={{ height: 6, maxWidth: 160 }}
-												>
-													<div
-														className="progress-bar"
-														style={{
-															width: `${Math.round(b.progress * 100)}%`,
-														}}
-													/>
-												</div>
-												<span className="text-body-secondary">
-													{Math.round(b.progress * 100)}% to {b.nextTierName}
-												</span>
-											</div>
-										) : null}
-									</li>
-								))}
-							</ul>
+				<div className="row g-2 mb-2" data-testid="player-tiered-badges">
+					{info.earned.map((b) => (
+						<div key={b.key} className="col-12 col-sm-6 col-lg-4">
+							<BadgeItem b={b} />
 						</div>
 					))}
 				</div>
 			)}
+			{info.nextUp.length > 0 ? (
+				<div className="mb-2" data-testid="player-tiered-badges-next">
+					<h3 className="mb-1 text-body-secondary">Next up</h3>
+					<div className="row g-2 mb-0">
+						{info.nextUp.map((b) => (
+							<div key={b.key} className="col-12 col-sm-6 col-lg-4">
+								<BadgeItem b={b} nextUp />
+							</div>
+						))}
+					</div>
+				</div>
+			) : null}
 			{past.length > 0 ? (
 				<div className="small mb-3">
 					<b>Past seasons:</b>

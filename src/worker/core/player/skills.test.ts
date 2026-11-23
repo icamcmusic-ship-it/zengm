@@ -1,8 +1,6 @@
 import { assert, describe, test } from "vitest";
 import { COMPOSITE_WEIGHTS } from "../../../common/constants.ts";
-import { compositeWeightsFor } from "../../../common/expandedRatings.ts";
 import { skillCutoffs } from "../../../common/skillCutoffs.ts";
-import { badgeComposite } from "../../../common/skillBadges/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { resetG } from "../../../test/helpers.ts";
 import compositeRating from "./compositeRating.ts";
@@ -66,28 +64,6 @@ describe("skill cutoffs (one table for the labels and the sim's synergy)", () =>
 		assert.strictEqual(c.Dp, 0.607);
 		assert.strictEqual(c.R, 0.62);
 		assert.strictEqual(c["3"], 0.59);
-	});
-});
-
-describe("composite math parity", () => {
-	test("badgeComposite equals player.compositeRating for every stock composite", () => {
-		const r = row();
-		for (const [key, { ratings, weights }] of Object.entries(
-			compositeWeightsFor(COMPOSITE_WEIGHTS, false),
-		)) {
-			// badgeComposite only knows the constant 50
-			if (ratings.some((c) => typeof c === "number" && c !== 50)) {
-				continue;
-			}
-			assert.strictEqual(
-				badgeComposite(r, {
-					ratings: ratings as any,
-					weights: weights ?? ratings.map(() => 1),
-				}),
-				compositeRating(r, ratings, weights, false),
-				key,
-			);
-		}
 	});
 });
 

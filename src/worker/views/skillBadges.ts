@@ -1,57 +1,42 @@
-import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
+// The Badges page (Frivolities, /frivolities/skill_badges[/:badge]): every 2K badge with its holders by tier this season (the tiers
+// shown everywhere, from the ratings as scouted), by category. Basketball only; always on.
 import {
 	CATEGORY_NAMES,
 	TIERED_BADGES,
 	TIERED_BADGES_BY_KEY,
 	TIER_NAMES,
+	displayTiersOf,
 	entryForSeason,
 	tieredBadgeScore,
 } from "../../common/tieredBadges/index.ts";
 import {
+	badgeRowOf,
 	ensureTieredBadges,
 	getTieredBadgeCutoffs,
 	inputName,
-	tieredBadgesOn,
 } from "../core/player/tieredBadges.ts";
-import { TRAIT_DEFINITIONS } from "../../common/playerTraits/definitions.ts";
-import { getTraitViewContext } from "../util/playerTraitsView.ts";
+import { fuzzedSkillRow } from "../core/player/skills.ts";
 import { idb } from "../db/index.ts";
 import { player } from "../core/index.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { PLAYER } from "../../common/constants.ts";
-import {
-	BADGE_GROUP_NAMES,
-	BADGE_RATING_KEYS,
-	SKILL_BADGES,
-	SKILL_COMBOS,
-	badgeScore,
-	getComboDetails,
-	getDisplayBadges,
-	hasBadge,
-	type BadgeTraits,
-	pickBadgeRatings,
-	type BadgeRatings,
-} from "../../common/skillBadges/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
-import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 
 const processInputs = (params: RouteParams<"skillBadges">) => {
 	const label =
 		params.badge !== undefined &&
-		(SKILL_BADGES.some((def) => def.label === params.badge) ||
-			SKILL_COMBOS.some((def) => def.label === params.badge) ||
-			TIERED_BADGES_BY_KEY[params.badge] !== undefined)
+		TIERED_BADGES_BY_KEY[params.badge] !== undefined
 			? params.badge
 			: undefined;
 	return { label };
 };
 
-const LEADERS = 5;
-const LIST_SIZE = 50;
+// Holders listed per badge on the overview (all of them on a badge's own page)
+const OVERVIEW_HOLDERS = 12;
 
-// 2K Badges: every badge with its holders by tier this season (stored tiers), and the cutoffs. No visible ratings challenge: holders
-// in a neutral order within a tier (team, then name) and no cutoffs or ovr sent
+// No Visible Ratings: holders in a neutral order within a tier (team, then name) and no cutoffs, scores or ovr sent, so the page
+// never ranks hidden ratings. Otherwise within a tier by the score as scouted (never the true one)
 const loadTiered = async (label: string | undefined) => {
 	await ensureTieredBadges();
 	const hideRatings = !!g.get("challengeNoRatings");
@@ -76,11 +61,17 @@ const loadTiered = async (label: string | undefined) => {
 	};
 	const holdersByKey: Record<string, Holder[]> = {};
 	for (const p of players) {
-		const t = entryForSeason(p.badges2k, season)?.t;
-		if (!t) {
+		const entry = entryForSeason(p.badges2k, season);
+		if (!entry) {
 			continue;
 		}
+		const t = displayTiersOf(entry);
 		const r = p.ratings.at(-1) as any;
+		// As scouted: fuzzed ratings, known traits only
+		const shown: Record<string, any> = {
+			...badgeRowOf(p),
+			...fuzzedSkillRow(r, false, p),
+		};
 		for (const [key, tier] of Object.entries(t)) {
 			const def = TIERED_BADGES_BY_KEY[key];
 			if (!def || !tier) {
@@ -95,19 +86,18 @@ const loadTiered = async (label: string | undefined) => {
 				age: season - p.born.year,
 				tier,
 				ovr: hideRatings ? undefined : player.fuzzRating(r.ovr, r.fuzz),
-				score: tieredBadgeScore(r, def),
+				score: hideRatings ? 0 : tieredBadgeScore(shown, def),
 			});
 		}
 	}
+	const neutral = (a: Holder, b: Holder) =>
+		a.abbrev.localeCompare(b.abbrev) ||
+		a.name.localeCompare(b.name) ||
+		a.pid - b.pid;
 	const tiered = TIERED_BADGES.map((def) => {
 		const holders = (holdersByKey[def.key] ?? []).sort(
 			(a, b) =>
-				b.tier - a.tier ||
-				(hideRatings
-					? a.abbrev.localeCompare(b.abbrev) ||
-						a.name.localeCompare(b.name) ||
-						a.pid - b.pid
-					: b.score - a.score),
+				b.tier - a.tier || (hideRatings ? neutral(a, b) : b.score - a.score),
 		);
 		const counts = [1, 2, 3, 4, 5].map(
 			(tier) => holders.filter((h) => h.tier === tier).length,
@@ -117,6 +107,7 @@ const loadTiered = async (label: string | undefined) => {
 			key: def.key,
 			short: def.short,
 			name: def.name,
+			categoryKey: def.category,
 			category: CATEGORY_NAMES[def.category],
 			meaning: def.meaning,
 			drivers: def.score
@@ -124,21 +115,33 @@ const loadTiered = async (label: string | undefined) => {
 				.map(([k]) => inputName(k))
 				.join(", "),
 			gates: (def.gates ?? [])
-				.map(
-					(gate) =>
-						`${inputName(gate.key)} ${gate.min === "median" ? "at or above the league median" : hideRatings ? "required" : `>= ${gate.min}`}`,
-				)
+				.map((gate) => {
+					const name = inputName(gate.key);
+					if (hideRatings) {
+						return `${name} required`;
+					}
+					return [
+						gate.min === "median"
+							? `${name} at or above the league median`
+							: gate.min !== undefined
+								? `${name} >= ${gate.min}`
+								: undefined,
+						gate.max !== undefined ? `${name} <= ${gate.max}` : undefined,
+					]
+						.filter((x) => x !== undefined)
+						.join(", ");
+				})
 				.join(", "),
 			cutoffs:
 				hideRatings || !cutoffs
 					? undefined
 					: cutoffs.c[def.key]?.map((x) => Math.round(x * 10) / 10),
 			counts,
-			top: holders
-				.filter((h) => h.tier >= 3)
-				.slice(0, LEADERS)
-				.map(strip),
-			list: label === def.key ? holders.slice(0, 200).map(strip) : [],
+			holders: (label === def.key
+				? holders
+				: holders.slice(0, OVERVIEW_HOLDERS)
+			).map(strip),
+			numHolders: holders.length,
 		};
 	});
 	return {
@@ -158,17 +161,9 @@ export default defineView({
 	id: "skillBadges",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
-		// (2K Badges replace the extended badges on this page when on)
-		const featureOff = featureOn("twoKBadges")
-			? undefined
-			: featureOffError("skillBadges");
-		if (featureOff) {
-			return featureOff;
-		}
 		if (__SPORT !== "basketball") {
 			return {
-				errorMessage:
-					"Extended skill badges are only available for basketball.",
+				errorMessage: "Badges are only available for basketball.",
 			};
 		}
 		if (
@@ -180,201 +175,6 @@ export default defineView({
 		) {
 			return;
 		}
-		if (SKILL_BADGES.length === 0) {
-			return { errorMessage: "No badges" };
-		}
-		if (tieredBadgesOn()) {
-			return { ...(await loadTiered(inputs.label)), badges: [], combos: [] };
-		}
-
-		const playersAll = await idb.cache.players.indexGetAll("playersByTid", [
-			PLAYER.FREE_AGENT,
-			Infinity,
-		]);
-		const formatted = await player.formatAll(playersAll, {
-			attrs: ["pid", "firstName", "lastName", "age", "tid", "abbrev", "injury"],
-			ratings: [
-				...ratingsKeysForView(BADGE_RATING_KEYS),
-				"ovr",
-				"pos",
-				"skills",
-			],
-			season: g.get("season"),
-			showNoStats: true,
-			showRookies: true,
-			fuzz: true,
-		});
-
-		type Row = {
-			pid: number;
-			name: string;
-			pos: string;
-			ovr: number;
-			age: number;
-			abbrev: string;
-			tid: number;
-			ratings: BadgeRatings;
-			traits: BadgeTraits | undefined;
-			display: string[];
-			skills: string[];
-		};
-		const rows: Row[] = [];
-		// No visible ratings challenge: holders in a neutral order (team, then name), and no ovr or scores sent at all, or the order
-		// and the numbers would be a leaderboard of the hidden ratings
-		const hideRatings = !!g.get("challengeNoRatings");
-		const neutralOrder = (a: { row: Row }, b: { row: Row }) =>
-			a.row.abbrev.localeCompare(b.row.abbrev) ||
-			a.row.name.localeCompare(b.row.name) ||
-			a.row.pid - b.row.pid;
-		const traitContext = await getTraitViewContext();
-		const playersByPid = new Map(playersAll.map((p) => [p.pid, p]));
-		for (const p of formatted) {
-			const ratings = pickBadgeRatings(p.ratings as any);
-			const fullPlayer = playersByPid.get(p.pid);
-			const traits =
-				traitContext.enabled && fullPlayer
-					? player.getBadgeTraits(
-							fullPlayer as any,
-							g.get("season"),
-							traitContext.scoutingLevel,
-						)
-					: undefined;
-			if (ratings) {
-				rows.push({
-					pid: p.pid,
-					name: `${p.firstName} ${p.lastName}`,
-					pos: p.ratings.pos,
-					ovr: p.ratings.ovr,
-					age: p.age,
-					abbrev: p.abbrev,
-					tid: p.tid,
-					ratings,
-					traits,
-					display: getDisplayBadges(ratings, p.ratings.skills ?? [], traits),
-					skills: p.ratings.skills ?? [],
-				});
-			}
-		}
-
-		const badges = SKILL_BADGES.filter(
-			(def) => traitContext.enabled || !def.traitConditions,
-		).map((def) => {
-			const holders = rows
-				.filter((r) => hasBadge(r.ratings, def, r.traits))
-				.map((r) => ({ row: r, score: badgeScore(r.ratings, def, r.traits) }))
-				.sort(
-					hideRatings
-						? neutralOrder
-						: (a, b) => b.score - a.score || b.row.ovr - a.row.ovr,
-				);
-			const toLeader = ({ row, score }: (typeof holders)[number]) => ({
-				pid: row.pid,
-				name: row.name,
-				pos: row.pos,
-				ovr: hideRatings ? undefined : row.ovr,
-				age: row.age,
-				abbrev: row.abbrev,
-				tid: row.tid,
-				score: hideRatings ? undefined : Math.round(score * 100),
-			});
-			return {
-				label: def.label,
-				name: def.name,
-				group: def.group,
-				groupName: BADGE_GROUP_NAMES[def.group],
-				meaning: def.meaning,
-				thresholds: [
-					...(def.traitConditions ?? []).map(
-						(cond) =>
-							`${TRAIT_DEFINITIONS[cond.trait].name} trait >= ${cond.cutoff}`,
-					),
-					...def.conditions.map(
-						(cond) =>
-							`score ${cond.dir === "below" ? "<=" : ">="} ${Math.round(cond.cutoff * 100)}`,
-					),
-					...(def.traitAlternative
-						? [
-								`(or ${TRAIT_DEFINITIONS[def.traitAlternative.trait].name} trait >= ${def.traitAlternative.cutoff})`,
-							]
-						: []),
-				],
-				count: holders.length,
-				leaders: holders.slice(0, LEADERS).map(toLeader),
-				list:
-					inputs.label === def.label
-						? holders.slice(0, LIST_SIZE).map(toLeader)
-						: [],
-			};
-		});
-
-		const combos = SKILL_COMBOS.map((def) => {
-			const holders = rows
-				.flatMap((r) => {
-					if (!r.display.includes(def.label)) {
-						return [];
-					}
-					// What it replaced for him, and how far past its cutoff the weakest part is (a combo made of combos, like
-					// Scoring machine, uses theirs)
-					const detail = getComboDetails(r.ratings, r.skills, r.traits).get(
-						def.label,
-					);
-					return [
-						{
-							row: r,
-							score: detail?.margin ?? 0,
-							parts: detail?.parts ?? def.all,
-						},
-					];
-				})
-				.sort(
-					hideRatings
-						? neutralOrder
-						: (a, b) => b.score - a.score || b.row.ovr - a.row.ovr,
-				);
-			const toLeader = ({ row, score, parts }: (typeof holders)[number]) => ({
-				pid: row.pid,
-				name: row.name,
-				pos: row.pos,
-				ovr: hideRatings ? undefined : row.ovr,
-				age: row.age,
-				abbrev: row.abbrev,
-				tid: row.tid,
-				score: hideRatings ? undefined : Math.round(score * 100),
-				parts: parts.join(" + "),
-			});
-			return {
-				label: def.label,
-				name: def.name,
-				meaning: def.meaning,
-				components: [
-					...def.all,
-					...(def.any
-						? [
-								def.minAny === 0
-									? `optional ${def.any.join("/")}`
-									: `${def.minAny ?? 1}+ of ${def.any.join("/")}`,
-							]
-						: []),
-					...(def.extra ? [`absorbs ${def.extra.join("/")}`] : []),
-				].join(" + "),
-				level: def.level ?? 1,
-				count: holders.length,
-				leaders: holders.slice(0, LEADERS).map(toLeader),
-				list:
-					inputs.label === def.label
-						? holders.slice(0, LIST_SIZE).map(toLeader)
-						: [],
-			};
-		});
-
-		return {
-			tiered: undefined,
-			label: inputs.label,
-			combos,
-			numPlayers: rows.length,
-			numTeams: g.get("numActiveTeams"),
-			userTid: g.get("userTid"),
-			badges,
-		};
+		return await loadTiered(inputs.label);
 	},
 });

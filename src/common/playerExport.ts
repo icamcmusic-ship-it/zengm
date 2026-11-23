@@ -155,7 +155,8 @@ export const playersToCSVRows = (players: PlayerExport[]): unknown[][] => {
 		"Injury",
 		"Season",
 		...ratingKeys.map((key) => key.toUpperCase()),
-		"Skills",
+		// (basketball shows only badges, not the stock skill labels)
+		...(__SPORT === "basketball" ? [] : ["Skills"]),
 		"Badges",
 		"Archetype",
 		...traitNames,
@@ -186,7 +187,7 @@ export const playersToCSVRows = (players: PlayerExport[]): unknown[][] => {
 		p.injury ?? "",
 		p.season,
 		...ratingKeys.map((key) => p.ratings?.[key] ?? ""),
-		p.skills.join(" "),
+		...(__SPORT === "basketball" ? [] : [p.skills.join(" ")]),
 		p.badges.join("; "),
 		p.archetype ?? "",
 		...traitNames.map(

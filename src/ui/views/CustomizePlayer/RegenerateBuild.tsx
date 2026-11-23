@@ -265,10 +265,13 @@ export const RegenerateBuild = ({
 												? ` → ${result.pos[1]}`
 												: ""}
 										</span>
-										<span>
-											Skills <SkillsBlock skills={result.skills[0]} /> {"→"}{" "}
-											<SkillsBlock skills={result.skills[1]} />
-										</span>
+										{/* (basketball shows no skill labels, only badges) */}
+										{__SPORT !== "basketball" ? (
+											<span>
+												Skills <SkillsBlock skills={result.skills[0]} /> {"→"}{" "}
+												<SkillsBlock skills={result.skills[1]} />
+											</span>
+										) : null}
 										<span
 											className={
 												result.ovr[0] === result.ovr[1] &&
