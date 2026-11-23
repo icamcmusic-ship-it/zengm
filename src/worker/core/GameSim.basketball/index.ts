@@ -916,6 +916,8 @@ class GameSim extends GameSimBase {
 	adjSel: [number, number] = [1, 1];
 	adjMake: [number, number] = [0, 0];
 	minutesPlan0 = new Map<PlayerGameSim, number>();
+	// Per-game download (worker/util/gameExport): each player's energy at the end of every period (read only, presentation)
+	energyLog = new Map<PlayerGameSim, number[]>();
 	// Fatigue and minutes (SIM_FIX_FATIGUE): tired legs show on defense first, back-to-backs and travel, stars' minutes by the score
 	flowFatigue = false;
 	// Garbage time (SIM_FIX_GARBAGE, with Realistic Rotations): whether it is on now, and whether it came this game
@@ -1486,6 +1488,27 @@ class GameSim extends GameSimBase {
 			this.team[1].stat.tmo = this.timeoutsUsed[1];
 		}
 
+		// Per-game download (worker/util/gameExport): each player's playing-time setting, minutes restriction, rest and the minutes the
+		// rotation planned for him at tip-off and at the end (Realistic Rotations). Read after the game, presentation only: nothing here
+		// draws a random number or feeds back into the sim
+		if (this.overtimes > 0) {
+			this.logEnergy();
+		}
+		const gameCtx = teamNums.map((t) =>
+			this.team[t].player.map((p) => {
+				const planEnd = this.minutesTargets.get(p);
+				return {
+					pid: p.id,
+					ptm: p.ptModifier,
+					restr: (p as any).minutesRestriction as number | undefined,
+					rest: (p as any).rested === true,
+					plan: this.minutesPlan0.get(p) ?? planEnd,
+					planEnd,
+					energy: p.stat.min > 0 ? this.energyLog.get(p) : undefined,
+				};
+			}),
+		);
+
 		// Delete stuff that isn't needed before returning
 		for (const t of teamNums) {
 			delete this.team[t].compositeRating;
@@ -1521,6 +1544,11 @@ class GameSim extends GameSimBase {
 			playByPlay: this.playByPlay.getPlayByPlay(this.team),
 			numPlayersOnCourt: this.numPlayersOnCourt,
 			neutralSite: this.neutralSite,
+			gameCtx,
+			// (Advanced Tracking Stats: each field goal attempt's defender, play type, sub-zone, xFG and contest level, for the download)
+			...(this.adv && this.adv.shotLog.length > 0
+				? { shotLog: this.adv.shotLog }
+				: {}),
 			// scoringSummary: this.playByPlay.scoringSummary,
 			...(this.shootoutShots.length > 0
 				? { shootoutShots: this.shootoutShots }
@@ -1787,6 +1815,8 @@ class GameSim extends GameSimBase {
 				this.checkElamEnding();
 			}
 
+			this.logEnergy();
+
 			// (an untimed game to a target score, the All-Star tournament, ends in its first period)
 			if (finalPeriod || this.elamDone) {
 				break;
@@ -1835,7 +1865,24 @@ class GameSim extends GameSimBase {
 		}
 	}
 
+	// Per-game download: each player's energy at the end of a period (read only: no random number, nothing the sim reads)
+	logEnergy() {
+		for (const t of this.team) {
+			for (const p of t.player) {
+				let arr = this.energyLog.get(p);
+				if (!arr) {
+					arr = [];
+					this.energyLog.set(p, arr);
+				}
+				arr.push(Math.round(100 * (p.stat.energy ?? 1)) / 100);
+			}
+		}
+	}
+
 	simOvertime() {
+		if (this.overtimes > 0) {
+			this.logEnergy();
+		}
 		this.t = 60 * this.getOvertimeLength();
 
 		this.timeouts = [NUM_TIMEOUTS_OVERTIME, NUM_TIMEOUTS_OVERTIME];

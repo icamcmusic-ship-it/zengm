@@ -593,6 +593,9 @@ export type Game = {
 	rivalry?: boolean;
 	// Basketball shootout: [team index, pid, made] for each shot, in order
 	shootoutShots?: [0 | 1, number, 0 | 1][];
+	// Per-game download (basketball, Advanced Tracking Stats): one row per field goal attempt, [shooter pid, defender pid (-1: none),
+	// made, blocked, play type index, sub-zone (-1: none), 1000 × xFG (0: none), contest level (-1: none)]. Presentation only
+	shotLog?: number[][];
 	note?: string;
 	noteBool?: 1; // Keep in sync with note - for indexing
 	numGamesToWinSeries?: number;
