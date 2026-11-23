@@ -91,30 +91,46 @@ export const GM_TRAIT_INFO: Record<
 	},
 };
 
-// Labels for the strongest leanings, e.g. ["Win-now", "Analytics", "Dealmaker"]
-export const gmStyleLabels = (traits: GmTraits, max = 3, threshold = 0.35) =>
-	GM_TRAIT_KEYS.filter((key) => Math.abs(traits[key]) >= threshold)
-		.sort((a, b) => Math.abs(traits[b]) - Math.abs(traits[a]))
+// A leaning as a band, -2 (strongly low) to 2 (strongly high). Outside God Mode the UI only gets bands, never the exact numbers, so the
+// user can't shop every asset to the one GM who values it most
+export type GmTraitBand = -2 | -1 | 0 | 1 | 2;
+export type GmTraitBands = Record<keyof GmTraits, GmTraitBand>;
+
+export const gmTraitBand = (x: number): GmTraitBand =>
+	x <= -0.35 ? -2 : x <= -0.12 ? -1 : x < 0.12 ? 0 : x < 0.35 ? 1 : 2;
+
+export const gmTraitBands = (traits: GmTraits) => {
+	const out = {} as GmTraitBands;
+	for (const key of GM_TRAIT_KEYS) {
+		out[key] = gmTraitBand(traits[key]);
+	}
+	return out;
+};
+
+// Labels for the strong leanings, e.g. ["Win-now", "Analytics", "Dealmaker"], in a fixed order (not by strength, which would leak how
+// strong each one is)
+export const gmStyleLabels = (traits: GmTraits, max = 3) =>
+	GM_TRAIT_KEYS.filter((key) => Math.abs(gmTraitBand(traits[key])) === 2)
 		.slice(0, max)
 		.map((key) =>
 			traits[key] < 0 ? GM_TRAIT_INFO[key].low : GM_TRAIT_INFO[key].high,
 		);
 
-export const gmTraitLabel = (key: keyof GmTraits, x: number) => {
-	if (x <= -0.35) {
-		return GM_TRAIT_INFO[key].low;
-	}
-	if (x >= 0.35) {
-		return GM_TRAIT_INFO[key].high;
-	}
-	if (x <= -0.12) {
-		return `Leans ${GM_TRAIT_INFO[key].low.toLowerCase()}`;
-	}
-	if (x >= 0.12) {
-		return `Leans ${GM_TRAIT_INFO[key].high.toLowerCase()}`;
-	}
-	return "Balanced";
+export const gmBandLabel = (key: keyof GmTraits, band: GmTraitBand) => {
+	const info = GM_TRAIT_INFO[key];
+	return band === -2
+		? info.low
+		: band === 2
+			? info.high
+			: band === -1
+				? `Leans ${info.low.toLowerCase()}`
+				: band === 1
+					? `Leans ${info.high.toLowerCase()}`
+					: "Balanced";
 };
+
+export const gmTraitLabel = (key: keyof GmTraits, x: number) =>
+	gmBandLabel(key, gmTraitBand(x));
 
 const clamp = (x: number, min = -1, max = 1) =>
 	x < min ? min : x > max ? max : x;
@@ -157,8 +173,11 @@ export const NEUTRAL_GM_TRAITS: GmTraits = {
 	draftUpside: 0,
 };
 
-// The weights each AI decision reads. With all traits 0 every weight is neutral (1 for factors, 0 for shifts). Magnitudes are kept
-// modest: no single trait moves a player's trade value more than about 7%
+// The weights each AI decision reads. With all traits 0 every weight is neutral (1 for factors, 0 for shifts). Value effects stay
+// modest (no single trait moves a player's trade value more than about 12%), but the leanings players read most (trading, payroll,
+// picks, timeline) are strong enough to show in what the team actually does over a few seasons: a dealmaker makes several times as
+// many trades as a quiet GM, a frugal GM runs a payroll well under a big spender's and stays out of the tax
+// (gmLeanings.script.test.ts measures it)
 export type GmWeights = {
 	traits: GmTraits;
 
@@ -175,7 +194,8 @@ export type GmWeights = {
 	contractsFactor: number;
 	// Value multiplier for his own players he'd be giving up who were drafted by or have been with the team for years
 	loyaltyFactor: number;
-	// Relative chance of being picked for an AI-to-AI trade, average 1
+	// Relative chance of being picked for an AI-to-AI trade (as the team starting it or as its partner), average 1: from 0.2 (quiet)
+	// to 2.6 (dealmaker)
 	tradeWeight: number;
 	// Winning percentage a contender needs to be a deadline buyer is 0.45 + this
 	buyerWinpShift: number;
@@ -183,8 +203,18 @@ export type GmWeights = {
 	dumpPayrollFactor: number;
 	// Rank on the team (0 = best) below which an expiring player is let go rather than re-signed into the tax: default 3 + this
 	avoidTaxRankShift: number;
+	// Tax-averse GMs (tolerance -0.15 or lower) take on no salary in a trade that leaves them over the luxury tax line
+	refusesTax: boolean;
+	// Tax-averse GMs only: rank on the team below which an expiring player is let go rather than re-signed over the salary cap (Infinity:
+	// no limit, as before)
+	overCapResignRank: number;
+	// Tax-averse GMs only: share of the salary cap he keeps free in free agency (no signing above the minimum takes the payroll past
+	// (1 - this) of the cap)
+	faCapRoom: number;
 	// Free agency: bonus in value points for expensive (positive, star hunter) or cheap (negative) free agents
 	faStarShift: number;
+	// Free agency: bonus in value points for young (positive, patient GMs) or veteran (negative, win-now GMs) free agents
+	faYouthShift: number;
 	// Skip chance multiplier for free agency each day (dealmakers are more active)
 	faActivity: number;
 	// Draft: multiplier on the need adjustment, and value points per point of pot - ovr gap (upside)
@@ -202,24 +232,31 @@ export type GmWeights = {
 
 export const gmWeightsFromTraits = (t: GmTraits): GmWeights => ({
 	traits: t,
-	futureFactor: 1 + 0.07 * t.patience,
-	vetFactor: 1 - 0.06 * t.patience,
-	pickFactor: 1 + 0.12 * t.pickValue,
+	futureFactor: 1 + 0.1 * t.patience,
+	vetFactor: 1 - 0.08 * t.patience,
+	pickFactor: 1 + 0.2 * t.pickValue,
 	styleStrength: 0.06 * t.analytics,
 	injuryFactor: 1 - 0.35 * t.risk,
 	contractsFactor: 1 - 0.3 * t.taxTolerance,
 	loyaltyFactor: 1 + 0.06 * t.loyalty,
-	tradeWeight: 1 + 0.55 * t.tradeFreq,
+	tradeWeight: Math.max(0.2, 1 + 1.6 * t.tradeFreq),
 	buyerWinpShift: 0.06 * t.patience,
-	dumpPayrollFactor: 1 + 0.05 * t.taxTolerance,
-	avoidTaxRankShift: Math.round(1.4 * t.taxTolerance),
+	dumpPayrollFactor: 1 + 0.12 * t.taxTolerance,
+	avoidTaxRankShift: Math.round((t.taxTolerance < 0 ? 4 : 5) * t.taxTolerance),
+	refusesTax: t.taxTolerance <= -0.15,
+	overCapResignRank:
+		t.taxTolerance <= -0.15
+			? Math.max(1, Math.round(9 + 14 * t.taxTolerance))
+			: Infinity,
+	faCapRoom: 0.25 * Math.max(0, -t.taxTolerance - 0.1),
 	faStarShift: 2.5 * t.faStars,
+	faYouthShift: 2.5 * t.patience,
 	faActivity: 1 + 0.25 * t.tradeFreq,
 	draftNeedScale: 1 - 0.75 * t.draftBPA,
 	draftUpside: 0.06 * t.draftUpside,
 	extensionFactor: 1 + 0.6 * t.loyalty,
 	optionShift: -0.08 * t.loyalty,
-	strategyShift: -8 * t.patience,
+	strategyShift: -12 * t.patience,
 	coachDevWeight: 0.15 * (t.analytics + t.patience) * 0.5,
 	coachFireFactor: 1 - 0.35 * t.patience,
 });

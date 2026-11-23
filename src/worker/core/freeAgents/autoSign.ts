@@ -16,7 +16,7 @@ import { idb } from "../../db/index.ts";
 import { g, local } from "../../util/index.ts";
 import { orderBy } from "../../../common/utils.ts";
 import { shuffle } from "../../../common/random.ts";
-import { getAllGmWeights } from "../gm/index.ts";
+import { getAllGmWeights, gmFaPayroll } from "../gm/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import {
 	capExceptionsEnabled,
@@ -135,6 +135,10 @@ const autoSign = async () => {
 
 		const gm = gms.get(t.tid);
 		if (gm) {
+			// AI GM personalities: a big spender shops like a contender even while rebuilding
+			if (__SPORT === "basketball" && gm.avoidTaxRankShift >= 2) {
+				probSkip = Math.min(probSkip, 0.75);
+			}
 			probSkip = 1 - (1 - probSkip) * gm.faActivity;
 		}
 
@@ -178,10 +182,12 @@ const autoSign = async () => {
 			playersForTeam = orderBy(playersSorted, (p) => values.get(p)!, "desc");
 			traitValues = values;
 		}
-		if (gm && gm.faStarShift !== 0) {
-			// Star hunters lean to the expensive free agents (the stars), depth builders to cheaper ones, by up to a few value points
+		if (gm && (gm.faStarShift !== 0 || gm.faYouthShift !== 0)) {
+			// Star hunters lean to the expensive free agents (the stars), depth builders to cheaper ones, by up to a few value points.
+			// Patient GMs lean to young free agents, win-now GMs to veterans
 			const minContract = g.get("minContract");
 			const range = Math.max(1, g.get("maxContract") - minContract);
+			const season = g.get("season");
 			const keys = new Map<(typeof players)[number], number>();
 			for (const p of playersForTeam) {
 				const amount = getContractDemand(p).amount;
@@ -189,9 +195,16 @@ const autoSign = async () => {
 					1,
 					Math.max(-1, (2 * (amount - minContract)) / range - 1),
 				);
+				// 1 at 23 or younger, -1 at 31 or older
+				const youth = Math.min(
+					1,
+					Math.max(-1, (27 - (season - p.born.year)) / 4),
+				);
 				keys.set(
 					p,
-					(traitValues?.get(p) ?? p.value) + gm.faStarShift * starness,
+					(traitValues?.get(p) ?? p.value) +
+						gm.faStarShift * starness +
+						gm.faYouthShift * youth,
 				);
 			}
 			playersForTeam = orderBy(playersForTeam, (p) => keys.get(p)!, "desc");
@@ -211,7 +224,8 @@ const autoSign = async () => {
 		const best = getBest(
 			playersOnRoster,
 			ringChase ? ringChase.players : playersForTeam,
-			payroll,
+			// A tax-averse GM keeps some cap room (AI GM personalities)
+			gmFaPayroll(payroll, gm),
 			pickCapException,
 		);
 		const ringChaser = best ? ringChase?.original.get(best) : undefined;

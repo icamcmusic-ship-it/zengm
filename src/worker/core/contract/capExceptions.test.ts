@@ -820,6 +820,16 @@ describe("salary cap exceptions", () => {
 
 			assert.isUndefined(pick("rebuilding", 0));
 			assert.isUndefined(pick("contending", -1));
+			// A big spender goes into the tax while rebuilding too (AI GM personalities); a tax-averse one keeps cap room and uses none
+			assert.isDefined(pick("rebuilding", 2));
+			assert.isUndefined(
+				makeAiCapExceptionPicker({
+					t: { strategy: "contending" },
+					roster,
+					payroll,
+					gm: { avoidTaxRankShift: 0, faCapRoom: 0.05 },
+				}),
+			);
 			const picked = pick("contending", 0);
 			assert.isDefined(picked);
 			// Shortened to the exception's length

@@ -17,6 +17,7 @@ import {
 	getNewDeptLevelLastThree,
 } from "../frontOffice/index.ts";
 import { getStashedPlayers } from "../draftStash/index.ts";
+import { getGmWeights } from "../gm/index.ts";
 
 const getTeamOvr = async (playersRaw: Player[]) => {
 	const players = await player.formatAll(playersRaw, {
@@ -231,6 +232,21 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 			"M",
 		)}.`;
 		s.warningAmount = amountOverCap;
+	} else if (g.get("salaryCapType") !== "hard" && g.get("luxuryTax") > 0) {
+		// AI GM personalities: a tax-averse GM takes on no salary that leaves his team over the luxury tax line
+		const luxuryPayroll = g.get("luxuryPayroll") / 1000;
+		for (const j of [0, 1] as const) {
+			const { payrollAfterTrade, payrollBeforeTrade } = s.teams[j];
+			if (
+				payrollAfterTrade > luxuryPayroll &&
+				payrollAfterTrade > payrollBeforeTrade &&
+				(await getGmWeights(tids[j]))?.refusesTax
+			) {
+				s.warning = `The ${s.teams[j].name}' general manager won't take on salary that puts them over the luxury tax (${helpers.formatCurrency(luxuryPayroll, "M")}).`;
+				s.warningAmount = payrollAfterTrade - luxuryPayroll;
+				break;
+			}
+		}
 	}
 
 	return s;

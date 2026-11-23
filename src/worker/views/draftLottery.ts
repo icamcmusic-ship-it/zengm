@@ -72,8 +72,13 @@ const getLotteryNightTeams = async (season: number) => {
 			useGms && t.gm && !g.get("userTids").includes(t.tid)
 				? {
 						name: `${t.gm.firstName} ${t.gm.lastName}`,
-						patience: t.gm.traits.patience,
-						draftUpside: t.gm.traits.draftUpside,
+						// Only whether the leaning is strong (lotteryNight reads > 0.3): the exact numbers stay in the worker
+						patience:
+							Math.sign(t.gm.traits.patience) *
+							(Math.abs(t.gm.traits.patience) > 0.3 ? 1 : 0),
+						draftUpside:
+							Math.sign(t.gm.traits.draftUpside) *
+							(Math.abs(t.gm.traits.draftUpside) > 0.3 ? 1 : 0),
 					}
 				: undefined;
 		out[t.tid] = {
