@@ -2184,6 +2184,8 @@ class GameSim extends GameSimBase {
 					rotationStyle: (t as any).rotationStyle,
 					backToBackCut: (t as any).backToBackCut,
 					regulationMinutes: this.numPeriods * this.ga.quarterLength,
+					// Playoff series state (set in game/play.ts, common/seriesState.ts)
+					seriesUrgency: (t as any).seriesUrgency,
 				},
 			);
 			for (const [i, p] of t.player.entries()) {
