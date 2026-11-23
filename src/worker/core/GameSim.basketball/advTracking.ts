@@ -337,6 +337,9 @@ export class AdvTracker {
 		new Map(),
 	];
 	scratch: number[] = [];
+	// Per-game download (worker/util/gameExport): one row per field goal attempt, in order: [shooter pid, defender pid (-1: none), made,
+	// blocked, play type index, sub-zone (-1: none), 1000 × xFG (0: none), contest level (-1: none)]. Read after the game, presentation only
+	shotLog: number[][] = [];
 	lineupCache: [AdvPlayer[], AdvPlayer[]] = [[], []];
 	lineupRow: [number[] | undefined, number[] | undefined] = [
 		undefined,
@@ -637,6 +640,16 @@ export class AdvTracker {
 		if (!cur) {
 			return;
 		}
+		this.shotLog.push([
+			cur.p.id,
+			(blocker ?? cur.defender)?.id ?? -1,
+			made ? 1 : 0,
+			blocker ? 1 : 0,
+			cur.pt,
+			cur.zone,
+			cur.zone >= 0 ? cur.xfg : 0,
+			cur.ct,
+		]);
 		const a = this.arr.get(cur.p)!;
 		a[ptIndex(cur.pt, PT_FGA)]! += 1;
 		if (cur.zone >= 0) {
