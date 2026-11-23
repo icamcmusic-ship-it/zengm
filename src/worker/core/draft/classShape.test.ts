@@ -48,7 +48,9 @@ const getClass = async () =>
 		.sort((a, b) => b.value - a.value || a.pid - b.pid);
 
 const bases: Player[][] = [];
-const NUM_BASES = 10;
+// 20: with development reliability the board's leader is read more from potential, so "the top prospect's ovr" moves more from class to
+// class (late bloomers' No. 1: +0.2 over 10 classes, +1.8 over 30, before +2.2)
+const NUM_BASES = 20;
 
 const load = async (
 	base: number,

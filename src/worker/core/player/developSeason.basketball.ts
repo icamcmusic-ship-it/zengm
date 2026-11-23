@@ -15,6 +15,7 @@ import {
 import {
 	DEV_RATES,
 	DEV_RATES_MAX_AGE,
+	YOUNG_NOISE_MEAN,
 	rateFor,
 	type DevRates,
 } from "../../../common/prospectVariety.ts";
@@ -312,6 +313,8 @@ const calcBaseChange = (
 	coachingLevel: number,
 	traitDev?: TraitDevelopment,
 	wideYoung?: boolean,
+	// Development reliability (version 2 players): young noise's deviation from its mean is scaled by this
+	noiseScale?: number,
 ): number => {
 	let val = baseChangeByAge(age);
 
@@ -326,8 +329,20 @@ const calcBaseChange = (
 				Math.min(0, Math.max(draw, DEV_RATES.youngNoiseMin) + 4) +
 				DEV_RATES.youngNoiseRecenter;
 		}
+		if (noiseScale !== undefined) {
+			noise =
+				YOUNG_NOISE_MEAN.upTo23 +
+				YOUNG_NOISE_MEAN.shift +
+				noiseScale * (noise - YOUNG_NOISE_MEAN.upTo23);
+		}
 	} else if (age <= 25) {
 		noise = helpers.bound(realGauss(0, 5), -4, 10);
+		if (noiseScale !== undefined) {
+			noise =
+				YOUNG_NOISE_MEAN.upTo25 +
+				YOUNG_NOISE_MEAN.shift +
+				noiseScale * (noise - YOUNG_NOISE_MEAN.upTo25);
+		}
 	} else {
 		noise = helpers.bound(realGauss(0, 3), -2, 4);
 	}
@@ -352,8 +367,8 @@ const developSeason = (
 	coachingLevel: number,
 	// Player traits development (work ethic, aging curve), see common/playerTraits/development.ts. Never passed for pot estimates
 	traitDev?: TraitDevelopment,
-	// Prospect variety: his development rate per rating group (common/prospectVariety.ts, devRatesOf). Never passed for pot estimates, so
-	// how fast each part of his game grows stays hidden
+	// Prospect variety: his development rate per rating group (common/prospectVariety.ts, devRatesOf). Pot estimates get only what scouts
+	// can read (potRatesOf: the shared part of his rate), so how fast each part of his game grows stays hidden
 	rates?: DevRates,
 ) => {
 	// In young players, height can sometimes increase
@@ -374,6 +389,7 @@ const developSeason = (
 		coachingLevel,
 		traitDev,
 		rates !== undefined,
+		rates?.noise,
 	);
 	const useRates = rates !== undefined && age <= DEV_RATES_MAX_AGE;
 	const bust = rates !== undefined ? bustTail : 0;

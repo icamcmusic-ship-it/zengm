@@ -5,6 +5,7 @@ import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
 import genRatings from "./genRatings.basketball.ts";
 import bonus from "./bonus.ts";
+import developSeason from "./developSeason.basketball.ts";
 import { ovrRaw } from "./ovr.basketball.ts";
 import {
 	applyPreDraftTrajectory,
@@ -20,7 +21,9 @@ import {
 } from "../../../common/draftClassShape.ts";
 import {
 	DEV_RATES,
+	DEV_RELIABILITY,
 	devRatesOf,
+	potRatesOf,
 	ratingFactor,
 	regionOf,
 	squashFactor,
@@ -176,6 +179,85 @@ describe("prospect variety", () => {
 			devRatesOf({ v: 1, s: 7 }),
 			devRatesOf({ v: 1, s: 7 }),
 		);
+	});
+
+	test("development reliability: version 2 rates spread wider around the same center, and potential reads them", () => {
+		const sums = { ath: 0, shoot: 0, skill: 0, ins: 0 };
+		const N = 20_000;
+		let sq = 0;
+		for (let s = 0; s < N; s++) {
+			const rates = devRatesOf({ v: 2, s });
+			assert.strictEqual(rates.noise, DEV_RELIABILITY.noiseScale);
+			const mean = (rates.ath + rates.shoot + rates.skill + rates.ins) / 4;
+			sq += (mean - DEV_RATES.center) ** 2 / N;
+			for (const key of Object.keys(sums) as (keyof typeof sums)[]) {
+				sums[key] += rates[key] / N;
+			}
+		}
+		for (const v of Object.values(sums)) {
+			assert.approximately(v, DEV_RATES.center, 0.01);
+		}
+		// The shared rate dominates a player's average rate (version 1: about 0.1)
+		assert.isAbove(Math.sqrt(sq), 0.3);
+		// Version 1 players: rates and potential exactly as before
+		assert.isUndefined(devRatesOf({ v: 1, s: 7 }).noise);
+		assert.isUndefined(potRatesOf({ v: 1, s: 7 }));
+		// Potential reads the shared part of his rate (the same for every group): close to the mean of his group rates
+		let err = 0;
+		for (let s = 0; s < 2000; s++) {
+			const gv = { v: 2, s, c: 0.9 };
+			const rates = devRatesOf(gv);
+			const pot = potRatesOf(gv)!;
+			assert.strictEqual(pot.ath, pot.ins);
+			assert.strictEqual(pot.noise, DEV_RELIABILITY.noiseScale);
+			const mean = (rates.ath + rates.shoot + rates.skill + rates.ins) / 4;
+			err += Math.abs(mean - pot.ath) / 2000;
+		}
+		assert.isBelow(err, 0.1);
+	});
+
+	test("development reliability: narrowing young players' noise keeps their average development", () => {
+		const base = {
+			hgt: 50,
+			stre: 45,
+			spd: 50,
+			jmp: 50,
+			endu: 45,
+			ins: 45,
+			dnk: 45,
+			ft: 45,
+			fg: 45,
+			tp: 45,
+			oiq: 40,
+			diq: 40,
+			drb: 45,
+			pss: 45,
+			reb: 45,
+		};
+		const flat = { ath: 1, shoot: 1, skill: 1, ins: 1 };
+		const run = (noise: number | undefined) => {
+			seeded("narrowNoise");
+			let sum = 0;
+			let sq = 0;
+			const N = 20_000;
+			for (let i = 0; i < N; i++) {
+				const r = { ...base } as any;
+				for (let age = 20; age <= 25; age++) {
+					developSeason(r, age, DEFAULT_LEVEL, undefined, {
+						...flat,
+						noise,
+					});
+				}
+				const d = ovrRaw(r) - ovrRaw(base as any);
+				sum += d / N;
+				sq += (d * d) / N;
+			}
+			return { mean: sum, sd: Math.sqrt(sq - sum * sum) };
+		};
+		const stock = run(undefined);
+		const narrow = run(DEV_RELIABILITY.noiseScale);
+		assert.approximately(narrow.mean, stock.mean, 0.4);
+		assert.isBelow(narrow.sd, 0.9 * stock.sd);
 	});
 
 	test("the hidden trajectory before the draft is applied once, centered over players", () => {

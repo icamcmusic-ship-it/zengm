@@ -254,8 +254,14 @@ describe("college stats on the path a new league uses", () => {
 			const mean = values.reduce((a, b) => a + b, 0) / values.length;
 			assert.isAtLeast(mean, key === "blocks: idef" ? 0.6 : 0.7, key);
 			// (one class at a time is noisy: the talent cycles' reshaped top 30 put one class's top rebounder at the 30th percentile of
-			// height, 0.296)
-			if (key !== "blocks: idef" && key !== "blocks: hgt") {
+			// height, 0.296; with development reliability one class's steals leader sat at the 11th percentile of perimeter defense. Over seeds
+			// 2026-2030 the single-class floor fails in either development: before, rebounds: hgt 0.20; after, steals: pdef 0.11 and 0.16, while
+			// its mean over the classes stays 0.71-0.91)
+			if (
+				key !== "blocks: idef" &&
+				key !== "blocks: hgt" &&
+				key !== "steals: pdef"
+			) {
 				assert.isAtLeast(Math.min(...values), 0.28, key);
 			}
 		}
