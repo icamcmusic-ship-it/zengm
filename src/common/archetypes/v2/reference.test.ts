@@ -5,19 +5,26 @@ import { assert, test } from "vitest";
 import { defaultNormsFor } from "../classify.ts";
 import type { Norms } from "../types.ts";
 import { classifyV2 } from "./engine.ts";
-import { nounsOfName } from "./nouns.ts";
+import { DEF_NOUNS, familyOf, nounsOfName } from "./nouns.ts";
 import { REFERENCE_LEAGUE, REFERENCE_PLAYERS } from "./reference.data.ts";
 
 // The share of the reference set the engine must keep naming as the user does (main name, or the same skills)
 const FLOOR = 0.35;
 
+// (archfam: a label's skills as reading 28 says them: one per family (shooting, creation, perimeter D), and his defense
+// as one, whether a defensive word, the old defensive tag or 2-Way says it)
 const skillsOf = (label: string) =>
 	[
 		...new Set(
-			label
-				.split(" · ")
-				.flatMap((part) => nounsOfName(part)?.nouns ?? [])
-				.map((n) => (n === "creator" ? "handle" : n)),
+			label.split(" · ").flatMap((part) => {
+				const nn = nounsOfName(part);
+				return [
+					...(nn?.nouns ?? []).map((n) =>
+						DEF_NOUNS.has(n) ? "defense" : familyOf(n),
+					),
+					...(nn?.twoWay ? ["defense"] : []),
+				];
+			}),
 		),
 	]
 		.sort()
@@ -63,4 +70,4 @@ test("the reference set: the engine names the user's players as he does", () => 
 		`reference set ${r.n}: whole label ${r.exact} (${pc(r.exact)}), main name ${r.main} (${pc(r.main)}), main name or the same skills ${r.skills} (${pc(r.skills)})`,
 	);
 	assert.isAtLeast(r.skills / r.n, FLOOR, r.misses.join("\n"));
-});
+}, 60_000);

@@ -7,7 +7,6 @@ import { test } from "vitest";
 import { ARCHETYPES } from "../classify.ts";
 import { nameAt } from "../posNames.ts";
 import { POSITIONS } from "../position.ts";
-import { DEFENSE_TEXT } from "./defenseLabels.ts";
 import { ROLE_BY_KEY } from "./grammar.ts";
 import { ELITE_RE, HONEST_ROLES } from "./honest.ts";
 import {
@@ -16,6 +15,8 @@ import {
 	CUSTOM_SPECIALS,
 	END_WORDS,
 	JACK_CLEARED,
+	LEAD_EDGE,
+	MID_EDGE,
 	NOUN_DESC,
 	SKILL_BAR,
 	STICK_BOOST,
@@ -26,15 +27,23 @@ import {
 	specialNounsOf,
 } from "./nouns.ts";
 import {
+	CRAFTY_COVER,
+	ELITE_COVER,
+	ELITE_SKILL,
 	EXTRA_COST,
+	FLAT_ELITE,
 	GENERIC_COVER,
 	JACK_FLAT,
+	MANY_ELITE,
+	MAX_PARTS,
 	MISS_TOP2,
 	RAMP_HI,
 	RAMP_LO,
 	SECOND_COST,
+	SPECIAL_EDGE,
 	STICK_COVER,
-	TAG_COVER,
+	THREE_LEVEL_BAR,
+	TWO_WAY_BAR,
 } from "./cover.ts";
 
 const pctTop = (p: number) => `${Math.round(100 * p)}th percentile`;
@@ -67,7 +76,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		out.push(`# Archetypes (reading ${ARCHETYPE_READING_VERSION})`);
 		out.push("");
 		out.push(
-			"Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is a main name, plus a defensive tag after a · for a defensive skill at the league's 85th percentile (or his second best) that the main name doesn't name.",
+			`Generated from the code (\`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts\`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is one name: there is no defensive tag. A two-way player's name takes the prefix 2-Way when his best defensive skill and his best offensive skill are both at the ${pctTop(TWO_WAY_BAR)}; 2-Way covers all his defensive skills.`,
 		);
 		out.push("");
 		out.push("## How a main name is built");
@@ -77,17 +86,21 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		);
 		out.push("");
 		out.push(
-			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best skills it names (the defensive tag counts ${TAG_COVER} of one), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two. Its skills must be among his best ${TOP_N} and include his best one. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name.`,
+			`Skills that say the same thing count once, as a family: shooting (3PT and mid-range), creation (handle and shot creation) and perimeter D (perimeter D and steals). A family stands where its best member stands and is named by one word: shooting by 3PT unless mid-range leads it by ${MID_EDGE} of standing, creation and perimeter D by the higher member. No name spends two words on one family; 3-Level is the one word for shooting and finishing, when 3PT, mid-range and finishing are all at the ${pctTop(THREE_LEVEL_BAR)}. Mid-range and offensive IQ need ${LEAD_EDGE} of standing over the next skill to lead; offensive IQ is mostly a flavor word (it covers ${CRAFTY_COVER} of a skill word, costs nothing to name or to leave out).`,
 		);
 		out.push("");
 		out.push(
-			`Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of ${STICK_BOOST} on each standing, so a point of noise doesn't take it away) and this season's best name doesn't cover more by ${STICK_COVER} or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.`,
+			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best families it names (2-Way names all his defensive ones), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two (2-Way counts as one; a noun name says at most ${MAX_PARTS}). Its skills must be among his best ${TOP_N} families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets ${SPECIAL_EDGE} over a noun name that covers the same. The many-skills names are gated by how many elite skills (the ${pctTop(ELITE_SKILL)}) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most ${FLAT_ELITE} and covers each of his best ${GENERIC_COVER} of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs ${MANY_ELITE} or more and covers each ${ELITE_COVER}. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name, about the skill he has ("Spot-Up Specialist").`,
+		);
+		out.push("");
+		out.push(
+			`Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of ${STICK_BOOST} on each standing, so a point of noise doesn't take it away), it still covers his top two skills (families), and this season's best name doesn't cover more by ${STICK_COVER} or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.`,
 		);
 		out.push("");
 		out.push("## Every word keeps its promise");
 		out.push("");
 		out.push(
-			`A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill, a defensive label's), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best ${TOP_N}, each modifier at its bar. The other words keep these promises:`,
+			`A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best ${TOP_N}, each modifier at its bar. The other words keep these promises:`,
 		);
 		out.push("");
 		for (const w of WORD_REQ) {
@@ -123,14 +136,13 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 			}
 		}
 		out.push("");
-		out.push(`## Defensive labels (${Object.keys(DEFENSE_TEXT).length})`);
-		out.push("");
-		for (const [name, t] of Object.entries(DEFENSE_TEXT)) {
-			out.push(`- ${star(name)}**${name}**: ${t.desc}`);
-		}
+		out.push("## 2-Way and 3-Level");
 		out.push("");
 		out.push(
-			"Any of them may take Long (long arms) or Switchable (defensive versatility 70+) in front.",
+			`- **2-Way**: a prefix any noun name or user's own name may take (the catalog's builds have their own 2-Way forms) when his best defensive skill and his best offensive skill are both at the ${pctTop(TWO_WAY_BAR)}. It covers all his defensive skills and counts as one skill named.`,
+		);
+		out.push(
+			`- **3-Level**: one word for shooting and finishing, when 3PT, mid-range and finishing are all at the ${pctTop(THREE_LEVEL_BAR)}.`,
 		);
 		out.push("");
 		out.push(
@@ -149,7 +161,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 			);
 		}
 		out.push(
-			`- **Jack-Of-All-Trades** [any]: ${JACK_CLEARED}+ real skills, his ${JACK_CLEARED}th at the ${pctTop(JACK_FLAT)}; it covers each of his skills ${GENERIC_COVER} of the way.`,
+			`- **Jack-Of-All-Trades** [any]: ${JACK_CLEARED}+ real skills (families), his ${JACK_CLEARED}th at the ${pctTop(JACK_FLAT)}, at most ${FLAT_ELITE} at the ${pctTop(ELITE_SKILL)}; it covers each of his skills ${GENERIC_COVER} of the way.`,
 		);
 		out.push("");
 		const builds: string[] = [];
