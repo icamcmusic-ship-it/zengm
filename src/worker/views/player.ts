@@ -18,6 +18,7 @@ import {
 import { player } from "../core/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { archetypeInfoForPlayer } from "../core/player/archetype.ts";
+import { tieredBadgesForPlayer } from "../core/player/tieredBadges.ts";
 import { idb } from "../db/index.ts";
 import { playerValueIndex } from "../util/valueData.ts";
 import { g, helpers } from "../util/index.ts";
@@ -229,6 +230,12 @@ export const getPlayer = async <
 
 		// Derived from his ratings, stored at each preseason (basketball)
 		archetype: await archetypeInfoForPlayer(pRaw),
+
+		// 2K Badges (League Extra): his tiered badges this season, by category (no numbers under the no visible ratings challenge)
+		tieredBadges: await tieredBadgesForPlayer(
+			pRaw,
+			!!g.get("challengeNoRatings") && pRaw.tid !== PLAYER.RETIRED,
+		),
 
 		// Filter out rows with no games played
 		stats: p.stats.filter((row) => (row.gp ?? 0) > 0),

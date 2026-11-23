@@ -292,6 +292,7 @@ import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
 import updateSubRatingsForLeague from "../core/player/updateSubRatingsForLeague.ts";
 import { ensureSubs } from "../core/player/subRatings.ts";
+import { ensureTieredBadges } from "../core/player/tieredBadges.ts";
 import {
 	ensureExpandedRatings,
 	expandedRatingsOn,
@@ -4966,6 +4967,11 @@ const updateGameAttributes = async (
 		await ensureGms();
 		await idb.cache.flush();
 	}
+	// 2K Badges turned on: this season's cutoffs and tiers, once (no-op when done)
+	if (gameAttributes.featureTwoKBadges) {
+		await ensureTieredBadges();
+		await idb.cache.flush();
+	}
 	// Keep Career Tracking for Retired Players turned on: retired players' remaining tracking rows folded now (no-op when done)
 	if (await foldRetiredAdvCareers()) {
 		await idb.cache.flush();
@@ -5067,6 +5073,7 @@ const updateGameAttributesGodMode = async (
 	await staff.ensureStaff();
 	await ensureGms();
 	await foldRetiredAdvCareers();
+	await ensureTieredBadges();
 
 	// Raising the number of future draft classes generates the missing ones now
 	await draft.topUpDraftClasses();

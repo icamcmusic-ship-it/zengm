@@ -796,6 +796,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	scoutingSystem: false,
 	rerandomizeDraftClassRatings: false,
 	draftClassRegenSettings: undefined,
+	tieredBadgeCutoffs: undefined,
 	draftBoardAutoDraft: true,
 	// New leagues get a coaching staff. Existing leagues are set to false in the version 76 DB migration
 	coachingStaff: true,

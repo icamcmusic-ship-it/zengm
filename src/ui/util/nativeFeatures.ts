@@ -145,6 +145,14 @@ export const isUrlFeatureOn = (url: readonly unknown[] | string) => {
 			(isFeatureOn("coachingDepth") && isFeatureOn("coachingStaff"))
 		);
 	}
+	// The Skill Badges page shows the 2K Badges when that is on
+	if (
+		typeof url !== "string" &&
+		url[0] === "frivolities" &&
+		url[1] === "skill_badges"
+	) {
+		return isFeatureOn("skillBadges") || isFeatureOn("twoKBadges");
+	}
 	const feature = featureForUrl(url);
 	const replacedBy = featureOffForUrl(url);
 	return (

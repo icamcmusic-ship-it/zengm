@@ -26,6 +26,7 @@ import { SHOT_SHARE } from "./shotShare.ts";
 import * as simSettings from "./simSettings.ts";
 import { SIM_FIX_SHOT_CHOICE, SIM_FIX_THREE } from "./simSettings.ts";
 import { FLOW_DIAG } from "./gameFlow.ts";
+import { BADGE_DIAG } from "./tieredBadgesSim.ts";
 
 const env = (globalThis as any).process.env;
 // THREE_GRAD_CONST changes the sim's constants (for tuning)
@@ -69,6 +70,8 @@ test.skipIf(!env.THREE_GRAD)(
 		const out = env.THREE_GRAD_OUT;
 		Math.random = makeSeededRandom(seed);
 		FLOW_DIAG.on = true;
+		// 2K Badges: the raw badge effects, for their calibration (tieredBadgesSim.ts BADGE_CAL)
+		BADGE_DIAG.on = true;
 		const settings: any = {
 			...getDefaultSettings(),
 			...gameSimPresets[2026],
@@ -101,6 +104,38 @@ test.skipIf(!env.THREE_GRAD)(
 			},
 		);
 		await league.loadGameAttributes();
+
+		// 2K Badges: the tier distribution of the new league (players on teams), when the setting is on
+		{
+			const counts = [0, 0, 0, 0, 0, 0];
+			const perBadge: Record<string, number[]> = {};
+			let holders = 0;
+			let onTeams = 0;
+			for (const p of await idb.cache.players.getAll()) {
+				if (p.tid < 0 || !p.badges2k) {
+					continue;
+				}
+				onTeams++;
+				const t = last(p.badges2k).t;
+				if (Object.keys(t).length > 0) {
+					holders++;
+				}
+				for (const [k, tier] of Object.entries(t)) {
+					counts[tier]++;
+					perBadge[k] ??= [0, 0, 0, 0, 0, 0];
+					perBadge[k][tier]++;
+				}
+			}
+			if (onTeams > 0) {
+				console.log(
+					`BADGE TIERS players ${onTeams} with badges ${holders} by tier (B/S/G/HOF/L) ${counts.slice(1).join("/")}\n${Object.entries(
+						perBadge,
+					)
+						.map(([k, c]) => `  ${k} ${c.slice(1).join("/")}`)
+						.join("\n")}`,
+				);
+			}
+		}
 
 		const leagues = [];
 		const players = [];
@@ -306,8 +341,25 @@ test.skipIf(!env.THREE_GRAD)(
 		lines.push(
 			`FLOW counts ${JSON.stringify(FLOW_DIAG.counts)} means ${JSON.stringify(means)}`,
 		);
+		const badgeMeans = Object.fromEntries(
+			Object.entries(BADGE_DIAG.sum).map(([k, v]) => [
+				k,
+				Number((v / BADGE_DIAG.n[k]).toFixed(5)),
+			]),
+		);
+		if (Object.keys(badgeMeans).length > 0) {
+			lines.push(
+				`BADGES mean raw effect ${JSON.stringify(badgeMeans)} n ${JSON.stringify(BADGE_DIAG.n)}`,
+			);
+		}
 		console.log(lines.join("\n"));
 		if (out) {
+			if (Object.keys(badgeMeans).length > 0) {
+				appendFileSync(
+					out,
+					`${JSON.stringify({ kind: "badges", seed, sum: BADGE_DIAG.sum, n: BADGE_DIAG.n })}\n`,
+				);
+			}
 			appendFileSync(
 				out,
 				`${JSON.stringify({ kind: "flow", seed, ctN: FLOW_DIAG.ctN, ctMake: FLOW_DIAG.ctMake, zSum: FLOW_DIAG.zSum, zN: FLOW_DIAG.zN, deltaSum: FLOW_DIAG.deltaSum, counts: FLOW_DIAG.counts, sums: FLOW_DIAG.sums })}\n`,

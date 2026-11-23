@@ -837,6 +837,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "twoKBadges",
+		key: "featureTwoKBadges",
+		name: "2K Badges",
+		description:
+			"NBA 2K-style tiered badges (Bronze, Silver, Gold, Hall of Fame, Legend) in five categories (Finishing, Shooting, Playmaking, Defense/Rebounding, Physicals), built on the sub-ratings. Tiers are league-relative (cutoffs saved each season from the rotation players' scores; at most one Legend per badge), badge points are capped by ovr, and badges are recomputed each preseason, dropping at most one tier a season. Shown as tier-colored pills next to the skills, a Badges section on the player page and on the Skill Badges page (in place of the extended skill badges). In the game sim they add small, bounded effects on top of the skills (Catch & Shoot on assisted threes, Clamps on the man he guards, Rim Protector at the rim, Boxout Beast on the glass, ...), calibrated so league averages stay the same. Off: the extended skill badges as before, and no change to the game.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "contractOptions",
 		college: false,
 		key: "contractOptions",

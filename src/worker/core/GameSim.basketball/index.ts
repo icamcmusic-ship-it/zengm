@@ -98,6 +98,18 @@ import {
 } from "./matchupDefense.ts";
 import { SUB_SIM_CAL } from "./subRatingsSim.ts";
 import {
+	BADGE_CAL,
+	BADGE_DIAG,
+	BADGE_SIM,
+	BI,
+	badgeDiag,
+	calKey,
+	maxScale,
+	meanScale,
+	shotMakeEffect,
+	tierScale,
+} from "./tieredBadgesSim.ts";
+import {
 	ENDGAME,
 	endgameRole,
 	endgameRoleScore,
@@ -374,6 +386,8 @@ type PlayerGameSim = {
 	stat: any;
 	compositeRating: any;
 	skills: string[];
+	// 2K Badges: his tier per badge (common/tieredBadges TIERED_BADGE_INDEX), when the setting is on and he has any
+	bt?: number[];
 	injured: boolean;
 	newInjury: boolean;
 	injury: PlayerInjury & {
@@ -717,6 +731,8 @@ class GameSim extends GameSimBase {
 	// Sub-Ratings in Sim (League extras, see subRatingsSim.ts): loadTeams folded the sub-ratings into the composites and added the jumper
 	// style gaps by shot type. Off: nothing here is used
 	subRatingsSim: boolean;
+	// 2K Badges (League extras, see tieredBadgesSim.ts): the badge effects. Off: nothing here is used
+	badgeSim: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
 	bigGame = false;
 	// Player traits: picking the player who gets a technical or flagrant foul (temper weighs in, see traitPickWeight)
@@ -980,6 +996,9 @@ class GameSim extends GameSimBase {
 		this.subRatingsSim = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.jumperGap3 !== undefined),
 		);
+		this.badgeSim =
+			nativeFeatureEnabled("twoKBadges", (key) => g.get(key as any)) &&
+			teams.some((t) => t.player.some((p) => p.bt !== undefined));
 		this.matchupDefense = nativeFeatureEnabled("matchupDefense", (key) =>
 			g.get(key as any),
 		);
@@ -5422,6 +5441,18 @@ class GameSim extends GameSimBase {
 		if (this.realisticTurnovers) {
 			prob2 *= TURNOVERS.tovMult;
 		}
+		// 2K Badges: the offense's Handles and Ball Security on the floor (centered)
+		if (this.badgeSim) {
+			const o = this.playersOnCourt[this.o];
+			const x =
+				1 -
+				BADGE_SIM.ballSecurity *
+					(meanScale(o, BI.ballSecurity) + 0.5 * meanScale(o, BI.handles));
+			if (BADGE_DIAG.on) {
+				badgeDiag("tov", x);
+			}
+			prob2 *= x / BADGE_CAL.tov;
+		}
 		// Shot Profiles & Defensive Schemes: the blitz forces turnovers
 		if (this.shotProfiles) {
 			prob2 *= SCHEME_EFFECTS[this.team[this.d].defScheme ?? "standard"].tov;
@@ -5500,6 +5531,15 @@ class GameSim extends GameSimBase {
 		}
 		if (this.realisticTurnovers) {
 			prob2 *= TURNOVERS.stlMult;
+		}
+		// 2K Badges: the defense's best Glove (centered)
+		if (this.badgeSim) {
+			const x =
+				1 + BADGE_SIM.glove * maxScale(this.playersOnCourt[this.d], BI.glove);
+			if (BADGE_DIAG.on) {
+				badgeDiag("stl", x);
+			}
+			prob2 *= x / BADGE_CAL.stl;
 		}
 		return boundProb(
 			this.traitsOn
@@ -6059,7 +6099,8 @@ class GameSim extends GameSimBase {
 		if (
 			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) *
 				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) *
-				contestBlk >
+				contestBlk *
+				(this.badgeSim ? this.badgeBlkMult(type) : 1) >
 			Math.random()
 		) {
 			blocked = true;
@@ -6282,6 +6323,25 @@ class GameSim extends GameSimBase {
 						1,
 					);
 				}
+			}
+		}
+
+		// 2K Badges: the badge effects on the make and the and-one (centered, see tieredBadgesSim.ts)
+		if (this.badgeSim && !blocked && !tipInFromOutOfBounds) {
+			probMake += this.badgeMakeDelta(
+				type,
+				p,
+				passer,
+				defender,
+				sc ? selfCreated : passer === undefined,
+			);
+			if (type === "atRim") {
+				const andOne =
+					1 + BADGE_SIM.fearlessFinisher * tierScale(p, BI.fearlessFinisher);
+				if (BADGE_DIAG.on) {
+					badgeDiag("andOne", andOne);
+				}
+				probAndOne *= andOne / BADGE_CAL.andOne;
 			}
 		}
 
@@ -6767,6 +6827,63 @@ class GameSim extends GameSimBase {
 	 *
 	 * @return {number} Probability from 0 to 1.
 	 */
+	// 2K Badges: a shot's make effect (capped, then centered by the league calibration)
+	badgeMakeDelta(
+		type: ShotType,
+		p: PlayerGameSim,
+		passer: PlayerGameSim | undefined,
+		defender: PlayerGameSim | undefined,
+		selfCreated: boolean,
+	) {
+		const x = shotMakeEffect(
+			type,
+			p,
+			passer,
+			defender,
+			this.playersOnCourt[this.d],
+			selfCreated,
+		);
+		const key = calKey(type);
+		if (BADGE_DIAG.on) {
+			badgeDiag(key, x);
+		}
+		return x - BADGE_CAL[key];
+	}
+
+	// 2K Badges: the best rim protector on the floor blocks more shots inside (centered)
+	badgeBlkMult(type: ShotType) {
+		const inside =
+			type === "atRim" ||
+			type === "lowPost" ||
+			type === "putBack" ||
+			type === "tipIn";
+		const x = inside
+			? 1 +
+				BADGE_SIM.rimProtectorBlk *
+					maxScale(this.playersOnCourt[this.d], BI.rimProtector)
+			: 1;
+		if (BADGE_DIAG.on) {
+			badgeDiag("blk", x);
+		}
+		return x / BADGE_CAL.blk;
+	}
+
+	// 2K Badges: defensive rebound probability shift (centered)
+	badgeDrbDelta() {
+		const d = this.playersOnCourt[this.d];
+		const o = this.playersOnCourt[this.o];
+		const k = BADGE_SIM;
+		const x =
+			k.boxoutBeast * maxScale(d, BI.boxoutBeast) +
+			k.reboundChaser * maxScale(d, BI.reboundChaser) -
+			k.putbackBossOrb * maxScale(o, BI.putbackBoss) -
+			k.reboundChaser * maxScale(o, BI.reboundChaser);
+		if (BADGE_DIAG.on) {
+			badgeDiag("drb", x);
+		}
+		return x - BADGE_CAL.drb;
+	}
+
 	probBlk() {
 		return (
 			this.ga.blockFactor *
@@ -7528,8 +7645,16 @@ class GameSim extends GameSimBase {
 	// 95% max, a 75 FT rating gets you 90%, and a 25 FT rating gets you 60%. Player traits: clutch free throw shooting
 	freeThrowProb(t: TeamNum, p: PlayerGameSim) {
 		// The FT accuracy factor scales the whole probability (it used to scale only the ratings part, so a factor of 0 still made 45%)
-		const base =
+		let base =
 			this.ga.ftAccuracyFactor * (p.compositeRating.shootingFT * 0.6 + 0.45);
+		// 2K Badges: Free-Throw Ace (centered)
+		if (this.badgeSim) {
+			const x = BADGE_SIM.freeThrowAce * tierScale(p, BI.freeThrowAce);
+			if (BADGE_DIAG.on) {
+				badgeDiag("ft", x);
+			}
+			base += x - BADGE_CAL.ft;
+		}
 		if (this.traitsOn && p.traitEffects) {
 			return helpers.bound(
 				base +
@@ -7929,6 +8054,10 @@ class GameSim extends GameSimBase {
 		if (afterFt && this.simFixes) {
 			probDrb = 1 - SIM_FIX_FT_ORB * (1 - probDrb);
 		}
+		// 2K Badges: the defense's best box-out and chaser against the offense's best putback and chaser (centered)
+		if (this.badgeSim) {
+			probDrb += this.badgeDrbDelta();
+		}
 		if (probDrb > Math.random()) {
 			p = this.pickPlayer(exp2 ? "defRebounding" : "rebounding", this.d, 3);
 			this.recordStat(this.d, p, "drb");
@@ -8008,6 +8137,30 @@ class GameSim extends GameSimBase {
 			// Player traits: shot selection, foul proneness, steals and hustle
 			if (this.traitsOn && p.traitEffects) {
 				value *= this.traitPickWeight(rating, p, t);
+			}
+
+			// 2K Badges: who gets a rebound (only who, not how many)
+			if (this.badgeSim && p.bt) {
+				if (
+					rating === "defRebounding" ||
+					(rating === "rebounding" && t === this.d)
+				) {
+					value *=
+						1 +
+						BADGE_SIM.rebWeight *
+							Math.max(
+								tierScale(p, BI.boxoutBeast),
+								tierScale(p, BI.reboundChaser),
+							);
+				} else if (rating === "offRebounding" || rating === "rebounding") {
+					value *=
+						1 +
+						BADGE_SIM.rebWeight *
+							Math.max(
+								tierScale(p, BI.putbackBoss),
+								tierScale(p, BI.reboundChaser),
+							);
+				}
 			}
 
 			array[i] = value;

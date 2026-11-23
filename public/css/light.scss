@@ -501,6 +501,32 @@ table {
 	vertical-align: 2%;
 }
 
+// 2K Badges: tier-colored pills (Bronze, Silver, Gold, Hall of Fame, Legend), fixed colors that read in both themes
+.badge2k {
+	border-radius: 0.6em;
+	color: #fff;
+	display: inline-block;
+	font-weight: 600;
+	line-height: 14px;
+	padding: 0 0.45em;
+	white-space: nowrap;
+}
+.badge2k-1 {
+	background-color: #9a5b2c;
+}
+.badge2k-2 {
+	background-color: #6f7781;
+}
+.badge2k-3 {
+	background-color: #a9810d;
+}
+.badge2k-4 {
+	background-color: #6a3d9a;
+}
+.badge2k-5 {
+	background: linear-gradient(90deg, #b3261e, #d9822b);
+}
+
 $jersey-number-width: 15px;
 .jersey-number-name {
 	font-size: 10px;

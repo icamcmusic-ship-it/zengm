@@ -81,6 +81,7 @@ import {
 import type { NewLeagueSettings } from "../../views/newLeague.ts";
 import { getNumPlayersTradedAwayNormalized } from "../player/getNumPlayersTradedAwayNormalized.ts";
 import { initArchetypesForNewLeague } from "../player/archetype.ts";
+import { updateTieredBadges } from "../player/tieredBadges.ts";
 import { applyRealTeamInfo } from "../../../common/applyRealTeamInfo.ts";
 import { last } from "../../../common/utils.ts";
 import { newLeagueGodModeLimits } from "../../util/newLeagueGodModeLimits.ts";
@@ -1291,6 +1292,8 @@ const finalizeActivePlayers = async ({
 
 	// Everyone's first archetype, derived from the ratings they start with
 	await initArchetypesForNewLeague();
+	// League Extras "2K Badges": the first cutoffs and tiers
+	await updateTieredBadges();
 
 	// WHY IS THIS NEEDED? Can't use players0 because the addRelatives call above might make a copy of a player object and write it to the cache, in which case the prior objects for those players in players0 will be stale.
 	const players = await idb.cache.players.getAll();

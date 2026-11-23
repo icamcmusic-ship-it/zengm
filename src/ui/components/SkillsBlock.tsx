@@ -9,6 +9,16 @@ import {
 } from "../../common/skillBadges/compute.ts";
 import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { badgeDriverText } from "../../common/skillBadges/subDrivers.ts";
+import {
+	TIER_NAMES,
+	parseBadgeToken,
+} from "../../common/tieredBadges/index.ts";
+
+// 2K Badges: a token's text for sorting and searching (its name and tier), or the token itself
+const tokenText = (token: string) => {
+	const parsed = parseBadgeToken(token);
+	return parsed ? `${parsed.def.name} ${TIER_NAMES[parsed.tier]}` : token;
+};
 
 // A skill or badge's tooltip, plus the sub-rating that drives it when the row has sub-ratings (the subRatings setting)
 const titleWithDriver = (base: string, token: string, sub?: number[]) => {
@@ -57,7 +67,9 @@ export const SkillsBlock = ({
 	sub?: number[];
 }) => {
 	const { fullNames } = useLocal(["fullNames"]);
-	const badgesOn = useFeatureOn("skillBadges");
+	const extendedOn = useFeatureOn("skillBadges");
+	const twoKOn = useFeatureOn("twoKBadges");
+	const badgesOn = extendedOn || twoKOn;
 	const [expanded, setExpanded] = useState(false);
 
 	if (skills === undefined) {
@@ -72,19 +84,34 @@ export const SkillsBlock = ({
 		);
 		return (
 			<span className={className}>
-				{shown.map(({ token, original }) => (
-					<span
-						key={token}
-						className="skill"
-						title={titleWithDriver(
-							original ? SKILLS[token]! : badgeTitle(token),
-							token,
-							sub,
-						)}
-					>
-						{token}
-					</span>
-				))}
+				{shown.map(({ token, original }) => {
+					// 2K Badges: a tier-colored pill
+					const tiered = original ? undefined : parseBadgeToken(token);
+					if (tiered) {
+						return (
+							<span
+								key={token}
+								className={`skill badge2k badge2k-${tiered.tier}`}
+								title={`${tiered.def.name} (${TIER_NAMES[tiered.tier]})`}
+							>
+								{tiered.def.short}
+							</span>
+						);
+					}
+					return (
+						<span
+							key={token}
+							className="skill"
+							title={titleWithDriver(
+								original ? SKILLS[token]! : badgeTitle(token),
+								token,
+								sub,
+							)}
+						>
+							{token}
+						</span>
+					);
+				})}
 				{hasMore ? (
 					<span
 						className="skill"
@@ -150,7 +177,7 @@ export const wrappedSkillsBlock = ({
 	skills: string[] | undefined;
 	badges?: string[];
 }) => {
-	const text = [...(skills ?? []), ...(badges ?? [])].join(" ");
+	const text = [...(skills ?? []), ...(badges ?? []).map(tokenText)].join(" ");
 	return {
 		value: (
 			<span className="skills-alone">

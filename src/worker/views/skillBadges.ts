@@ -1,4 +1,18 @@
-import { featureOffError } from "../util/nativeFeatures.ts";
+import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
+import {
+	CATEGORY_NAMES,
+	TIERED_BADGES,
+	TIERED_BADGES_BY_KEY,
+	TIER_NAMES,
+	entryForSeason,
+	tieredBadgeScore,
+} from "../../common/tieredBadges/index.ts";
+import {
+	ensureTieredBadges,
+	getTieredBadgeCutoffs,
+	inputName,
+	tieredBadgesOn,
+} from "../core/player/tieredBadges.ts";
 import { TRAIT_DEFINITIONS } from "../../common/playerTraits/definitions.ts";
 import { getTraitViewContext } from "../util/playerTraitsView.ts";
 import { idb } from "../db/index.ts";
@@ -26,7 +40,8 @@ const processInputs = (params: RouteParams<"skillBadges">) => {
 	const label =
 		params.badge !== undefined &&
 		(SKILL_BADGES.some((def) => def.label === params.badge) ||
-			SKILL_COMBOS.some((def) => def.label === params.badge))
+			SKILL_COMBOS.some((def) => def.label === params.badge) ||
+			TIERED_BADGES_BY_KEY[params.badge] !== undefined)
 			? params.badge
 			: undefined;
 	return { label };
@@ -35,11 +50,118 @@ const processInputs = (params: RouteParams<"skillBadges">) => {
 const LEADERS = 5;
 const LIST_SIZE = 50;
 
+// 2K Badges: every badge with its holders by tier this season (stored tiers), and the cutoffs. No visible ratings challenge: holders
+// in a neutral order within a tier (team, then name) and no cutoffs or ovr sent
+const loadTiered = async (label: string | undefined) => {
+	await ensureTieredBadges();
+	const hideRatings = !!g.get("challengeNoRatings");
+	const season = g.get("season");
+	const players = await idb.cache.players.indexGetAll("playersByTid", [
+		PLAYER.FREE_AGENT,
+		Infinity,
+	]);
+	const cutoffs = getTieredBadgeCutoffs(season);
+	const teamAbbrevs = g.get("teamInfoCache").map((t) => t.abbrev);
+	type Holder = {
+		pid: number;
+		name: string;
+		pos: string;
+		abbrev: string;
+		tid: number;
+		age: number;
+		tier: number;
+		ovr: number | undefined;
+		// For ordering only (never sent)
+		score: number;
+	};
+	const holdersByKey: Record<string, Holder[]> = {};
+	for (const p of players) {
+		const t = entryForSeason(p.badges2k, season)?.t;
+		if (!t) {
+			continue;
+		}
+		const r = p.ratings.at(-1) as any;
+		for (const [key, tier] of Object.entries(t)) {
+			const def = TIERED_BADGES_BY_KEY[key];
+			if (!def || !tier) {
+				continue;
+			}
+			(holdersByKey[key] ??= []).push({
+				pid: p.pid,
+				name: `${p.firstName} ${p.lastName}`,
+				pos: r.pos,
+				abbrev: p.tid >= 0 ? (teamAbbrevs[p.tid] ?? "") : "FA",
+				tid: p.tid,
+				age: season - p.born.year,
+				tier,
+				ovr: hideRatings ? undefined : player.fuzzRating(r.ovr, r.fuzz),
+				score: tieredBadgeScore(r, def),
+			});
+		}
+	}
+	const tiered = TIERED_BADGES.map((def) => {
+		const holders = (holdersByKey[def.key] ?? []).sort(
+			(a, b) =>
+				b.tier - a.tier ||
+				(hideRatings
+					? a.abbrev.localeCompare(b.abbrev) ||
+						a.name.localeCompare(b.name) ||
+						a.pid - b.pid
+					: b.score - a.score),
+		);
+		const counts = [1, 2, 3, 4, 5].map(
+			(tier) => holders.filter((h) => h.tier === tier).length,
+		);
+		const strip = ({ score: _score, ...h }: Holder) => h;
+		return {
+			key: def.key,
+			short: def.short,
+			name: def.name,
+			category: CATEGORY_NAMES[def.category],
+			meaning: def.meaning,
+			drivers: def.score
+				.toSorted((a, b) => b[1] - a[1])
+				.map(([k]) => inputName(k))
+				.join(", "),
+			gates: (def.gates ?? [])
+				.map(
+					(gate) =>
+						`${inputName(gate.key)} ${gate.min === "median" ? "at or above the league median" : hideRatings ? "required" : `>= ${gate.min}`}`,
+				)
+				.join(", "),
+			cutoffs:
+				hideRatings || !cutoffs
+					? undefined
+					: cutoffs.c[def.key]?.map((x) => Math.round(x * 10) / 10),
+			counts,
+			top: holders
+				.filter((h) => h.tier >= 3)
+				.slice(0, LEADERS)
+				.map(strip),
+			list: label === def.key ? holders.slice(0, 200).map(strip) : [],
+		};
+	});
+	return {
+		tiered: {
+			badges: tiered,
+			tierNames: TIER_NAMES.slice(1),
+			numRotation: cutoffs?.n,
+		},
+		label,
+		numPlayers: players.length,
+		numTeams: g.get("numActiveTeams"),
+		userTid: g.get("userTid"),
+	};
+};
+
 export default defineView({
 	id: "skillBadges",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
-		const featureOff = featureOffError("skillBadges");
+		// (2K Badges replace the extended badges on this page when on)
+		const featureOff = featureOn("twoKBadges")
+			? undefined
+			: featureOffError("skillBadges");
 		if (featureOff) {
 			return featureOff;
 		}
@@ -60,6 +182,9 @@ export default defineView({
 		}
 		if (SKILL_BADGES.length === 0) {
 			return { errorMessage: "No badges" };
+		}
+		if (tieredBadgesOn()) {
+			return { ...(await loadTiered(inputs.label)), badges: [], combos: [] };
 		}
 
 		const playersAll = await idb.cache.players.indexGetAll("playersByTid", [
@@ -243,6 +368,7 @@ export default defineView({
 		});
 
 		return {
+			tiered: undefined,
 			label: inputs.label,
 			combos,
 			numPlayers: rows.length,

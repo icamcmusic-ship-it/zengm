@@ -6,6 +6,186 @@ import { frivolitiesMenu } from "./Frivolities.tsx";
 import type { View } from "../../common/types.ts";
 
 type Props = View<"skillBadges">;
+type Tiered = NonNullable<Props["tiered"]>;
+
+const TierPill = ({
+	short,
+	name,
+	tier,
+}: {
+	short: string;
+	name: string;
+	tier: number;
+}) => (
+	<span className={`skill ms-0 badge2k badge2k-${tier}`} title={name}>
+		{short}
+	</span>
+);
+
+// 2K Badges (League Extra): the badges by category with their holders by tier, and one badge's full list
+const TieredBadges = ({
+	tiered,
+	label,
+	userTid,
+	hideRatings,
+}: {
+	tiered: Tiered;
+	label: string | undefined;
+	userTid: number;
+	hideRatings: boolean;
+}) => {
+	const selected = tiered.badges.find((b) => b.key === label);
+	const categories = [...new Set(tiered.badges.map((b) => b.category))];
+	const tierCols = tiered.tierNames.map((name) => ({
+		title: name,
+		sortType: "number" as const,
+	}));
+	return (
+		<>
+			<p>
+				NBA 2K-style badges in five categories, each in five tiers:{" "}
+				{tiered.tierNames.map((name, i) => (
+					<span key={name} className="me-1">
+						<span className={`skill ms-0 badge2k badge2k-${i + 1}`}>
+							{name}
+						</span>
+					</span>
+				))}
+				. Tiers are league-relative: a badge's score (a weighted average of the
+				ratings and sub-ratings that drive it) is compared with the league's
+				rotation players
+				{tiered.numRotation !== undefined
+					? ` (${tiered.numRotation} this season)`
+					: ""}
+				, Bronze from the 85th percentile, Silver 93rd, Gold 97.5th, Hall of
+				Fame 99.3rd and Legend 99.9th (at most one Legend per badge). Badge
+				points (Bronze 1 to Legend 5) are capped by ovr, so role players carry
+				fewer. Badges are set each preseason and drop at most one tier a season.
+				In games they add small effects on top of the skills, calibrated so
+				league averages stay the same.
+			</p>
+			{selected ? (
+				<div className="mb-4">
+					<h2>
+						<TierPill short={selected.short} name={selected.name} tier={3} />{" "}
+						{selected.name}
+					</h2>
+					<p>
+						{selected.meaning} Driven by {selected.drivers}.
+						{selected.gates ? ` Needs ${selected.gates}.` : ""}{" "}
+						<a href={helpers.leagueUrl(["frivolities", "skill_badges"])}>
+							Back to all badges
+						</a>
+					</p>
+					<DataTable
+						cols={[
+							{ title: "Tier" },
+							{ title: "Name" },
+							{ title: "Pos" },
+							{ title: "Team" },
+							{ title: "Age", sortType: "number" },
+							...(hideRatings
+								? []
+								: [{ title: "Ovr", sortType: "number" as const }]),
+						]}
+						defaultSort="disableSort"
+						name="SkillBadges:tieredList"
+						pagination
+						rows={selected.list.map((p) => ({
+							key: p.pid,
+							data: [
+								{
+									value: (
+										<TierPill
+											short={tiered.tierNames[p.tier - 1]!}
+											name={tiered.tierNames[p.tier - 1]!}
+											tier={p.tier}
+										/>
+									),
+									sortValue: p.tier,
+									searchValue: tiered.tierNames[p.tier - 1],
+								},
+								<PlayerCell key="n" p={p} />,
+								p.pos,
+								p.abbrev,
+								p.age,
+								...(hideRatings ? [] : [p.ovr]),
+							],
+							classNames: { "table-info": p.tid === userTid },
+						}))}
+					/>
+				</div>
+			) : null}
+			{categories.map((category) => (
+				<div key={category} className="mb-4">
+					<h3>{category}</h3>
+					<DataTable
+						cols={[
+							{ title: "Badge" },
+							{ title: "Name" },
+							{ title: "Meaning", sortType: "string" },
+							{ title: "Driven by" },
+							...tierCols,
+							...(hideRatings
+								? []
+								: [
+										{
+											title: "Cutoffs",
+											desc: "Score where Bronze, Silver, Gold, Hall of Fame and Legend start this season",
+										},
+									]),
+							{ title: "Best (Gold+)", noSearch: true },
+						]}
+						defaultSort={[1, "asc"]}
+						name={`SkillBadges:tiered:${category}`}
+						rows={tiered.badges
+							.filter((b) => b.category === category)
+							.map((b) => ({
+								key: b.key,
+								data: [
+									{
+										value: (
+											<a
+												href={helpers.leagueUrl([
+													"frivolities",
+													"skill_badges",
+													b.key,
+												])}
+											>
+												<TierPill short={b.short} name={b.name} tier={3} />
+											</a>
+										),
+										sortValue: b.short,
+										searchValue: b.short,
+									},
+									b.name,
+									b.meaning,
+									b.gates ? `${b.drivers} (needs ${b.gates})` : b.drivers,
+									...b.counts,
+									...(hideRatings ? [] : [b.cutoffs?.join(" / ") ?? ""]),
+									{
+										value: (
+											<span className="small">
+												{b.top.map((p, i) => (
+													<span key={p.pid}>
+														{i > 0 ? ", " : ""}
+														<PlayerCell p={p} /> ({tiered.tierNames[p.tier - 1]}
+														)
+													</span>
+												))}
+											</span>
+										),
+										searchValue: b.top.map((p) => p.name).join(" "),
+										sortValue: b.top[0]?.name ?? "",
+									},
+								],
+							}))}
+					/>
+				</div>
+			))}
+		</>
+	);
+};
 type Badge = Props["badges"][number];
 type Combo = Props["combos"][number];
 
@@ -51,12 +231,29 @@ const Leaders = ({
 	</span>
 );
 
-const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
+const SkillBadges = ({
+	badges,
+	combos,
+	label,
+	numPlayers,
+	tiered,
+	userTid,
+}: Props) => {
 	useTitleBar({
-		title: "Skill Badges",
+		title: tiered ? "Badges" : "Skill Badges",
 		customMenu: frivolitiesMenu,
 	});
 	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
+	if (tiered) {
+		return (
+			<TieredBadges
+				tiered={tiered}
+				label={label}
+				userTid={userTid}
+				hideRatings={!!challengeNoRatings}
+			/>
+		);
+	}
 	const selected = badges.find((b) => b.label === label);
 	const listCols = [
 		{ title: "#", sortSequence: [] as [] },

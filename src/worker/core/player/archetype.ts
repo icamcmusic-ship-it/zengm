@@ -1,4 +1,8 @@
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
+import {
+	badgeWhyLine,
+	entryForSeason,
+} from "../../../common/tieredBadges/compute.ts";
 import { defenseWhy } from "../../../common/archetypes/v2/defenseLabels.ts";
 import {
 	labelSourceOf,
@@ -905,6 +909,14 @@ export const archetypeInfoForPlayer = async (
 		if (line) {
 			whyList = [...(whyList ?? []), line];
 		}
+	}
+	// 2K Badges: his best badges back the reading up (cited only; badges never change the archetype)
+	const badgeLine =
+		__SPORT === "basketball" && featureOn("twoKBadges")
+			? badgeWhyLine(entryForSeason(p.badges2k, season)?.t)
+			: undefined;
+	if (badgeLine) {
+		whyList = [...(whyList ?? []), badgeLine];
 	}
 	const mode = archetypeLabelSource();
 	const tk =

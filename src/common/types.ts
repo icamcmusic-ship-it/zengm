@@ -1039,6 +1039,10 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	rerandomizeDraftClassRatings: boolean;
 	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings
 	draftClassRegenSettings: Record<string, unknown> | undefined;
+	// 2K Badges (League Extra, basketball): the league's tier cutoffs, by season (common/tieredBadges, the last CUTOFF_HISTORY seasons)
+	tieredBadgeCutoffs:
+		| Record<number, import("./tieredBadges/compute.ts").TieredBadgeCutoffs>
+		| undefined;
 	draftBoardAutoDraft: boolean;
 
 	// Basketball only. Real coaching staff (coaches with ratings and contracts) instead of the coaching budget slider
@@ -1763,6 +1767,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
+	// Basketball, 2K Badges: his tiered badges, set each preseason (see src/common/tieredBadges), oldest first
+	badges2k?: import("./tieredBadges/compute.ts").TieredBadgeEntry[];
 	real?: boolean;
 	relatives: Relative[];
 	retiredYear: number;

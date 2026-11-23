@@ -58,6 +58,11 @@ import {
 	subSimTouches,
 } from "../GameSim.basketball/subRatingsSim.ts";
 import { subRatingsOn } from "../player/subRatings.ts";
+import {
+	ensureTieredBadges,
+	simTiers,
+	tieredBadgesOn,
+} from "../player/tieredBadges.ts";
 import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
 import { careerAgingOn, oldAgeMinutesCap } from "../player/careerAging.ts";
 import {
@@ -349,6 +354,12 @@ export const processTeam = async (
 		seasonStatsByPid = new Map(rows.map((p) => [p.pid, p.stats]));
 	}
 
+	// 2K Badges (basketball): each player's tiers this season, for the sim's badge effects (GameSim.basketball/tieredBadgesSim.ts)
+	const badgeSim = tieredBadgesOn();
+	if (badgeSim) {
+		await ensureTieredBadges();
+	}
+
 	for (const p of players) {
 		const injuryFactor = playThroughInjuriesFactor(p.injury.gamesRemaining);
 
@@ -443,6 +454,12 @@ export const processTeam = async (
 				}
 				if (tids.size > 0) {
 					(p2 as any).pbpTids = [...tids];
+				}
+			}
+			if (badgeSim) {
+				const bt = simTiers(p);
+				if (bt) {
+					(p2 as any).bt = bt;
 				}
 			}
 		}

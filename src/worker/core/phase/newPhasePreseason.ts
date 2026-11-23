@@ -38,6 +38,7 @@ import * as commercial from "../commercial/index.ts";
 import { OWNER_TYPES } from "../../../common/commercial.ts";
 import * as college from "../college/index.ts";
 import { updateArchetypesForPreseason } from "../player/archetype.ts";
+import { updateTieredBadges } from "../player/tieredBadges.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type {
 	Conditions,
@@ -683,6 +684,9 @@ const newPhasePreseason = async (
 
 	// The archetype label for the new season, now that development has happened
 	await updateArchetypesForPreseason(players);
+
+	// League Extras "2K Badges": this season's cutoffs and everyone's tiers, from the developed ratings (no randomness)
+	await updateTieredBadges();
 
 	// League Extras "Face Aging": faces a year older (seeded from pid and season, no game randomness)
 	if (!repeatSeason) {

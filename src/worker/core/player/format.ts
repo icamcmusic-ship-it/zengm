@@ -47,6 +47,12 @@ import {
 import { expandedRatingsApply } from "./expandedRatings.ts";
 import { fuzzSubs, subRatingsOn } from "./subRatings.ts";
 import { isValidSubArray } from "../../../common/subRatings.ts";
+import {
+	MAX_TOKENS,
+	badgeToken,
+	entryForSeason,
+	sortedBadges,
+} from "../../../common/tieredBadges/compute.ts";
 
 type PlayerFormatOptionsRequired = Required<
 	Omit<PlayerFormatOptions, "season" | "seasonRange" | "seasonType" | "tid">
@@ -569,8 +575,22 @@ const processAttrs = (
 	}
 };
 
+// 2K Badges (League Extra): its tier pills take the place of the extended skill badges
+const twoKBadgesOn = () => __SPORT === "basketball" && featureOn("twoKBadges");
+
 const badgesWithSkills = () =>
-	__SPORT === "basketball" && featureOn("skillBadges");
+	__SPORT === "basketball" &&
+	(featureOn("skillBadges") || featureOn("twoKBadges"));
+
+// 2K Badges: his stored badges of the row's season, best first, as display tokens ("2k:<key>:<tier>", see common/tieredBadges)
+const tieredTokensForRow = (pr: any, p: Player): string[] => {
+	const t = entryForSeason(p.badges2k, pr.season)?.t;
+	return t
+		? sortedBadges(t)
+				.slice(0, MAX_TOKENS)
+				.map(({ key, tier }) => badgeToken(key, tier))
+		: [];
+};
 
 // The ratings row as the user sees it (fuzzed unless fuzz is false, with God Mode and multi team mode turning fuzz off as everywhere
 // else): the one row both the displayed skills and the extended badges are computed from
@@ -594,6 +614,9 @@ const getBadgesForShownRow = (
 	skills: string[],
 	p: Player,
 ) => {
+	if (twoKBadgesOn()) {
+		return tieredTokensForRow(pr, p);
+	}
 	const r: any = {};
 	for (const key of BADGE_RATING_KEYS) {
 		const v = row[key];

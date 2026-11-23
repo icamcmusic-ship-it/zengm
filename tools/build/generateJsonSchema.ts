@@ -1811,6 +1811,9 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					draftClassRegenSettings: {
 						type: "object",
 					},
+					tieredBadgeCutoffs: {
+						type: "object",
+					},
 					fakeAgeProb: {
 						type: "number",
 						minimum: 0,

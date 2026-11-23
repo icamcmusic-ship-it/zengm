@@ -16,6 +16,7 @@ import { SeasonIcons } from "../../components/SeasonIcons.tsx";
 import TopStuff from "./TopStuff.tsx";
 import { ContractMood } from "./ContractMood.tsx";
 import { PlayerTraitsSummary } from "./Traits.tsx";
+import { TieredBadgesSection } from "./TieredBadges.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import { ProProjectionSection } from "../../components/ProProjection.tsx";
@@ -295,6 +296,10 @@ const Player2 = ({
 				/>
 				{showRatings ? <SubRatingsToggle view={subView} /> : null}
 			</HideableSection>
+
+			{player.tieredBadges ? (
+				<TieredBadgesSection info={player.tieredBadges} />
+			) : null}
 
 			{playerTraits && showRatings ? (
 				<PlayerTraitsSummary pid={player.pid} playerTraits={playerTraits} />
