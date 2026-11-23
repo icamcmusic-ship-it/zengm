@@ -50,7 +50,7 @@ export const relSeasonDelta = ({
 	const fame = traits.includes("F");
 	const loyal = traits.includes("L");
 	const winner = traits.includes("W");
-	let d = 0.08;
+	let d = 0.03;
 	d += (fame ? 0.28 : 0.18) * clamp(minutes, -1, 1);
 	d += 0.12 * clamp(dev, -1, 1);
 	d += 0.07 * personality;
@@ -61,7 +61,7 @@ export const relSeasonDelta = ({
 	if (loyal) {
 		d += 0.04;
 	}
-	d += 0.06 * noise;
+	d += 0.1 * noise;
 	d = clamp(d, -0.45, 0.45);
 	return Math.round(100 * clamp(0.9 * v + d, -1, 1)) / 100;
 };
