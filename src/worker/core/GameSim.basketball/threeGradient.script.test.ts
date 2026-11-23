@@ -243,6 +243,11 @@ test.skipIf(!env.THREE_GRAD)(
 						tp: row.tp,
 						fgaMid: row.fgaMidRange,
 						fgMid: row.fgMidRange,
+						fgaRim: row.fgaAtRim,
+						fgRim: row.fgAtRim,
+						fgaPost: row.fgaLowPost,
+						fgPost: row.fgLowPost,
+						zt: r.zt,
 					});
 				}
 			}

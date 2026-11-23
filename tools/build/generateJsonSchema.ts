@@ -162,6 +162,14 @@ const genRatings = (sport: Sport) => {
 				maximum: 100,
 			},
 		};
+		// Game Sim Fixes: shot zone tendencies, multipliers for [three, mid-range, rim, post]
+		properties.zt = {
+			type: "array",
+			items: {
+				type: "number",
+				minimum: 0,
+			},
+		};
 		// The same sub-ratings by name ({"Shot Blocking": 61, ...}), written by exports; on import the named values win
 		properties.subRatings = {
 			type: "object",

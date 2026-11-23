@@ -68,6 +68,7 @@ import {
 } from "../../../common/contracts.ts";
 import { ageFacesForPreseason } from "../../util/faceAging.ts";
 import { developStashed } from "../draftStash/index.ts";
+import { updateZoneTendencies } from "../player/zoneTendencies.ts";
 
 // When a player changes teams or leaves his team at the start of a new season without a normal signing or release (repeat season, forced historical rosters), his contract just ends before this season
 const endContractBeforeNewSeason = (
@@ -675,6 +676,11 @@ const newPhasePreseason = async (
 	}
 
 	await depthDev?.finish(players as any);
+
+	// Game Sim Fixes: shot mix toward each player's best zones, learned from last season (no randomness)
+	if (!repeatSeason && __SPORT === "basketball" && featureOn("simFixes")) {
+		updateZoneTendencies(players as any, newSeason);
+	}
 
 	// Draft-and-stash: players abroad develop too, after everyone else so a league without any develops exactly as before.
 	// From here on they go along with the others (archetypes, faces, saved below; the jersey numbers only look at rosters)

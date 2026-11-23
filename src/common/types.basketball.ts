@@ -106,6 +106,9 @@ export type PlayerRatings = {
 	// Sub-ratings (the subRatings setting, see common/subRatings.ts): one int per sub-rating, in the order of SUB_DEFS. Only on a
 	// player's last few rows (SUB_HISTORY), and missing in leagues that never had the setting on.
 	sub?: number[];
+	// Game Sim Fixes: shot zone tendencies learned from his own makes (worker/core/player/zoneTendencies.ts): multipliers on how often he
+	// picks [three, mid-range, rim, post]. Missing when all 1
+	zt?: number[];
 };
 
 export type RatingKey =

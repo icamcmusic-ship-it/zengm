@@ -604,6 +604,10 @@ export const processTeam = async (
 				);
 				// ...and lefties get a small edge at the rim (computed once per player here, not per shot)
 				(p2 as any).lefty = getShootingHand(p) === "left";
+				// ...and his shot zone tendencies, learned from his makes (player/zoneTendencies.ts)
+				if ((rating as any).zt) {
+					(p2 as any).zt = (rating as any).zt;
+				}
 			}
 		}
 		if (SEASON_STATS_KEYS !== undefined) {

@@ -397,6 +397,8 @@ type PlayerGameSim = {
 	bt?: number[];
 	injured: boolean;
 	newInjury: boolean;
+	// Game Sim Fixes: shot zone tendencies [three, mid, rim, post] (player/zoneTendencies.ts), when not all 1
+	zt?: number[];
 	// Game Sim Fixes: a knock (minor in-game injury), with the game minute when he is evaluated
 	knock?: { evalAt: number };
 	injury: PlayerInjury & {
@@ -6029,7 +6031,9 @@ class GameSim extends GameSimBase {
 								: 1) *
 							(sp ? sp.three : 1) *
 							(this.adjZone[this.d] === 0 ? this.adjSel[this.d] : 1) *
-							(this.allStarGame ? ALL_STAR_SIM.three : 1),
+							(this.allStarGame ? ALL_STAR_SIM.three : 1) *
+							// (Game Sim Fixes: his three tendency, learned from his makes)
+							(p.zt ? p.zt[0]! : 1),
 						p.compositeRating,
 					),
 				)
@@ -6151,12 +6155,23 @@ class GameSim extends GameSimBase {
 				// floored rating + synergy), with one random number instead of the old race of three (weight x random, biggest wins)
 				const clampMult = (m: number) =>
 					helpers.bound(m, fix.multMin, fix.multMax);
-				const w1 = fix.mid * clampMult(m1) * Math.max(fix.baseFloor, base1);
+				// (and his zone tendencies, learned from his makes: player/zoneTendencies.ts)
+				const zt = p.zt;
+				const w1 =
+					fix.mid *
+					clampMult(m1) *
+					Math.max(fix.baseFloor, base1) *
+					(zt ? zt[1]! : 1);
 				const w2 =
 					fix.rim *
 					clampMult(m2 * (trailBy2 ? fix.trailBy2Rim : 1)) *
-					Math.max(fix.baseFloor, base2);
-				const w3 = fix.post * clampMult(m3) * Math.max(fix.baseFloor, base3);
+					Math.max(fix.baseFloor, base2) *
+					(zt ? zt[2]! : 1);
+				const w3 =
+					fix.post *
+					clampMult(m3) *
+					Math.max(fix.baseFloor, base3) *
+					(zt ? zt[3]! : 1);
 				const rand = Math.random() * (w1 + w2 + w3);
 				// (encoded as r1/r2/r3 so the comparisons below pick the drawn type)
 				r1 = rand < w1 ? 1 : 0;
