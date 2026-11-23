@@ -192,8 +192,9 @@ export const coachRatingRef = (key: keyof CoachRatings, role: CoachRole) => {
 	return key === own ? COACH_BASE_RATING + 15 : COACH_BASE_RATING;
 };
 
-// Share of the gap to that reference closed each year (on top of the age trend): half the gap in about 17 years
-export const COACH_REVERSION = 0.03;
+// Share of the gap to that reference closed each year (on top of the age trend): half the gap in about 35 years (0.03 pulled the
+// hired, better-than-generated coaches down by about 2.7 head coach ovr over 30 seasons; 0.02 about 1)
+export const COACH_REVERSION = 0.02;
 
 /** Mean yearly change of one of a coach's ratings: the age trend, pulled toward what a coach of his age and job is made with. */
 export const coachRatingDrift = (

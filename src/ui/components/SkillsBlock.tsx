@@ -61,7 +61,8 @@ const BadgePill = ({ badge }: { badge: ParsedBadge }) => {
 							</>
 						) : (
 							<p className="text-body-secondary small mb-1">
-								No direct effect in games: it describes his game.
+								No direct effect in games: it describes his game. Within a tier,
+								badges with a game effect take his badge slots first.
 							</p>
 						)}
 						<div className="text-body-secondary small">

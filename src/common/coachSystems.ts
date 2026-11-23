@@ -1020,12 +1020,13 @@ export const bestSystems = (fit: ReturnType<typeof rosterSchemeFit>) => {
 // other team to this much less, for the defense system)
 export const FIT_MAKE_FACTOR = 0.004;
 // Strengths: offense/defense ratings of the head coach and coordinator ((x - 50) / 15, bounded +-2): make probability per unit. 0.0015
-// before, when an elite head coach (the league's top 5%) was worth about 1.5 wins a season more than a poor one (bottom 5%) with the
-// same roster; now about 5 (coachImpact.script.test.ts), still well under roster talent (scheme fit: about 3 wins per SD)
-export const STRENGTH_MAKE_FACTOR = 0.0045;
+// before (and no MOTIVATION_MAKE_FACTOR), when an elite head coach (the league's top 5%) was worth 1.2 wins (SE 0.6) a season more
+// than a poor one (bottom 5%) with the same roster; now 5.3 (SE 0.6; COACH_IMPACT=1 coachImpact.script.test.ts, 180 rosters x 40 games
+// each way), still under roster talent
+export const STRENGTH_MAKE_FACTOR = 0.0055;
 // The head coach's motivation ((x - 50) / 15): make probability per unit at both ends (effort and focus over the whole game, on top of
 // the late-game effect)
-export const MOTIVATION_MAKE_FACTOR = 0.002;
+export const MOTIVATION_MAKE_FACTOR = 0.0025;
 // A new system not yet installed costs this much (make probability, both ends) at the start
 export const INSTALL_MAKE_PENALTY = 0.005;
 // How far tendencies go in the first game with a new system (then ramp up to full)
