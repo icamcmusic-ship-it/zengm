@@ -3,11 +3,11 @@ import type {
 	Conditions,
 	ThreeResult,
 } from "../../../common/types.ts";
-import type { PlayerRatings } from "../../../common/types.basketball.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { updatePlayerAwards } from "../awards/awardsByPlayer.ts";
 import { getNextRoundType } from "./contest.ts";
+import { threeTalent } from "./weekend.ts";
 
 type Three = NonNullable<AllStars["three"]>;
 
@@ -119,8 +119,8 @@ export const simNextThreeEvent = async (
 				// Can happen if player was deleted before starting sim
 				success = false;
 			} else {
-				const ratings = p.ratings.at(-1) as PlayerRatings;
-				const rating = ratings.tp;
+				// Catch-and-shoot shooting from a rack (three-point rating, catch-and-shoot and its sub-ratings when there)
+				const rating = Math.min(100, Math.max(0, threeTalent(p)));
 
 				success = getShotOutcome(rating);
 			}

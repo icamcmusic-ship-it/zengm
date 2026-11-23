@@ -7,6 +7,9 @@ import { getAllStarCandidates, isEligible } from "./create.ts";
 import draftAll from "./draftAll.ts";
 import * as dunkContest from "./dunkContest.ts";
 import * as threeContest from "./threeContest.ts";
+import { simRisingStars } from "./risingStars.ts";
+import { simSkills } from "./skills.ts";
+import { playSemis } from "./tournament.ts";
 
 // Before the game: anyone on an All-Star team who got hurt, was released or retired since being picked is out, and the
 // commissioner names the next best eligible player (same conference for East vs West style teams) in his place. Players
@@ -17,17 +20,25 @@ export const replaceUnavailable = async (conditions: Conditions) => {
 		return [];
 	}
 
+	// Tournament format before its semifinals: the four teams. Otherwise the two All-Star teams
+	const tourney =
+		allStars.tournament &&
+		allStars.tournament.semis.some((semi) => semi.winner === undefined)
+			? allStars.tournament
+			: undefined;
+	const sides: AllStarPlayer[][] = tourney ? tourney.teams : allStars.teams;
+
 	const pidsUsed = new Set(
-		[...allStars.teams[0], ...allStars.teams[1], ...allStars.remaining].map(
+		[...sides.flat(), ...allStars.teams.flat(), ...allStars.remaining].map(
 			(p) => p.pid,
 		),
 	);
 
-	const numOut: [number, number] = [0, 0];
+	const numOut = sides.map(() => 0);
 	let changed = false;
-	for (const i of [0, 1] as const) {
+	for (const [i, side] of sides.entries()) {
 		const kept: AllStarPlayer[] = [];
-		for (const entry of allStars.teams[i]) {
+		for (const entry of side) {
 			const p = await idb.cache.players.get(entry.pid);
 			if (p && isEligible(p) && p.injury.gamesRemaining === 0) {
 				if (p.tid !== entry.tid) {
@@ -37,7 +48,7 @@ export const replaceUnavailable = async (conditions: Conditions) => {
 				}
 				kept.push(entry);
 			} else {
-				numOut[i] += 1;
+				numOut[i] = numOut[i]! + 1;
 				changed = true;
 				if (p) {
 					// Still an All-Star, listed with the ones who can't play
@@ -48,13 +59,13 @@ export const replaceUnavailable = async (conditions: Conditions) => {
 				}
 			}
 		}
-		allStars.teams[i] = kept;
+		sides[i] = kept;
 	}
 
 	const replacements: AllStarPlayer[] = [];
-	if (numOut[0] + numOut[1] > 0) {
+	if (numOut.some((n) => n > 0)) {
 		let cidsByTid: Record<number, number> | undefined;
-		let teamCids: (number | undefined)[] = [undefined, undefined];
+		let teamCids: (number | undefined)[] = sides.map(() => undefined);
 		if (allStars.type === "byConf") {
 			cidsByTid = {};
 			for (const t of await idb.cache.teams.getAll()) {
@@ -69,8 +80,8 @@ export const replaceUnavailable = async (conditions: Conditions) => {
 			(p) => !pidsUsed.has(p.pid) && p.injury.gamesRemaining === 0,
 		);
 
-		for (const i of [0, 1] as const) {
-			for (let j = 0; j < numOut[i]; j++) {
+		for (const i of sides.keys()) {
+			for (let j = 0; j < numOut[i]!; j++) {
 				const ind = candidates.findIndex(
 					(p) => cidsByTid === undefined || cidsByTid[p.tid] === teamCids[i],
 				);
@@ -84,7 +95,8 @@ export const replaceUnavailable = async (conditions: Conditions) => {
 					tid: p.tid,
 					name: p.name,
 				};
-				allStars.teams[i].push(obj);
+				obj.replacement = true;
+				sides[i]!.push(obj);
 				replacements.push(obj);
 			}
 		}
@@ -112,6 +124,10 @@ export const replaceUnavailable = async (conditions: Conditions) => {
 };
 
 export const simContests = async (conditions: Conditions) => {
+	// The night before: Rising Stars, then the skills challenge
+	await simRisingStars(conditions);
+	await simSkills(conditions);
+
 	const allStars = await idb.cache.allStars.get(g.get("season"));
 	if (allStars?.dunk && allStars.dunk.winner === undefined) {
 		while (true) {
@@ -143,6 +159,11 @@ const prepareGame = async (conditions: Conditions) => {
 	}
 
 	await replaceUnavailable(conditions);
+
+	// Tournament: the semifinals decide who plays the All-Star Game
+	if (!(await playSemis(conditions))) {
+		return false;
+	}
 
 	const allStars2 = await idb.cache.allStars.get(g.get("season"));
 	const numPlayersOnCourt = g.get("numPlayersOnCourt");

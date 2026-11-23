@@ -173,6 +173,7 @@ import {
 	NEUTRAL_EMPHASIS_SIM,
 } from "../../../common/offEmphasis.ts";
 import { AdvTracker } from "./advTracking.ts";
+import { ALL_STAR_SIM } from "./allStarSim.ts";
 import {
 	expectedFg,
 	pickShotZone,
@@ -918,6 +919,7 @@ class GameSim extends GameSimBase {
 		allStarGame,
 		baseInjuryRate,
 		neutralSite,
+		targetScore,
 	}: {
 		gid: number;
 		day?: number;
@@ -927,6 +929,9 @@ class GameSim extends GameSimBase {
 		allStarGame: boolean;
 		baseInjuryRate: number;
 		neutralSite: boolean;
+		// All-Star tournament games (allStarType "tournament"): untimed, the first team to this score wins (an Elam ending from
+		// the tip). Ignored outside All-Star games
+		targetScore?: number;
 	}) {
 		super({
 			gid,
@@ -1181,6 +1186,11 @@ class GameSim extends GameSimBase {
 		// Sanity check for very small values - things behave weirdly below this
 		this.paceFactor = Math.max(this.paceFactor, 0.1);
 
+		// All-Star Game: a faster game (allStarSim.ts)
+		if (allStarGame) {
+			this.paceFactor *= ALL_STAR_SIM.pace;
+		}
+
 		this.realPoss = !!g.get("realisticPossessions");
 		this.playTypes =
 			this.realPoss &&
@@ -1244,6 +1254,16 @@ class GameSim extends GameSimBase {
 		this.elamActive = false;
 		this.elamDone = false;
 		this.elamTarget = 0;
+		if (allStarGame && targetScore !== undefined && targetScore > 0) {
+			this.elam = true;
+			this.elamActive = true;
+			this.elamTarget = targetScore;
+			this.t = Infinity;
+			this.playByPlay.logEvent({
+				type: "elamActive",
+				target: this.elamTarget,
+			});
+		}
 
 		this.fatigueFactor = 0.055;
 
@@ -1733,7 +1753,8 @@ class GameSim extends GameSimBase {
 				this.checkElamEnding();
 			}
 
-			if (finalPeriod) {
+			// (an untimed game to a target score, the All-Star tournament, ends in its first period)
+			if (finalPeriod || this.elamDone) {
 				break;
 			}
 
@@ -1917,6 +1938,10 @@ class GameSim extends GameSimBase {
 		// Load, Fatigue & Venue: the referees
 		if (this.scheduleLoad) {
 			probability *= this.foulMult[this.d];
+		}
+
+		if (this.allStarGame) {
+			probability *= ALL_STAR_SIM.nonShootingFoul;
 		}
 
 		return probability * this.ga.foulRateFactor;
@@ -5185,6 +5210,9 @@ class GameSim extends GameSimBase {
 					probTransition *= this.oe[this.o].transition;
 				}
 			}
+			if (this.allStarGame) {
+				probTransition *= ALL_STAR_SIM.transition;
+			}
 			if (Math.random() < probTransition) {
 				shotAt = k * drawTransitionTime();
 				this.advTransition = true;
@@ -5441,6 +5469,9 @@ class GameSim extends GameSimBase {
 		if (this.realisticTurnovers) {
 			prob2 *= TURNOVERS.tovMult;
 		}
+		if (this.allStarGame) {
+			prob2 *= ALL_STAR_SIM.tov;
+		}
 		// 2K Badges: the offense's Handles and Ball Security on the floor (centered)
 		if (this.badgeSim) {
 			const o = this.playersOnCourt[this.o];
@@ -5531,6 +5562,9 @@ class GameSim extends GameSimBase {
 		}
 		if (this.realisticTurnovers) {
 			prob2 *= TURNOVERS.stlMult;
+		}
+		if (this.allStarGame) {
+			prob2 *= ALL_STAR_SIM.stl;
 		}
 		// 2K Badges: the defense's best Glove (centered)
 		if (this.badgeSim) {
@@ -5852,7 +5886,8 @@ class GameSim extends GameSimBase {
 										: 1)
 								: 1) *
 							(sp ? sp.three : 1) *
-							(this.adjZone[this.d] === 0 ? this.adjSel[this.d] : 1),
+							(this.adjZone[this.d] === 0 ? this.adjSel[this.d] : 1) *
+							(this.allStarGame ? ALL_STAR_SIM.three : 1),
 						p.compositeRating,
 					),
 				)
@@ -5899,7 +5934,7 @@ class GameSim extends GameSimBase {
 
 			// Better shooting in the ASG, why not?
 			if (this.allStarGame) {
-				probMake += 0.02;
+				probMake += ALL_STAR_SIM.makeThree;
 			}
 			probMake *= this.ga.threePointAccuracyFactor;
 		} else {
@@ -5913,7 +5948,8 @@ class GameSim extends GameSimBase {
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
 				(this.offEmph ? this.oe[this.o].mid : 1) *
 				(sp ? sp.mid : 1) *
-				(this.adjZone[this.d] === 1 ? this.adjSel[this.d] : 1);
+				(this.adjZone[this.d] === 1 ? this.adjSel[this.d] : 1) *
+				(this.allStarGame ? ALL_STAR_SIM.mid : 1);
 			const m2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				(sc
@@ -5934,7 +5970,8 @@ class GameSim extends GameSimBase {
 					? p.lefty
 						? this.lefty.driveLefty
 						: this.lefty.driveRighty
-					: 1);
+					: 1) *
+				(this.allStarGame ? ALL_STAR_SIM.rim : 1);
 			const m3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
 				(this.playTypes ? PLAY_TYPES.post : 1) *
@@ -5943,7 +5980,8 @@ class GameSim extends GameSimBase {
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(sp ? sp.post : 1) *
-				(this.adjZone[this.d] === 3 ? this.adjSel[this.d] : 1);
+				(this.adjZone[this.d] === 3 ? this.adjSel[this.d] : 1) *
+				(this.allStarGame ? ALL_STAR_SIM.post : 1);
 			// Synergy makes easy shots either more likely or less likely
 			const synergy =
 				this.synergyFactor *
@@ -6056,7 +6094,7 @@ class GameSim extends GameSimBase {
 			}
 			// Better shooting in the ASG, why not?
 			if (this.allStarGame) {
-				probMake += 0.1;
+				probMake += ALL_STAR_SIM.makeTwo;
 			}
 
 			if (this.playTypes) {
@@ -6100,6 +6138,7 @@ class GameSim extends GameSimBase {
 			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) *
 				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) *
 				contestBlk *
+				(this.allStarGame ? ALL_STAR_SIM.blk : 1) *
 				(this.badgeSim ? this.badgeBlkMult(type) : 1) >
 			Math.random()
 		) {
@@ -6113,7 +6152,7 @@ class GameSim extends GameSimBase {
 				this.ga.foulRateFactor;
 
 			if (this.allStarGame) {
-				foulFactor *= 0.4;
+				foulFactor *= ALL_STAR_SIM.shootingFoul;
 			}
 
 			// Sub-Ratings in Sim: calibration (the league's contact finishing is below its dunks/layups rating)
@@ -6167,7 +6206,9 @@ class GameSim extends GameSimBase {
 			}
 			probMake =
 				(probMake -
-					0.25 * (md ? teamDefense + matchupDelta : teamDefense) +
+					0.25 *
+						(md ? teamDefense + matchupDelta : teamDefense) *
+						(this.allStarGame ? ALL_STAR_SIM.defense : 1) +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)) *
 				currentFatigue;
@@ -6353,7 +6394,9 @@ class GameSim extends GameSimBase {
 			desperation: forceThreePointer || rushed,
 			fgaLogType,
 			probAndOne: clampProb(probAndOne),
-			probMake: clampProb(probMake),
+			probMake: clampProb(
+				this.allStarGame ? Math.min(probMake, ALL_STAR_SIM.makeMax) : probMake,
+			),
 			probMissAndFoul: clampProb(probMissAndFoul),
 			type,
 		};

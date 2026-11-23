@@ -425,6 +425,12 @@ export const getDefaultSettings = () => {
 		weightFactor: unwrapGameAttribute(defaultGameAttributes, "weightFactor"),
 		allStarDunk: unwrapGameAttribute(defaultGameAttributes, "allStarDunk"),
 		allStarThree: unwrapGameAttribute(defaultGameAttributes, "allStarThree"),
+		allStarVote: unwrapGameAttribute(defaultGameAttributes, "allStarVote"),
+		allStarRisingStars: unwrapGameAttribute(
+			defaultGameAttributes,
+			"allStarRisingStars",
+		),
+		allStarSkills: unwrapGameAttribute(defaultGameAttributes, "allStarSkills"),
 		minRetireAge: unwrapGameAttribute(defaultGameAttributes, "minRetireAge"),
 		numWatchColors: unwrapGameAttribute(
 			defaultGameAttributes,

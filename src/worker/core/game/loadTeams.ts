@@ -909,6 +909,11 @@ const loadTeams = async (tids: number[], conditions: Conditions) => {
 				},
 				players,
 			);
+
+			// Tournament format: the final is played to a target score (play.ts passes it to GameSim)
+			if (allStars.tournament) {
+				(teams[tid] as any).targetScore = allStars.tournament.targetFinal;
+			}
 		}
 	} else {
 		for (const tid of tids) {

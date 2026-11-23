@@ -126,6 +126,70 @@ export type AllStarPlayer = {
 	pid: number;
 	tid: number;
 	name: string;
+	// Vote selection (allStarVote): voted in as a starter, or named by the commissioner in place of an injured All-Star
+	starter?: true;
+	replacement?: true;
+};
+
+// One row of the All-Star vote (allStarVote, basketball): the fans' votes and each electorate's rank (1 = first), no ratings
+export type AllStarVoteRow = {
+	pid: number;
+	tid: number;
+	name: string;
+	// The conference voted in (-1 when the league votes as one)
+	cid: number;
+	court: "backcourt" | "frontcourt";
+	fanVotes: number;
+	fanRank: number;
+	playerRank: number;
+	mediaRank: number;
+	// Weighted rank: fans 50%, players 25%, media 25% (lower is better)
+	score: number;
+	selected?: "starter" | "reserve" | "replacement";
+};
+
+// A short box score for the weekend's exhibition games that aren't stored as games (Rising Stars, the tournament's semifinals)
+export type AllStarMiniBoxPlayer = {
+	pid: number;
+	tid: number;
+	name: string;
+	min: number;
+	pts: number;
+	trb: number;
+	ast: number;
+	stl: number;
+	blk: number;
+	fg: number;
+	fga: number;
+	tp: number;
+	tpa: number;
+	ft: number;
+	fta: number;
+	// Made shots at the rim (dunks and layups)
+	rim: number;
+};
+
+export type AllStarMiniGame = {
+	teamNames: [string, string];
+	score: [number, number];
+	// Untimed games to a target score (the tournament)
+	target?: number;
+	overtimes: number;
+	players: [AllStarMiniBoxPlayer[], AllStarMiniBoxPlayer[]];
+	mvp?: AllStarPlayer;
+};
+
+export type SkillsRun = {
+	index: number;
+	// Seconds for each station and in all (handle: the dribbling slalom, pass: the passing targets, shoot: the jumper, sprint: the
+	// full-court finish), with the misses that cost time
+	time: number;
+	handle: number;
+	pass: number;
+	shoot: number;
+	sprint: number;
+	passMisses: number;
+	shotMisses: number;
 };
 
 export type DunkAttempt = {
@@ -208,6 +272,41 @@ export type AllStars = {
 
 		// Index of players array above. Undefined if still in progress
 		winner?: number;
+	};
+
+	// The All-Star vote (allStarVote, basketball): the top of each ballot
+	votes?: AllStarVoteRow[];
+
+	// Rising Stars game (allStarRisingStars, basketball): first- and second-year players
+	risingStars?: {
+		teamNames: [string, string];
+		teams: [AllStarPlayer[], AllStarPlayer[]];
+		game?: AllStarMiniGame;
+	};
+
+	// Skills challenge (allStarSkills, basketball): an obstacle course, the two fastest of the first round race again
+	skills?: {
+		players: AllStarPlayer[];
+		rounds: {
+			indexes: number[];
+			runs: SkillsRun[];
+		}[];
+		winner?: number;
+	};
+
+	// Tournament format (allStarType "tournament"): four teams, two semifinals to a target score, and the final (the All-Star Game,
+	// teams[0] vs teams[1]) to its own target
+	tournament?: {
+		teamNames: string[];
+		teams: AllStarPlayer[][];
+		semis: {
+			// Indexes of tournament.teams
+			teams: [number, number];
+			game?: AllStarMiniGame;
+			winner?: number;
+		}[];
+		targetSemis: number;
+		targetFinal: number;
 	};
 };
 
@@ -689,9 +788,13 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 
 	allStarGame: number | null;
 	allStarNum: number;
-	allStarType: "draft" | "byConf" | "top";
+	allStarType: "draft" | "byConf" | "top" | "tournament";
 	allStarDunk: boolean;
 	allStarThree: boolean;
+	// All-Star weekend (basketball): the fan/player/media vote with position slots, the Rising Stars game and the skills challenge
+	allStarVote: boolean;
+	allStarRisingStars: boolean;
+	allStarSkills: boolean;
 	alwaysShowCountry: boolean;
 	autoExpand:
 		| {

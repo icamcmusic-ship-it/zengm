@@ -1920,6 +1920,9 @@ export const settings: Setting[] = (
 				...(__SPORT === "basketball" ? [{ key: "draft", value: "Draft" }] : []),
 				{ key: "byConf", value: "By Conference" },
 				{ key: "top", value: "Mixed" },
+				...(__SPORT === "basketball"
+					? [{ key: "tournament", value: "Tournament" }]
+					: []),
 			],
 			descriptionLong: (
 				<>
@@ -1937,6 +1940,13 @@ export const settings: Setting[] = (
 						<b>Mixed:</b> Teams are made up of the top players, regardless of
 						conference.
 					</p>
+					{__SPORT === "basketball" ? (
+						<p>
+							<b>Tournament:</b> The All-Stars are split into four teams. Two
+							semifinals are played to a target score, untimed, and the winners
+							meet in the All-Star Game, also to a target score.
+						</p>
+					) : null}
 				</>
 			),
 		},
@@ -3328,6 +3338,49 @@ export const settings: Setting[] = (
 			name: "Enable 3pt Contest",
 			type: "bool",
 		},
+		...(__SPORT === "basketball"
+			? ([
+					{
+						category: "All-Star",
+						key: "allStarVote",
+						name: "All-Star Vote",
+						type: "bool",
+						descriptionLong: (
+							<>
+								<p>
+									All-Stars are voted in: fans (half of the vote, swayed by
+									scoring, fame, team buzz and market size), players and media
+									(a quarter each, by how well they've played) pick the
+									starters, two backcourt and three frontcourt players per
+									conference. The reserves fill out the team with at least two
+									more guards and three more frontcourt players. Players need to
+									have played enough of their team's games.
+								</p>
+								<p>
+									When off, the All-Stars are simply the players with the best
+									stats.
+								</p>
+							</>
+						),
+					},
+					{
+						category: "All-Star",
+						key: "allStarRisingStars",
+						name: "Enable Rising Stars Game",
+						type: "bool",
+						description:
+							"First-year players against second-year players, the night before the All-Star Game.",
+					},
+					{
+						category: "All-Star",
+						key: "allStarSkills",
+						name: "Enable Skills Challenge",
+						type: "bool",
+						description:
+							"A timed obstacle course: dribbling, passing, shooting and a sprint to the finish.",
+					},
+				] as Setting[])
+			: []),
 		{
 			category: "All-Star",
 			key: "numPlayersThree",

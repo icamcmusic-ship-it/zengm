@@ -78,6 +78,16 @@ const logEventAwardsByPlayer = ({
 	} else if (p.award.type === "Three-Point Contest Winner") {
 		text += "won the three-point contest.";
 		score = 10;
+	} else if (p.award.type === "Skills Challenge Winner") {
+		text += "won the skills challenge.";
+		score = 10;
+	} else if (p.award.type === "Rising Stars MVP") {
+		text += `was named MVP of the <a href="${helpers.leagueUrl([
+			"all_star",
+			"weekend",
+			season,
+		])}">Rising Stars game</a>.`;
+		score = 10;
 	} else if (p.award.type === undefined && p.award.numTeams !== undefined) {
 		// Team awards - arguably should have formatAwardNamePrefix here too, idk
 		const groupPrefix = getGroupPrefix(p.award, season);

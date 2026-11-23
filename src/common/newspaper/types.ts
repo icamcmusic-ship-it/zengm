@@ -446,6 +446,46 @@ export type NewsFacts = {
 	draftPreview?: NPDraftPreview;
 	// Rivalry Stories setting: previews of upcoming marquee rivalry games and recaps of this season's big ones
 	rivalry?: { previews: NPRivalryStory[]; recaps: NPRivalryStory[] };
+	// All-Star weekend (basketball), once something of it has happened
+	allStar?: NPAllStar;
+};
+
+export type NPAllStarPlayer = { pid: number; tid: number; name: string };
+
+export type NPAllStarLine = NPAllStarPlayer & {
+	pts: number;
+	trb: number;
+	ast: number;
+	tp: number;
+};
+
+export type NPAllStar = {
+	format: "draft" | "byConf" | "top" | "tournament";
+	teamNames: [string, string];
+	gid?: number;
+	score?: [number, number];
+	overtimes?: number;
+	mvp?: NPAllStarLine;
+	// The fans' top vote-getter
+	fanLeader?: NPAllStarPlayer & { fanVotes: number };
+	numReplacements?: number;
+	dunk?: {
+		winner?: NPAllStarPlayer;
+		// The best-scored dunk of the contest, in words ("a windmill from 12 feet")
+		best?: NPAllStarPlayer & { score: number; desc: string };
+	};
+	three?: { winner?: NPAllStarPlayer; score?: number };
+	skills?: {
+		winner?: NPAllStarPlayer;
+		time?: number;
+		runnerUp?: NPAllStarPlayer;
+	};
+	risingStars?: {
+		teamNames: [string, string];
+		score: [number, number];
+		mvp?: NPAllStarLine;
+	};
+	semis?: { teamNames: [string, string]; score: [number, number] }[];
 };
 
 export type NPRivalryStory = {

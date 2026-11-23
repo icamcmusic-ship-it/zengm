@@ -1272,6 +1272,9 @@ const deleteScheduledEvents = async (type: string) => {
 						"elamASG",
 						"allStarDunk",
 						"allStarThree",
+						"allStarVote",
+						"allStarRisingStars",
+						"allStarSkills",
 					],
 					event,
 				);

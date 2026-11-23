@@ -534,6 +534,11 @@ const play = async (
 
 			// @ts-expect-error
 			dh,
+
+			// All-Star tournament final: to a target score (basketball, set by loadTeams)
+			...(allStarGame && teams[0].targetScore !== undefined
+				? { targetScore: teams[0].targetScore }
+				: {}),
 		}).run();
 	};
 
