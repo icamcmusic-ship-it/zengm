@@ -18,6 +18,15 @@ import {
 } from "../../../common/coachSystems.ts";
 import { range } from "../../../common/utils.ts";
 import { team } from "../index.ts";
+import {
+	coachMind,
+	deriveDecisionTraits,
+	leagueRead,
+	perceiveTeam,
+	planCoachDecisions,
+	readTeam,
+} from "../../../common/coachDecisions.ts";
+import { applyPlan, decisionPlayer } from "../staff/coachDecisions.ts";
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const sd = (xs) => {
@@ -253,6 +262,167 @@ test.skipIf(!process.env.COACH_SPREAD)(
 		};
 		console.log(
 			`${rows.length} matchups x ${games} games, team ovr difference SD ${sd(rows.map((r) => r.d)).toFixed(2)}: net per ovr point off ${slope("off").toFixed(3)} on ${slope("on").toFixed(3)}; matchup net SD off ${sd(rows.map((r) => r.off)).toFixed(2)} on ${sd(rows.map((r) => r.on)).toFixed(2)}`,
+		);
+	},
+	3_600_000,
+);
+
+// Coach Decisions: the same rosters and seeds with an elite and a poor head coach in game prep and player management (top and bottom 5% of
+// the league's head coaches, CD_CAL's percentiles), the coach's game-day calls on (starters, matchups, the stopper, attacking weaknesses,
+// minutes, closers, hot hand, halftime; not the season-long ones that need a record of games: form, promises, rest nights). With
+// COACH_DECISIONS_ALL=1 the elite and poor coaches also differ in offense, defense, motivation and game management (ELITE / POOR), for the
+// whole head coach impact with decisions. COACH_DECISIONS_IMPACT=1 npx vitest --run --project basketball <this file>
+const ELITE_DECISIONS = { prp: 74, plm: 72 };
+const POOR_DECISIONS = { prp: 45, plm: 31 };
+
+test.skipIf(!process.env.COACH_DECISIONS_IMPACT)(
+	"elite vs poor game prep and player management on the same roster",
+	async () => {
+		const numLeagues = Number(process.env.COACH_IMPACT_LEAGUES ?? 2);
+		const games = Number(process.env.COACH_IMPACT_GAMES ?? 40);
+		const all = !!process.env.COACH_DECISIONS_ALL;
+		const diffs = [];
+		let gamesPlayed = 0;
+		const ALL_DELEGATED = {
+			starters: true,
+			rotation: true,
+			minutes: true,
+			matchups: true,
+		};
+		const putPair = async (league, pair) => {
+			await genTeams();
+			for (const p of await idb.cache.players.getAll()) {
+				await idb.cache.players.delete(p.pid);
+			}
+			for (const tid of [0, 1]) {
+				for (const p of league[pair * 2 + tid].players) {
+					await idb.cache.players.put(structuredClone(p));
+				}
+			}
+			g.setWithoutSavingToDB("storePlayByPlay", false);
+			for (const [key, value] of Object.entries(SETTINGS)) {
+				g.setWithoutSavingToDB(key, value);
+			}
+		};
+		for (const L of range(numLeagues)) {
+			const league = await genLeague({
+				numPairs: 15,
+				seed: 300 + L,
+				settings: SETTINGS,
+			});
+			// How every team looks to an opposing coach (for what counts as a weak defense or a fast team)
+			const reads = [];
+			for (let pair = 0; pair * 2 < league.length; pair++) {
+				await withSeededRandom(L * 31 + pair, async () => {
+					await putPair(league, pair);
+					const teams = await loadTeams([0, 1], {});
+					for (const tid of [0, 1]) {
+						reads[pair * 2 + tid] = readTeam(
+							teams[tid].player.map((p2) =>
+								decisionPlayer(p2, undefined, tid, 2025, undefined),
+							),
+							teams[tid].pace,
+							5,
+						);
+					}
+				});
+			}
+			const lgRead = leagueRead(reads);
+			const mindOfTeam = (t, ratings) =>
+				coachMind(
+					{ ...t.head, prp: 50, plm: 50, ...ratings },
+					t.profile,
+					deriveDecisionTraits({
+						firstName: "C",
+						lastName: String(t.head.off),
+						born: { year: 1970 },
+						profile: t.profile,
+					}),
+				);
+			for (let pair = 0; pair * 2 < league.length; pair++) {
+				for (const side of [0, 1]) {
+					const idx = pair * 2 + side;
+					const won = {};
+					for (const [name, ratings, head] of [
+						["elite", ELITE_DECISIONS, ELITE],
+						["poor", POOR_DECISIONS, POOR],
+					]) {
+						const sims = all
+							? simWith(league, idx, head)
+							: league.map((t) => t.sim);
+						const minds = [0, 1].map((tid) =>
+							pair * 2 + tid === idx
+								? mindOfTeam(league[idx], {
+										...ratings,
+										...(all
+											? { off: head.off, def: head.def, mot: head.mot }
+											: {}),
+									})
+								: mindOfTeam(league[pair * 2 + tid], {}),
+						);
+						if (all) {
+							minds[side] = { ...minds[side], mgmt: head.mgmt };
+						}
+						won[name] = 0;
+						await withSeededRandom(
+							(L * 1000 + pair) * 7919 + side * 104729,
+							async () => {
+								await putPair(league, pair);
+								for (const i of range(games)) {
+									const teams = await loadTeams([0, 1], {});
+									for (const tid of [0, 1]) {
+										const t = teams[tid];
+										t.coachSim = { ...sims[pair * 2 + tid] };
+										const plan = planCoachDecisions(
+											t.player.map((p2) =>
+												decisionPlayer(p2, undefined, tid, 2025, undefined),
+											),
+											{
+												mind: minds[tid],
+												numPlayersOnCourt: 5,
+												playoffs: false,
+												rebuilding: false,
+												marquee: false,
+												rivalry: false,
+												opp: perceiveTeam(
+													reads[pair * 2 + 1 - tid],
+													minds[tid].prep,
+													`${L}|${pair}|${side}|${i}|${tid}`,
+												),
+												league: lgRead,
+												delegate: ALL_DELEGATED,
+											},
+										);
+										applyPlan(t, plan, ALL_DELEGATED, minds[tid], false, false);
+									}
+									const home = i % 2;
+									const result = new GameSim({
+										gid: i,
+										teams: [teams[home], teams[1 - home]],
+										baseInjuryRate: 0,
+										doPlayByPlay: false,
+										homeCourtFactor: 1,
+										allStarGame: false,
+										neutralSite: false,
+									}).run();
+									const mine = result.team.find((t) => t.id === side);
+									const theirs = result.team.find((t) => t.id !== side);
+									if (mine.stat.pts > theirs.stat.pts) {
+										won[name] += 1;
+									}
+								}
+							},
+						);
+					}
+					gamesPlayed += games;
+					diffs.push((won.elite - won.poor) / games);
+				}
+			}
+		}
+		const m = mean(diffs);
+		const se = sd(diffs) / Math.sqrt(diffs.length);
+		console.log(
+			`elite - poor ${all ? "head coach (all ratings, with decisions)" : "game prep and player management"}: ${(82 * m).toFixed(2)} wins per 82 (SE ${(82 * se).toFixed(2)}), ${diffs.length} rosters, ${gamesPlayed} games each`,
 		);
 	},
 	3_600_000,

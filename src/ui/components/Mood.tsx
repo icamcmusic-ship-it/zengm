@@ -43,6 +43,8 @@ const componentText = (
 				return "Likes the coach and fits his system";
 			case "coachRel":
 				return "Close with the head coach";
+			case "rolePromise":
+				return "Counting on the role he was promised";
 			case "relatives":
 				return `Wants to play with ${helpers.pronoun(gender, "his")} ${helpers.plural("relative", value / 2)}`;
 		}
@@ -73,6 +75,8 @@ const componentText = (
 			return "Doesn't fit the coach's system";
 		case "coachRel":
 			return "Strained relationship with the head coach";
+		case "rolePromise":
+			return "The coach broke the role he was promised";
 	}
 };
 

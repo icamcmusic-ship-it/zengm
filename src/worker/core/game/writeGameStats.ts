@@ -279,6 +279,11 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 		if (cs) {
 			(gameStats.teams[i] as any).coachSys = { off: cs.off, def: cs.def };
 		}
+		// Coach Decisions: the coach's pregame note (why tonight's lineup and minutes), for the box score and the play-by-play header
+		const note = (results.team[i] as any).coachNote;
+		if (Array.isArray(note) && note.length > 0) {
+			(gameStats.teams[i] as any).coachNote = note;
+		}
 	}
 	if (
 		__SPORT === "basketball" &&

@@ -1433,6 +1433,9 @@ export type MoodComponents = {
 	coachFit: number;
 	// Player–coach relationships: his bond with the team's head coach. 0 with the setting off (missing in old mood snapshots)
 	coachRel: number;
+	// Coach Decisions: a role promised to him (kept or broken), or offered in the negotiation. 0 with the setting off (missing in old
+	// mood snapshots)
+	rolePromise: number;
 	custom?: {
 		text: string;
 		amount: number;
@@ -1445,6 +1448,9 @@ export type Negotiation = {
 	pid: number;
 	tid: number;
 	resigning: boolean;
+
+	// Coach Decisions: the role the user promises him with this offer (free agency or re-signing)
+	rolePromise?: "starter" | "rotation";
 
 	// In-season extension for a player under contract. Never saved to the database, it's created whenever it's needed, like a free agent negotiation. amount and exp are what he asks for, before mood.
 	extension?: FlatContractInfo;
@@ -1869,6 +1875,10 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	health?: PlayerHealth;
 	// injuryDepth setting: rest this player on the second night of back-to-backs
 	loadManagement?: boolean;
+	// Coach Decisions (basketball, common/coachDecisions.ts): his recent form for earned and lost roles, updated after each game
+	coachForm?: import("./coachDecisions.ts").CoachForm;
+	// Coach Decisions: a role promised when he signed (free agency or re-signing), honored by the head coach; breaking it hurts his mood
+	rolePromise?: import("./coachDecisions.ts").RolePromise;
 	// AI Roster Balance: signed to a hardship contract by this team this season (released when the team is healthy again)
 	hardship?: { tid: number; season: number };
 	jerseyNumber?: string; // Should be undefined only for a player who has never been on a team, or a player signed to his first team before the preseason
@@ -2818,6 +2828,12 @@ export type Team = {
 
 	// injuryDepth setting: rest older/injury-prone players on the second night of back-to-backs
 	loadManagement?: boolean;
+
+	// Coach Decisions (basketball): what the head coach decides on the user's team (missing: everything when keepRosterSorted, else
+	// nothing), the user's lineup preset for the next game, and how often the user overrode the coach this season
+	coachDelegation?: import("./coachDecisions.ts").CoachDelegation;
+	lineupPreset?: import("./coachDecisions.ts").LineupPreset;
+	coachPushback?: import("./coachDecisions.ts").CoachPushback;
 
 	// featureGmPersonalities setting: the AI general manager (none for a team the user runs), and GMs who left this team and are
 	// still on the market (or retired), see core/gm

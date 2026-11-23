@@ -118,6 +118,8 @@ const RATING_KEYS: (keyof CoachRatings)[] = [
 	"sht",
 	"cnd",
 	"vid",
+	"prp",
+	"plm",
 ];
 
 // The four ratings as words and small bars (not just numbers)

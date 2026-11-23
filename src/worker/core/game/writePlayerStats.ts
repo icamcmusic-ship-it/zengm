@@ -23,6 +23,7 @@ import {
 	isInjuryDepthEnabled,
 	maybeSameBodyPart,
 } from "../player/injuryDepth.ts";
+import { recordCoachDecisionGame } from "../staff/coachDecisions.ts";
 
 export const P_FATIGUE_DAILY_REDUCTION = 20;
 
@@ -502,6 +503,18 @@ const writePlayerStats = async (
 
 					// Stats are accumulated by dynamic keys from the box score, so treat the row as a generic record
 					const ps: Record<string, any> = psLatest;
+
+					// Coach Decisions: his form (earned and lost roles) and a promised role (only with the setting on: the sim sets
+					// t.coachDecisions)
+					if (__SPORT === "basketball" && (t as any).coachDecisions) {
+						recordCoachDecisionGame(
+							p2,
+							p,
+							t.id,
+							(t as any).coachDecisions.resp,
+							playoffs,
+						);
+					}
 
 					if (__SPORT === "hockey") {
 						if (p2.pid === goaliePID) {

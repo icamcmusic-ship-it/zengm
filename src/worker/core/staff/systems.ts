@@ -1128,6 +1128,12 @@ export const headCoachFitBonus = (
 		(rebuilding
 			? 4 * profile.philosophy + 2 * profile.youth + 0.04 * (c.ratings.dev - 50)
 			: -2.5 * profile.philosophy + 0.08 * (profile.mgmt - 50)) +
+		// Coach Decisions (when he has the ratings): a contender wants a game preparer, a rebuilding team a player manager
+		(c.ratings.prp !== undefined && c.ratings.plm !== undefined
+			? rebuilding
+				? 0.05 * (c.ratings.plm - 50)
+				: 0.05 * (c.ratings.prp - 50)
+			: 0) +
 		2.5 * patience * profile.philosophy +
 		0.05 * Math.max(0, -patience) * (profile.mgmt - 50) +
 		0.08 * (coachReputation(c) - 50)

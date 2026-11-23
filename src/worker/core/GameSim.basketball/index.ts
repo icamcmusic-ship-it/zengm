@@ -225,6 +225,10 @@ import {
 	ADV as ADV_LAYOUT,
 	SHOT_ZONE_INDEX,
 } from "../../../common/advStats.ts";
+import {
+	HALFTIME,
+	type CoachGameSettings,
+} from "../../../common/coachDecisions.ts";
 
 // Shot Share Model: the shot diet fields (read once: used in the sim's hot path)
 const SD = {
@@ -455,6 +459,8 @@ type TeamGameSim = {
 	pace: number; // mean number of possessions the team likes to have in a game
 	// Coaching systems (the coachSystems setting, common/coachSystems.ts), set by staff/systems.ts applyCoachSystems. Undefined: no effect
 	coachSim?: CoachSim;
+	// Coach Decisions (the coachDecisions setting), set by staff/coachDecisions.ts applyCoachDecisions. Undefined: no effect
+	coachDecisions?: CoachGameSettings;
 	// Offensive Emphasis (featureOffEmphasis, common/offEmphasis.ts), set by worker/core/offEmphasis applyOffEmphasis. Undefined: no effect
 	offEmphasis?: EmphasisSim;
 	// Shot Profiles & Defensive Schemes (loadTeams): the team's defensive scheme. Undefined when off
@@ -485,6 +491,11 @@ type PossessionOutcome =
 type ClockFactor = ReturnType<GameSim["getClockFactor"]>;
 
 const teamNums: [TeamNum, TeamNum] = [0, 1];
+
+// Coach Decisions: late-game free throws (see pickFormClosers)
+const CD_FT_LEAD = 6;
+const CD_FT_SECONDS = 120;
+const CD_FT_REF = 0.55;
 
 // perf4: what a value cached for a lineup was worked out from: the players on the court in court order, and what of theirs
 // the lineup caches read (their trait effects and height, set once per game in loadTeams; compared too, so a test or a God
@@ -775,6 +786,12 @@ class GameSim extends GameSimBase {
 	// below is used and no random numbers are drawn differently, so games play out exactly as before
 	coachSys = false;
 	cs: [CoachSim, CoachSim] = [NEUTRAL_CS, NEUTRAL_CS];
+	// Coach Decisions (staff/coachDecisions.ts): each team's coach's in-game settings (foul trouble, hot hand, closers, halftime, the
+	// stopper). Undefined with the setting off: nothing changes
+	cd: [CoachGameSettings | undefined, CoachGameSettings | undefined] = [
+		undefined,
+		undefined,
+	];
 	// The current segment of the possession followed a shot or free throw attempt (for the shot clock reset when it goes out off the defense)
 	afterShotAttempt = false;
 	// Spacing & Shot Creation (League extras, see spacingCreation.ts): the spacing of each team's five (refreshed with the synergy, at
@@ -1016,6 +1033,10 @@ class GameSim extends GameSimBase {
 					p.gameZ = gaussian();
 				}
 			}
+		}
+
+		if (!allStarGame) {
+			this.cd = [teams[0].coachDecisions, teams[1].coachDecisions];
 		}
 
 		if (teams[0].coachSim || teams[1].coachSim) {
@@ -2306,6 +2327,9 @@ class GameSim extends GameSimBase {
 					minutesRestriction: (p as any).minutesRestriction,
 					injuryRestriction: (p as any).injuryRestriction,
 					coachMinutesMult: (p as any).coachMinutesMult,
+					// Coach Decisions: his place in the coach's order and a minutes floor (staff/coachDecisions.ts)
+					coachKeyMult: (p as any).coachKeyMult,
+					coachFloor: (p as any).coachFloor,
 				})),
 				{
 					playoffs,
@@ -2350,7 +2374,7 @@ class GameSim extends GameSimBase {
 	}
 
 	// Realistic Rotations: after a foul, does he have to sit for a while (rotationPlanner.ts foulTroubleSitUntil)
-	onPersonalFoul(p: PlayerGameSim) {
+	onPersonalFoul(p: PlayerGameSim, t: TeamNum) {
 		const sitUntil = foulTroubleSitUntil({
 			pf: p.stat.pf,
 			period: this.team[0].stat.ptsQtrs.length,
@@ -2358,6 +2382,8 @@ class GameSim extends GameSimBase {
 			foulsNeededToFoulOut: this.rotationFoulsToFoulOut,
 			quarterSeconds: this.rotationQuarterSeconds,
 			elapsed: this.elapsedRegulationSeconds(),
+			// Coach Decisions: the coach's own foul-trouble rules (undefined with the setting off)
+			ride: this.cd[t]?.ride,
 		});
 		if (
 			sitUntil !== undefined &&
@@ -2404,10 +2430,78 @@ class GameSim extends GameSimBase {
 			if (od) {
 				return this.pickEndgameClosers(t, candidates);
 			}
+			// Coach Decisions: the best five for this game (tonight's play counts), not just the best on paper
+			if (this.cd[t] && this.cd[t]!.closerForm > 0) {
+				return this.pickFormClosers(t, candidates);
+			}
 			return this.breakout
 				? this.pickHotClosers(candidates)
 				: pickClosers(candidates, this.numPlayersOnCourt);
 		}) as [Set<PlayerGameSim>, Set<PlayerGameSim>];
+	}
+
+	// Coach Decisions: late-game free throws (pickFormClosers): ahead by 1-CD_FT_LEAD with CD_FT_SECONDS or less left, a closer's value
+	// is cut by ftSubs x how far his free throw composite is below CD_FT_REF
+	// Coach Decisions: the closing lineup by value x tonight's play (game score per minute against the team's, by the coach's game prep),
+	// with Breakout nights' hot role players on top. No random numbers
+	pickFormClosers(t: TeamNum, candidates: PlayerGameSim[]) {
+		const w = this.cd[t]!.closerForm;
+		const rate = (p: PlayerGameSim) =>
+			helpers.gameScore(p.stat) / (p.stat.min + 6);
+		let sum = 0;
+		let n = 0;
+		for (const p of candidates) {
+			if (p.stat.min >= 6) {
+				sum += rate(p);
+				n += 1;
+			}
+		}
+		const teamRate = n > 0 ? sum / n : 0;
+		const hot = (p: PlayerGameSim) =>
+			this.breakout && p.ss !== undefined && p.ss.rf > 0 && hotCloser(p.stat);
+		// Late-game free throws: ahead in the last 2 minutes (before End-of-Game Intelligence's last-minute substitutions), the other team
+		// may foul, so a coach who prepares for it plays his free throw shooters (by his game prep)
+		const lead = this.team[t].stat.pts - this.team[t === 0 ? 1 : 0].stat.pts;
+		const ftWeight =
+			lead >= 1 &&
+			lead <= CD_FT_LEAD &&
+			this.t !== undefined &&
+			this.t <= CD_FT_SECONDS
+				? this.cd[t]!.ftSubs
+				: 0;
+		const scored = candidates
+			.map((p) => {
+				const form =
+					p.stat.min >= 6
+						? helpers.bound((rate(p) - teamRate) / 0.25, -1, 1)
+						: 0;
+				const ft =
+					ftWeight > 0
+						? 1 -
+							ftWeight *
+								helpers.bound(
+									CD_FT_REF - (p.compositeRating.shootingFT ?? CD_FT_REF),
+									0,
+									0.4,
+								)
+						: 1;
+				return {
+					pos: p.pos,
+					valueNoPot:
+						p.valueNoPot *
+						(this.allStarGame ? 1 : p.ptModifier) *
+						(1 + w * form) *
+						ft *
+						(hot(p) ? 1 + BREAKOUT.closerHot : 1),
+					p,
+				};
+			})
+			.sort((a, b) => b.valueNoPot - a.valueNoPot);
+		const closers = new Set<PlayerGameSim>();
+		for (const { p } of pickClosers(scored, this.numPlayersOnCourt)) {
+			closers.add(p);
+		}
+		return closers;
 	}
 
 	// Breakout nights (Shot Share Model): a role player who is hot tonight counts as (1 + closerHot) × his value for the closing lineup
@@ -2627,6 +2721,7 @@ class GameSim extends GameSimBase {
 					continue;
 				}
 				flowSum(`min_r${rank}`, p.stat.min);
+				flowSum(`min2_r${rank}`, p.stat.min * p.stat.min);
 				if (rank === 0) {
 					flowSum(`starMin_${bucket}`, p.stat.min);
 				}
@@ -2661,9 +2756,19 @@ class GameSim extends GameSimBase {
 			const amount = (weight * adapt) / 100;
 			const good = (1 + skill) / 2;
 
-			// Minutes: the hot hand plays more, a cold one less
+			// Minutes: the hot hand plays more, a cold one less (Coach Decisions: by his player management)
 			if (this.realisticRotations) {
-				this.adjustMinutes(t, amount * good, scale, (weight * (1 + good)) / 2);
+				const hotScale = this.cd[t]?.hotScale ?? 1;
+				this.adjustMinutes(
+					t,
+					amount * good * hotScale,
+					scale,
+					((weight * (1 + good)) / 2) * hotScale,
+				);
+			}
+			// Coach Decisions: at halftime, a matchup that isn't working is undone (or the one he held back is made)
+			if (weight === 1 && this.realisticRotations && this.cd[t]?.halftime) {
+				this.halftimeMatchup(t);
 			}
 
 			// Matchups: the best fitting defender goes to the opponent's top scorer
@@ -2716,6 +2821,41 @@ class GameSim extends GameSimBase {
 		if (this.matchupDefense) {
 			this.assignMatchups();
 			this.ssVersion += 1;
+		}
+	}
+
+	// Coach Decisions: trailing at halftime, undo the pregame matchup swap (the starter he benched gets HALFTIME.minutes of the plan back
+	// from the one he started), or make the swap he held back when it's going badly. No random numbers
+	halftimeMatchup(t: TeamNum) {
+		const cd = this.cd[t];
+		if (!cd) {
+			return;
+		}
+		const opp: TeamNum = t === 0 ? 1 : 0;
+		const margin = this.team[t].stat.pts - this.team[opp].stat.pts;
+		let from: PlayerGameSim | undefined;
+		let to: PlayerGameSim | undefined;
+		const byId = (id: number) => this.team[t].player.find((p) => p.id === id);
+		if (cd.swap && cd.swap.kind !== "change" && margin <= -HALFTIME.trail) {
+			from = byId(cd.swap.in);
+			to = byId(cd.swap.out);
+		} else if (!cd.swap && cd.altSwap && margin <= -HALFTIME.trailAlt) {
+			from = byId(cd.altSwap.out);
+			to = byId(cd.altSwap.in);
+		}
+		if (!from || !to || from.injured || to.injured) {
+			return;
+		}
+		const a = this.minutesTargets.get(from) ?? 0;
+		const b = this.minutesTargets.get(to) ?? 0;
+		const move = Math.min(HALFTIME.minutes, a);
+		if (move <= 0) {
+			return;
+		}
+		this.minutesTargets.set(from, a - move);
+		this.minutesTargets.set(to, b + move);
+		if (FLOW_DIAG.on) {
+			flowCount("cdHalftime");
 		}
 	}
 
@@ -4329,6 +4469,8 @@ class GameSim extends GameSimBase {
 	assignMatchups() {
 		for (const d of teamNums) {
 			const o = teamNums[1 - d]!;
+			// Coach Decisions: the stopper on their best scorer when both are on the floor
+			const stopper = this.cd[d]?.stopper;
 			assignMatchups(
 				this.playersOnCourt[o],
 				this.playersOnCourt[d],
@@ -4336,6 +4478,12 @@ class GameSim extends GameSimBase {
 				this.guards[d],
 				this.adjFocus[d],
 				1 + this.adjFocusW[d],
+				stopper
+					? this.playersOnCourt[o].find((p) => p.id === stopper[1])
+					: undefined,
+				stopper
+					? this.playersOnCourt[d].find((p) => p.id === stopper[0])
+					: undefined,
 			);
 			let versatility = 0;
 			for (const p of this.playersOnCourt[d]) {
@@ -8864,7 +9012,7 @@ class GameSim extends GameSimBase {
 			} else {
 				p.stat[s] += amt;
 				if (s === "pf" && this.realisticRotations) {
-					this.onPersonalFoul(p);
+					this.onPersonalFoul(p, t);
 				}
 			}
 		}

@@ -85,7 +85,7 @@ export const COACH_TERMS = {
 	},
 	ratings: {
 		title: "Ratings",
-		text: "Development: how much he helps players improve. Offense and Defense: teaching and scheming on that side of the ball. Motivation: getting players to play hard, which matters late in close games and a little for development. All 0-100.",
+		text: "Development: how much he helps players improve. Offense and Defense: teaching and scheming on that side of the ball. Motivation: getting players to play hard, which matters late in close games and a little for development. Game prep: reading opponents (big or small lineups, a stopper on their best scorer, attacking their weaknesses, how accurately he reads them). Player management: roles, promises, egos and rest (how fast roles follow form, the hot hand). All 0-100.",
 	},
 	systems: {
 		title: "Systems",

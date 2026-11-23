@@ -108,7 +108,7 @@ const acceptExtension = async ({
  */
 const accept = async <
 	DryRun extends boolean,
-	SuccessReturn extends DryRun extends true ? void : () => Promise<boolean>,
+	SuccessReturn extends (DryRun extends true ? void : () => Promise<boolean>),
 >({
 	negotiation,
 	amount,
@@ -225,7 +225,14 @@ const accept = async <
 
 		const exception =
 			capInfo?.type === "exception" ? capInfo.exception.type : undefined;
-		const eid = await player.sign(p, tid, contract, phase, exception);
+		const eid = await player.sign(
+			p,
+			tid,
+			contract,
+			phase,
+			exception,
+			negotiation.rolePromise,
+		);
 		await idb.cache.players.put(p);
 		const undoCapException = capInfo
 			? await recordCapExceptionSigning(tid, {

@@ -271,21 +271,67 @@ const ContractTermsControls = ({
 	);
 };
 
+// Coach Decisions: a role promised with the offer. He's more willing (and asks for a little less); the coach honors it, and breaking it
+// hurts his mood
+const RolePromiseControl = ({
+	pid,
+	value,
+	reload,
+}: {
+	pid: number;
+	value: "none" | "starter" | "rotation";
+	reload?: () => void;
+}) => {
+	return (
+		<div className="mb-3" style={widthStyle}>
+			<label className="form-label mb-1" htmlFor="negotiation-role-promise">
+				Promise a role
+			</label>
+			<select
+				id="negotiation-role-promise"
+				className="form-select form-select-sm"
+				value={value}
+				onChange={async (event) => {
+					await toWorker("main", "setNegotiationRolePromise", {
+						pid,
+						role: event.target.value as "none" | "starter" | "rotation",
+					});
+					reload?.();
+				}}
+			>
+				<option value="none">No promise</option>
+				<option value="rotation">A rotation spot (15+ minutes)</option>
+				<option value="starter">A starting job</option>
+			</select>
+			<div className="form-text">
+				A promise makes him more willing to sign. Your head coach honors it if
+				he decides the starters and rotation; if it's broken, he'll be unhappy.
+			</div>
+		</div>
+	);
+};
+
 const Negotiation = ({
 	contractOptions,
 	contractTermsEnabled,
 	close,
 	p,
+	reload,
+	rolePromise,
 }: Pick<
 	NegotaitionModalProps,
-	"contractOptions" | "contractTermsEnabled" | "p"
+	"contractOptions" | "contractTermsEnabled" | "p" | "rolePromise"
 > & {
 	close: () => void;
+	reload?: () => void;
 }) => {
 	const [terms, setTerms] = useState<ContractTerms>({});
 	const { minContract } = useLocal(["minContract"]);
 	return (
 		<>
+			{rolePromise !== undefined ? (
+				<RolePromiseControl pid={p.pid} value={rolePromise} reload={reload} />
+			) : null}
 			{contractTermsEnabled ? (
 				<ContractTermsControls terms={terms} setTerms={setTerms} />
 			) : null}
@@ -366,10 +412,12 @@ const Negotiation = ({
 export const NegotiationModal = ({
 	close,
 	negotiationProps,
+	reload,
 	show,
 }: {
 	close: () => void;
 	negotiationProps: NegotaitionModalProps | undefined;
+	reload?: () => void;
 	show: boolean;
 }) => {
 	return (
@@ -389,7 +437,7 @@ export const NegotiationModal = ({
 				{negotiationProps ? (
 					<>
 						<NegotiationHeader {...negotiationProps} />
-						<Negotiation {...negotiationProps} close={close} />
+						<Negotiation {...negotiationProps} close={close} reload={reload} />
 					</>
 				) : null}
 			</Modal.Body>
@@ -415,7 +463,24 @@ export const useNegotiaionModal = () => {
 
 	const loadingPid = useRef<number | undefined>(undefined);
 
+	// After a change that moves his asking price (a role promise): the same negotiation, reloaded
+	const reload = async () => {
+		if (state.status !== "loaded") {
+			return;
+		}
+		const pid = state.props.p.pid;
+		const newProps = await toWorker("main", "getNegotiationProps", pid);
+		if (typeof newProps !== "string") {
+			setState((current) =>
+				current.status === "loaded" && current.props.p.pid === pid
+					? { ...current, props: newProps }
+					: current,
+			);
+		}
+	};
+
 	const props = {
+		reload,
 		close: () => {
 			if (show) {
 				setState((state) => {

@@ -1170,6 +1170,35 @@ const CoachSystemsLine = ({ teams }: { teams: any[] }) => {
 	);
 };
 
+// Coach Decisions: each coach's pregame note (why tonight's lineup and minutes), stored with the game. Words only (no ratings)
+const CoachNotes = ({
+	teams,
+	className,
+}: {
+	teams: any[];
+	className?: string;
+}) => {
+	const withNotes = (teams ?? []).filter(
+		(t) => Array.isArray(t?.coachNote) && t.coachNote.length > 0,
+	);
+	if (withNotes.length === 0) {
+		return null;
+	}
+	return (
+		<div
+			className={clsx("small text-body-secondary", className)}
+			data-testid="box-score-coach-notes"
+		>
+			{withNotes.map((t) => (
+				<div key={t.tid}>
+					<span className="fw-bold">{t.abbrev} coach:</span>{" "}
+					{t.coachNote.join(" ")}
+				</div>
+			))}
+		</div>
+	);
+};
+
 const PBP_REVEALED_KEY = "box-score-pbp-revealed";
 const revealedPbp = new Set<string>();
 try {
@@ -1265,6 +1294,7 @@ const BoxScorePlayByPlayTabsBasketball = ({
 			</ul>
 			{tab === "pbp" ? (
 				<div className="mb-3">
+					<CoachNotes teams={boxScore.teams} className="mb-2" />
 					<BoxScorePlayByPlay boxScore={boxScore} />
 				</div>
 			) : (
@@ -1410,6 +1440,7 @@ export const BoxScoreWrapper = ({
 						/>
 					</div>
 					<CoachSystemsLine teams={boxScore.teams} />
+					<CoachNotes teams={boxScore.teams} className="text-center mt-1" />
 				</div>
 				<TeamLogo season={boxScore.season} t={t1} />
 			</div>

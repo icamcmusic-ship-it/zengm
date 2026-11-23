@@ -8,6 +8,11 @@ import { addContract, createContract } from "../contract/index.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import type { CapExceptionType } from "../../../common/capExceptions.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
+import {
+	aiRolePromise,
+	coachDecisionsOn,
+	newPromise,
+} from "../staff/rolePromise.ts";
 
 const sign = async (
 	p: Player,
@@ -16,6 +21,8 @@ const sign = async (
 	phase: Phase,
 	// Salary cap exception this signing uses (League Extras: Salary Cap Exceptions), for the transaction text and the contract
 	exception?: CapExceptionType,
+	// Coach Decisions: the role the user promised him in the negotiation (AI teams make their own, aiRolePromise)
+	rolePromise?: "starter" | "rotation",
 ) => {
 	const isRookie =
 		getProStats(p).length === 0 &&
@@ -95,6 +102,23 @@ const sign = async (
 		contract.exception = exception;
 	}
 	addContract(p, contract);
+
+	// Coach Decisions: a role promised with this contract (the user's from the negotiation, an AI team's from where he'd rank on it). An
+	// old promise from another team ends
+	if (
+		__SPORT === "basketball" &&
+		coachDecisionsOn() &&
+		!contractSummary.rookie
+	) {
+		const promise = rolePromise
+			? newPromise(tid, rolePromise, contractSummary.exp, "user")
+			: await aiRolePromise(p, tid, contractSummary.exp);
+		if (promise) {
+			p.rolePromise = promise;
+		} else if (p.rolePromise) {
+			delete p.rolePromise;
+		}
+	}
 
 	const freeAgent = !resigning && !isRookie;
 	if (freeAgent) {

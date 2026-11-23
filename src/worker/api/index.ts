@@ -347,6 +347,11 @@ import type {
 	SuggestionAction,
 } from "../../common/staffDepth/types.ts";
 import * as draftStash from "../core/draftStash/index.ts";
+import { coachDecisionsOn } from "../core/staff/rolePromise.ts";
+import type {
+	CoachDelegation,
+	LineupPreset,
+} from "../../common/coachDecisions.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -2266,7 +2271,77 @@ const getNegotiationProps = async (pid: number) => {
 		contractTermsEnabled: featureOn("contractOptions"),
 		salaryCap: g.get("salaryCap") / 1000,
 		t,
+		// Coach Decisions: a role the user can promise with the offer (undefined: the setting is off, or an in-season extension)
+		rolePromise:
+			coachDecisionsOn() && !extension
+				? (negotiation.rolePromise ?? ("none" as const))
+				: undefined,
 	};
+};
+
+// Coach Decisions: the role promised with the user's offer (it makes him more willing; the coach honors it, breaking it hurts his mood)
+const setNegotiationRolePromise = async ({
+	pid,
+	role,
+}: {
+	pid: number;
+	role: "none" | "starter" | "rotation";
+}) => {
+	const negotiation = (await idb.cache.negotiations.getAll()).find(
+		(n) => n.pid === pid && n.tid === g.get("userTid"),
+	);
+	if (!negotiation || !coachDecisionsOn()) {
+		return;
+	}
+	if (role === "none") {
+		delete negotiation.rolePromise;
+	} else {
+		negotiation.rolePromise = role;
+	}
+	await idb.cache.negotiations.put(negotiation);
+};
+
+// Coach Decisions: what the head coach decides on the user's team, and the lineup preset for the next game
+const updateCoachDelegation = async ({
+	tid,
+	delegation,
+}: {
+	tid: number;
+	delegation: CoachDelegation;
+}) => {
+	const t = await idb.cache.teams.get(tid);
+	if (!t) {
+		throw new Error("Invalid tid");
+	}
+	t.coachDelegation = { ...delegation };
+	// "Always let coach decide" (the roster stays sorted) is the starters and the rotation order together
+	const keep = delegation.starters && delegation.rotation;
+	if (keep && !t.keepRosterSorted) {
+		await team.rosterAutoSort(tid);
+	}
+	t.keepRosterSorted = keep;
+	await idb.cache.teams.put(t);
+	await toUI("realtimeUpdate", [["team"]]);
+};
+
+const updateLineupPreset = async ({
+	tid,
+	preset,
+}: {
+	tid: number;
+	preset: LineupPreset | "coach";
+}) => {
+	const t = await idb.cache.teams.get(tid);
+	if (!t) {
+		throw new Error("Invalid tid");
+	}
+	if (preset === "coach") {
+		delete t.lineupPreset;
+	} else {
+		t.lineupPreset = preset;
+	}
+	await idb.cache.teams.put(t);
+	await toUI("realtimeUpdate", [["team"]]);
 };
 
 const getNumPlayoffTeams = ({
@@ -5142,6 +5217,15 @@ const updateKeepRosterSorted = async ({
 	}
 
 	t.keepRosterSorted = keepRosterSorted;
+	// Coach Decisions: "Always let coach decide" sets every area (the per-area switches are on the Roster page)
+	if (t.coachDelegation) {
+		t.coachDelegation = {
+			starters: keepRosterSorted,
+			rotation: keepRosterSorted,
+			minutes: keepRosterSorted,
+			matchups: keepRosterSorted,
+		};
+	}
 	await idb.cache.teams.put(t);
 	await toUI("realtimeUpdate", [["team"]]);
 };
@@ -6903,6 +6987,9 @@ const api = {
 		updateGameAttributesGodMode,
 		rerollLeagueSalt,
 		updateKeepRosterSorted,
+		updateCoachDelegation,
+		updateLineupPreset,
+		setNegotiationRolePromise,
 		updateKeyboardShortcuts,
 		updateLeague,
 		updateMultiTeamMode,
