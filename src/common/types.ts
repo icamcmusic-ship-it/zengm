@@ -1228,6 +1228,10 @@ export type MenuItemHeader = {
 	nonLeague?: true;
 	commandPalette?: true;
 	commandPaletteOnly?: true;
+	// Side menu: the group starts collapsed until the user expands it
+	collapsed?: true;
+	// Top navbar: the group's links are shown in the dropdown of this other group (long name), to keep the navbar short
+	topMenu?: string;
 	children: (MenuItemLink | MenuItemText)[];
 };
 

@@ -1,4 +1,5 @@
 import type { LeagueUrlParts, ViewId } from "../router/types.ts";
+import { DAILY_SCHEDULE } from "../../common/constants.ts";
 
 // Pages of this fork that are tabs of an original BBGM page. Every tab keeps its own route, so the URL of a tab is the
 // page's old URL: links, bookmarks and the command palette land on the right tab. The first tab is the host page.
@@ -69,7 +70,7 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
-		{ id: "draftScouting", name: "Scouting", url: ["draft_scouting"] },
+		{ id: "draftScouting", name: "Draft Scouting", url: ["draft_scouting"] },
 		{ id: "draftBoard", name: "Draft Board", url: ["draft_board"] },
 		{
 			id: "mockDraft",
@@ -144,7 +145,7 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
-		{ id: "playerRatings", name: "Ratings", url: ["player_ratings"] },
+		{ id: "playerRatings", name: "Player Ratings", url: ["player_ratings"] },
 		{
 			id: "archetypes",
 			name: "Archetypes",
@@ -159,7 +160,7 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
-		{ id: "historyAll", name: "History", url: ["history_all"] },
+		{ id: "historyAll", name: "League History", url: ["history_all"] },
 		{
 			id: "timeline",
 			name: "Timeline",
@@ -201,7 +202,7 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
-		{ id: "playerStats", name: "Stats", url: ["player_stats"] },
+		{ id: "playerStats", name: "Player Stats", url: ["player_stats"] },
 		{
 			id: "milestones",
 			name: "Milestones",
@@ -228,7 +229,7 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
-		{ id: "dailySchedule", name: "Schedule", url: ["daily_schedule"] },
+		{ id: "dailySchedule", name: DAILY_SCHEDULE, url: ["daily_schedule"] },
 		{
 			id: "hype",
 			name: "Games to Watch",

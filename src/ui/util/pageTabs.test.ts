@@ -130,7 +130,7 @@ test("every tab page highlights a visible side menu item, like SideBar does", as
 	}
 });
 
-test("League Extras is a tab of League Settings, with no side menu item of its own but a command palette item", async () => {
+test("League Extras is a tab of League Settings, and an item of its own in the Settings group", async () => {
 	vi.stubGlobal("CSS", { supports: () => false });
 	assert.strictEqual(tabHostPageID("leagueExtras"), "settings");
 	assert.deepEqual(
@@ -157,6 +157,11 @@ test("League Extras is a tab of League Settings, with no side menu item of its o
 	);
 	assert.strictEqual(extras.length, 1);
 	assert.isTrue(extras[0]!.commandPalette);
-	assert.isTrue(extras[0]!.commandPaletteOnly);
-	assert.strictEqual(extras[0]!.text, "League Settings > League Extras");
+	assert.isUndefined(extras[0]!.commandPaletteOnly);
+	assert.strictEqual(extras[0]!.text, "League Extras");
+	const settings = menuItems.find(
+		(item): item is MenuItemHeader =>
+			item.type === "header" && item.long === "Settings",
+	)!;
+	assert.include(settings.children, extras[0]);
 });

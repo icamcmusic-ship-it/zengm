@@ -3,6 +3,7 @@ import { toWorker } from "./toWorker.ts";
 import {
 	DAILY_SCHEDULE,
 	DEPTH_CHART_NAME,
+	PHASE,
 	REAL_PLAYERS_INFO,
 	WEBSITE_ROOT,
 } from "../../common/constants.ts";
@@ -10,11 +11,13 @@ import type {
 	MenuItemLink,
 	MenuItemHeader,
 	MenuItemText,
+	Phase,
 } from "../../common/types.ts";
 import { frivolities } from "../views/Frivolities.tsx";
 import {
 	isFrivolitiesTabPage,
 	PAGE_TAB_GROUPS,
+	tabHostPageID,
 	tabsForSport,
 } from "./pageTabs.ts";
 import { takeScreenshot } from "./takeScreenshot.ts";
@@ -119,8 +122,9 @@ const leagueAchievementsLinks: MenuItemLink[] =
 		: [];
 
 // Coaching staff (basketball only). Hidden while its League extras are off (the pages themselves say how to turn them
-// on, for old links and bookmarks). The Staff Report has no `feature`: it belongs to two features, so it uses the same
-// rule as the page (isUrlFeatureOn, via isMenuLinkFeatureOn)
+// on, for old links and bookmarks). The Staff Report is a tab of Draft Scouting (util/pageTabs.ts): its command palette
+// item ("Draft Scouting > Staff Report") is added with the other tab pages, and uses the same rule as the page
+// (isUrlFeatureOn, via isMenuLinkFeatureOn), since it belongs to two features
 const staffLinks: MenuItemLink[] =
 	__SPORT === "basketball"
 		? [
@@ -135,15 +139,17 @@ const staffLinks: MenuItemLink[] =
 				},
 				{
 					type: "link",
-					active: (pageID) => pageID === "staffReport",
+					active: (pageID) => pageID === "coachNotes",
 					league: true,
 					commandPalette: true,
-					path: ["staff_report"],
-					text: "Staff Report",
+					commandPaletteOnly: true,
+					feature: "coachSystems",
+					path: ["coach_notes"],
+					text: "Coach's Notes",
 				},
 			]
 		: [];
-const coachesLinks: MenuItemLink[] =
+const historyCoachesLinks: MenuItemLink[] =
 	__SPORT === "basketball"
 		? [
 				{
@@ -157,14 +163,18 @@ const coachesLinks: MenuItemLink[] =
 				},
 				{
 					type: "link",
-					active: (pageID) => pageID === "coachNotes",
+					active: (pageID) => pageID === "frontOffices",
 					league: true,
 					commandPalette: true,
-					commandPaletteOnly: true,
-					feature: "coachSystems",
-					path: ["coach_notes"],
-					text: "Coach's Notes",
+					feature: "gmPersonalities",
+					path: ["front_offices"],
+					text: "Front Offices",
 				},
+			]
+		: [];
+const collegeCarouselLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
 				{
 					type: "link",
 					active: (pageID) => pageID === "collegeCarousel",
@@ -174,15 +184,6 @@ const coachesLinks: MenuItemLink[] =
 					feature: "coachingStaff",
 					path: ["college_carousel"],
 					text: "Coaching Carousel",
-				},
-				{
-					type: "link",
-					active: (pageID) => pageID === "frontOffices",
-					league: true,
-					commandPalette: true,
-					feature: "gmPersonalities",
-					path: ["front_offices"],
-					text: "Front Offices",
 				},
 			]
 		: [];
@@ -397,15 +398,6 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "collegePolls",
-				league: true,
-				commandPalette: true,
-				leagueType: "college",
-				path: ["college_polls"],
-				text: "Top 25 & Selection",
-			},
-			{
-				type: "link",
 				active: (pageID) => pageID === "collegeConfTournaments",
 				league: true,
 				commandPalette: true,
@@ -431,25 +423,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["daily_schedule"],
 				text: DAILY_SCHEDULE,
 			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "leagueFinances",
-				league: true,
-				commandPalette: true,
-				path: ["league_finances"],
-				text: "Finances",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "history" || pageID === "historyAll",
-				league: true,
-				commandPalette: true,
-				path: ["history_all"],
-				text: "History",
-			},
-			...wrappedLinks,
-			...leagueAchievementsLinks,
-			...timelineLinks,
+			...hypeLinks,
 			{
 				type: "link",
 				active: (pageID) => pageID === "powerRankings",
@@ -468,13 +442,22 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "rumors",
+				active: (pageID) => pageID === "leagueFinances",
 				league: true,
 				commandPalette: true,
-				feature: "rumors",
-				path: ["rumors"],
-				text: "Rumors",
+				path: ["league_finances"],
+				text: "Finances",
 			},
+		],
+	},
+	{
+		type: "header",
+		long: "Newsroom",
+		short: "N",
+		league: true,
+		commandPalette: true,
+		topMenu: "League",
+		children: [
 			{
 				type: "link",
 				active: (pageID) => pageID === "news",
@@ -483,10 +466,54 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["news"],
 				text: "News Feed",
 			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "rumors",
+				league: true,
+				commandPalette: true,
+				feature: "rumors",
+				path: ["rumors"],
+				text: "Rumors",
+			},
 			...newspaperLinks,
-			...hypeLinks,
-			...coachesLinks,
-			...archetypeLinks,
+			...wrappedLinks,
+			{
+				type: "link",
+				league: true,
+				commandPalette: true,
+				commandPaletteOnly: true,
+				path: ["season_preview"],
+				text: "Season Previews",
+			},
+		],
+	},
+	{
+		type: "header",
+		long: "History",
+		short: "H",
+		league: true,
+		commandPalette: true,
+		topMenu: "League",
+		children: [
+			{
+				type: "link",
+				active: (pageID) => pageID === "history" || pageID === "historyAll",
+				league: true,
+				commandPalette: true,
+				path: ["history_all"],
+				text: "League History",
+			},
+			...leagueAchievementsLinks,
+			{
+				type: "link",
+				active: (pageID) => pageID === "hallOfFame",
+				league: true,
+				commandPalette: true,
+				path: ["hall_of_fame"],
+				text: "Hall of Fame",
+			},
+			...timelineLinks,
+			...historyCoachesLinks,
 			{
 				type: "link",
 				league: true,
@@ -526,21 +553,6 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				path: ["all_star", "history"],
 				text: "All-Star History",
-			},
-			{
-				type: "link",
-				league: true,
-				commandPalette: true,
-				commandPaletteOnly: true,
-				path: ["season_preview"],
-				text: "Season Previews",
-			},
-			{
-				type: "link",
-				league: true,
-				commandPalette: true,
-				path: ["notes"],
-				text: "Notes",
 			},
 		],
 	},
@@ -590,7 +602,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				league: true,
 				commandPalette: true,
 				path: ["team_history"],
-				text: "History",
+				text: "Team History",
 			},
 			{
 				type: "link",
@@ -617,33 +629,6 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 		league: true,
 		commandPalette: true,
 		children: [
-			{
-				type: "link",
-				active: (pageID) => pageID === "collegeRecruiting",
-				league: true,
-				commandPalette: true,
-				leagueType: "college",
-				path: ["college_recruiting"],
-				text: "Recruiting",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "collegePortal",
-				league: true,
-				commandPalette: true,
-				leagueType: "college",
-				path: ["college_portal"],
-				text: "Transfer Portal",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "collegeDepartures",
-				league: true,
-				commandPalette: true,
-				leagueType: "college",
-				path: ["college_departures"],
-				text: "Departures & Arrivals",
-			},
 			{
 				type: "link",
 				active: (pageID) => pageID === "freeAgents",
@@ -714,12 +699,86 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			...valueLinks,
 			{
 				type: "link",
+				active: (pageID) => pageID === "comparePlayers",
+				league: true,
+				commandPalette: true,
+				path: ["compare_players"],
+				text: "Compare Players",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "watchList",
+				league: true,
+				commandPalette: true,
+				path: ["watch_list"],
+				text: "Watch List",
+			},
+		],
+	},
+	{
+		type: "header",
+		long: "Draft / College",
+		short: "D",
+		league: true,
+		commandPalette: true,
+		topMenu: "Players",
+		children: [
+			{
+				type: "link",
+				// Not the Draft Scouting pages (Draft Board, Mock Draft, ...), which have an item of their own
 				active: (pageID) =>
-					typeof pageID === "string" && pageID.startsWith("draft"),
+					typeof pageID === "string" &&
+					pageID.startsWith("draft") &&
+					tabHostPageID(pageID) !== "draftScouting",
 				league: true,
 				commandPalette: true,
 				path: ["draft"],
 				text: "Draft",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "draftScouting",
+				league: true,
+				commandPalette: true,
+				path: ["draft_scouting"],
+				text: "Draft Scouting",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegeRecruiting",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_recruiting"],
+				text: "Recruiting",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegePortal",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_portal"],
+				text: "Transfer Portal",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegeDepartures",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_departures"],
+				text: "Departures & Arrivals",
+			},
+			...collegeCarouselLinks,
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegePolls",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_polls"],
+				text: "Top 25 & Selection",
 			},
 			{
 				type: "link",
@@ -750,17 +809,9 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				league: true,
 				commandPalette: true,
 				commandPaletteOnly: true,
-				path: ["draft_scouting"],
-				text: "Draft Scouting",
-			},
-			{
-				type: "link",
-				league: true,
-				commandPalette: true,
-				commandPaletteOnly: true,
 				feature: "draftBoard",
 				path: ["draft_board"],
-				text: "Draft Board",
+				text: "Draft Scouting > Draft Board",
 			},
 			{
 				type: "link",
@@ -769,7 +820,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				feature: "mockDraft",
 				path: ["mock_draft"],
-				text: "Mock Draft",
+				text: "Draft Scouting > Mock Draft",
 			},
 			{
 				type: "link",
@@ -778,7 +829,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				feature: "lotteryNight",
 				path: ["draft_combine"],
-				text: "Draft Combine",
+				text: "Draft Scouting > Combine",
 			},
 			{
 				type: "link",
@@ -787,7 +838,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				feature: "scoutingReports",
 				path: ["big_boards"],
-				text: "Big Boards",
+				text: "Draft Scouting > Big Boards",
 			},
 			{
 				type: "link",
@@ -796,7 +847,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				feature: "scoutingDepth",
 				path: ["pro_scouting"],
-				text: "Pro Scouting",
+				text: "Draft Scouting > Pro Scouting",
 			},
 			{
 				type: "link",
@@ -805,7 +856,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				feature: "collegeSeason",
 				path: ["college_overseas"],
-				text: "College/Overseas (March Madness)",
+				text: "Draft Scouting > College/Overseas (March Madness)",
 			},
 			{
 				type: "link",
@@ -814,30 +865,6 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPaletteOnly: true,
 				path: ["draft_team_history"],
 				text: "Draft Team History",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "comparePlayers",
-				league: true,
-				commandPalette: true,
-				path: ["compare_players"],
-				text: "Compare Players",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "watchList",
-				league: true,
-				commandPalette: true,
-				path: ["watch_list"],
-				text: "Watch List",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "hallOfFame",
-				league: true,
-				commandPalette: true,
-				path: ["hall_of_fame"],
-				text: "Hall of Fame",
 			},
 		],
 	},
@@ -891,6 +918,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["player_ratings"],
 				text: "Player Ratings",
 			},
+			...archetypeLinks,
 			{
 				type: "link",
 				league: true,
@@ -1054,29 +1082,42 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "customizePlayer",
-				godMode: true,
 				league: true,
+				nonLeague: true,
 				commandPalette: true,
-				path: ["customize_player"],
-				text: "Create A Player",
+
+				onClick() {
+					takeScreenshot();
+				},
+
+				prefix: <span className="glyphicon glyphicon-camera me-1" />,
+				text: "Screenshot",
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "deleteOldData",
+				active: (pageID) =>
+					pageID === "frivolities" || isFrivolitiesTabPage(pageID),
 				league: true,
 				commandPalette: true,
-				path: ["delete_old_data"],
-				text: "Delete Old Data",
+				path: ["frivolities"],
+				text: "Frivolities",
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "editAwardWinners",
-				godMode: true,
+				active: (pageID) => pageID === "faceStyleGallery",
+				league: true,
+				nonLeague: true,
+				commandPalette: true,
+				path: "/face_style_gallery",
+				text: "Face Style Gallery",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "notes",
 				league: true,
 				commandPalette: true,
-				path: ["edit_award_winners"],
-				text: "Edit Award Winners",
+				path: ["notes"],
+				text: "Notes",
 			},
 			{
 				type: "link",
@@ -1096,138 +1137,23 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "expansionDraft",
-				league: true,
-				commandPalette: true,
-				path: ["expansion_draft"],
-				text: "Expansion Draft",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "fantasyDraft",
-				league: true,
-				commandPalette: true,
-				path: ["fantasy_draft"],
-				text: "Fantasy Draft",
-			},
-			...(REAL_PLAYERS_INFO
-				? ([
-						{
-							type: "link",
-							active: (pageID) => pageID === "eightyTwoZeroDraft",
-							godMode: true,
-							league: true,
-							commandPalette: true,
-							path: ["82-0_draft"],
-							text: "82-0 Draft",
-						},
-					] as MenuItemLink[])
-				: []),
-			{
-				type: "link",
-				active: (pageID) =>
-					pageID === "frivolities" || isFrivolitiesTabPage(pageID),
-				league: true,
-				commandPalette: true,
-				path: ["frivolities"],
-				text: "Frivolities",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "godMode",
-				league: true,
-				commandPalette: true,
-				path: ["god_mode"],
-				text: "God Mode",
-			},
-			{
-				type: "link",
 				active: (pageID) => pageID === "exportPlayers",
 				league: true,
 				commandPalette: true,
 				path: ["export_players"],
 				text: "Import/Export Players",
 			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "manageConfs",
-				league: true,
-				commandPalette: true,
-				path: ["manage_confs"],
-				text: "Manage Confs",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "manageTeams",
-				league: true,
-				commandPalette: true,
-				path: ["manage_teams"],
-				text: "Manage Teams",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "multiTeamMode",
-				league: true,
-				commandPalette: true,
-				godMode: true,
-				path: ["multi_team_mode"],
-				text: "Multi Team Mode",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "scheduleEditor",
-				league: true,
-				commandPalette: true,
-				path: ["schedule_editor"],
-				text: "Schedule Editor",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "scheduledEvents",
-				league: true,
-				commandPalette: true,
-				path: ["scheduled_events"],
-				text: "Scheduled Events",
-			},
-			{
-				type: "link",
-				league: true,
-				nonLeague: true,
-				commandPalette: true,
-
-				onClick() {
-					takeScreenshot();
-				},
-
-				prefix: <span className="glyphicon glyphicon-camera me-1" />,
-				text: "Screenshot",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "newTeam",
-				league: true,
-				commandPalette: true,
-				godMode: true,
-				path: ["new_team"],
-				text: "Switch Team",
-			},
-			{
-				type: "link",
-				nonLeague: true,
-				commandPalette: true,
-
-				async onClick(): Promise<false> {
-					const response = await toWorker("toolsMenu", "resetDb", undefined);
-
-					if (response) {
-						window.location.reload();
-					}
-
-					return false;
-				},
-
-				text: "Delete All Leagues",
-			},
+		],
+	},
+	{
+		type: "header",
+		long: "Settings",
+		short: "Se",
+		league: true,
+		nonLeague: true,
+		commandPalette: true,
+		topMenu: "Tools",
+		children: [
 			{
 				type: "link",
 				active: (pageID) =>
@@ -1268,12 +1194,11 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "faceStyleGallery",
+				active: (pageID) => pageID === "leagueExtras",
 				league: true,
-				nonLeague: true,
 				commandPalette: true,
-				path: "/face_style_gallery",
-				text: "Face Style Gallery",
+				path: ["league_extras"],
+				text: "League Extras",
 			},
 			{
 				type: "link",
@@ -1283,6 +1208,141 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["award_settings"],
 				text: "Award Settings",
 			},
+		],
+	},
+	{
+		type: "header",
+		long: "Commissioner",
+		short: "C",
+		league: true,
+		commandPalette: true,
+		collapsed: true,
+		topMenu: "Tools",
+		children: [
+			{
+				type: "link",
+				active: (pageID) => pageID === "godMode",
+				league: true,
+				commandPalette: true,
+				path: ["god_mode"],
+				text: "God Mode",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "customizePlayer",
+				godMode: true,
+				league: true,
+				commandPalette: true,
+				path: ["customize_player"],
+				text: "Create A Player",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "editAwardWinners",
+				godMode: true,
+				league: true,
+				commandPalette: true,
+				path: ["edit_award_winners"],
+				text: "Edit Award Winners",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "manageTeams",
+				league: true,
+				commandPalette: true,
+				path: ["manage_teams"],
+				text: "Manage Teams",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "manageConfs",
+				league: true,
+				commandPalette: true,
+				path: ["manage_confs"],
+				text: "Manage Confs",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "scheduleEditor",
+				league: true,
+				commandPalette: true,
+				path: ["schedule_editor"],
+				text: "Schedule Editor",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "scheduledEvents",
+				league: true,
+				commandPalette: true,
+				path: ["scheduled_events"],
+				text: "Scheduled Events",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "expansionDraft",
+				league: true,
+				commandPalette: true,
+				path: ["expansion_draft"],
+				text: "Expansion Draft",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "fantasyDraft",
+				league: true,
+				commandPalette: true,
+				path: ["fantasy_draft"],
+				text: "Fantasy Draft",
+			},
+			...(REAL_PLAYERS_INFO
+				? ([
+						{
+							type: "link",
+							active: (pageID) => pageID === "eightyTwoZeroDraft",
+							godMode: true,
+							league: true,
+							commandPalette: true,
+							path: ["82-0_draft"],
+							text: "82-0 Draft",
+						},
+					] as MenuItemLink[])
+				: []),
+			{
+				type: "link",
+				active: (pageID) => pageID === "multiTeamMode",
+				league: true,
+				commandPalette: true,
+				godMode: true,
+				path: ["multi_team_mode"],
+				text: "Multi Team Mode",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "newTeam",
+				league: true,
+				commandPalette: true,
+				godMode: true,
+				path: ["new_team"],
+				text: "Switch Team",
+			},
+		],
+	},
+	{
+		type: "header",
+		long: "Danger",
+		short: "!",
+		league: true,
+		nonLeague: true,
+		commandPalette: true,
+		topMenu: "Tools",
+		children: [
+			{
+				type: "link",
+				active: (pageID) => pageID === "deleteOldData",
+				league: true,
+				commandPalette: true,
+				path: ["delete_old_data"],
+				text: "Delete Old Data",
+			},
 			{
 				type: "link",
 				active: (pageID) => pageID === "dangerZone",
@@ -1290,6 +1350,23 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPalette: true,
 				path: ["danger_zone"],
 				text: "Danger Zone",
+			},
+			{
+				type: "link",
+				nonLeague: true,
+				commandPalette: true,
+
+				async onClick(): Promise<false> {
+					const response = await toWorker("toolsMenu", "resetDb", undefined);
+
+					if (response) {
+						window.location.reload();
+					}
+
+					return false;
+				},
+
+				text: "Delete All Leagues",
 			},
 		],
 	},
@@ -1426,3 +1503,114 @@ const addTabPages = (items: (MenuItemLink | MenuItemHeader)[]) => {
 export const menuItems: (MenuItemLink | MenuItemHeader)[] = addTabPages(
 	menuItemsRaw.map(consolidate),
 );
+
+// Top navbar: groups with `topMenu` are folded into that group's dropdown (League gets Newsroom and History, Players gets
+// Draft / College, Tools gets Settings, Commissioner and Danger), so the navbar keeps its few dropdowns
+export const topMenuItems: (MenuItemLink | MenuItemHeader)[] = (() => {
+	const out: (MenuItemLink | MenuItemHeader)[] = [];
+	const byName = new Map<string, MenuItemHeader>();
+	for (const item of menuItems) {
+		if (item.commandPaletteOnly) {
+			continue;
+		}
+		if (item.type === "header") {
+			const target = item.topMenu ? byName.get(item.topMenu) : undefined;
+			if (target) {
+				target.children.push(...item.children);
+				target.league ||= item.league;
+				target.nonLeague ||= item.nonLeague;
+				continue;
+			}
+			const copy = { ...item, children: [...item.children] };
+			byName.set(item.long, copy);
+			out.push(copy);
+		} else {
+			out.push(item);
+		}
+	}
+	return out;
+})();
+
+// Stable key of a side menu link, to remember it (Favorites): its league URL, its address, or the action's name
+export const menuLinkKey = (link: MenuItemLink) => {
+	if (Array.isArray(link.path)) {
+		return `l/${link.path.join("/")}`;
+	}
+	if (typeof link.path === "string") {
+		return link.path;
+	}
+	return typeof link.text === "string" ? `action:${link.text}` : undefined;
+};
+
+// Phase-aware shortcuts ("Now" group of the side menu): the pages that matter in this phase, by league URL. College
+// leagues rename the phases (docs/college-mode.md) and have their own pages, so each list holds both: links that are
+// not available in this league (pro-only pages in a college league, turned-off League extras, ...) are left out like
+// everywhere else in the menu
+const NOW_PATHS: Partial<Record<Phase, string[]>> = {
+	[PHASE.EXPANSION_DRAFT]: ["draft"],
+	[PHASE.FANTASY_DRAFT]: ["draft"],
+	// College: conference tournaments
+	[PHASE.AFTER_TRADE_DEADLINE]: ["college_conf_tournaments"],
+	[PHASE.PLAYOFFS]: ["playoffs", "college_polls", "daily_schedule"],
+	// College: season over, the coaching carousel
+	[PHASE.DRAFT_LOTTERY]: [
+		"draft_lottery",
+		"draft_scouting",
+		"college_carousel",
+	],
+	// College: departures
+	[PHASE.DRAFT]: ["draft", "draft_scouting", "college_departures"],
+	// College: transfer portal
+	[PHASE.AFTER_DRAFT]: ["college_portal"],
+	// College: recruiting
+	[PHASE.RESIGN_PLAYERS]: [
+		"negotiation",
+		"upcoming_free_agents",
+		"team_finances",
+		"college_recruiting",
+	],
+	// College: signing day
+	[PHASE.FREE_AGENCY]: ["free_agents", "team_finances", "college_recruiting"],
+};
+
+// Re-signing has no menu item of its own (the Play menu leads there)
+const reSignPlayersLink: MenuItemLink = {
+	type: "link",
+	active: (pageID) => pageID === "negotiationList",
+	league: true,
+	path: ["negotiation"],
+	text: "Re-sign Players",
+};
+
+export const nowShortcuts = (phase: Phase | undefined): MenuItemLink[] => {
+	const paths = phase === undefined ? undefined : NOW_PATHS[phase];
+	if (!paths) {
+		return [];
+	}
+	const links = new Map<string, MenuItemLink>([
+		["negotiation", reSignPlayersLink],
+	]);
+	for (const item of menuItems) {
+		for (const link of item.type === "header" ? item.children : [item]) {
+			if (
+				link.type === "link" &&
+				Array.isArray(link.path) &&
+				link.path.length === 1 &&
+				typeof link.path[0] === "string"
+			) {
+				const existing = links.get(link.path[0]);
+				// A side menu item over a command palette one
+				if (
+					!existing ||
+					(existing.commandPaletteOnly && !link.commandPaletteOnly)
+				) {
+					links.set(link.path[0], link);
+				}
+			}
+		}
+	}
+	return paths.flatMap((path) => {
+		const link = links.get(path);
+		return link ? [link] : [];
+	});
+};
