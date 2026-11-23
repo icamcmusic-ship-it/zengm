@@ -1851,6 +1851,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		threshold: number;
 		status?: "inducted" | "dropped" | "expired" | "veterans";
 	};
+	// College Hall of Fame (college leagues, core/hallOfFame/college.ts): the season he was inducted
+	collegeHof?: number;
 	imgURL: string;
 	injury: PlayerInjury;
 	injuries: {

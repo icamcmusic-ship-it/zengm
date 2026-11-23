@@ -365,6 +365,36 @@ export const awardsSchema = z.object({
 				.optional(),
 		})
 		.optional(),
+
+	// College Hall of Fame (college leagues, src/worker/core/hallOfFame/college.ts): this season's class, the coaches inducted and how
+	// many candidates there were
+	collegeHof: z
+		.object({
+			classSize: z.number(),
+			candidates: z.number(),
+			players: z.array(
+				z.object({
+					pid: z.number(),
+					name: z.string(),
+					tids: z.array(z.number()),
+					firstSeason: z.number().optional(),
+					lastSeason: z.number().optional(),
+					exit: z.string().optional(),
+					score: z.number(),
+					line: z.string(),
+				}),
+			),
+			coaches: z.array(
+				z.object({
+					cid: z.number(),
+					name: z.string(),
+					tid: z.number(),
+					score: z.number(),
+					line: z.string(),
+				}),
+			),
+		})
+		.optional(),
 });
 
 export type Award = z.infer<typeof awardSchema>;

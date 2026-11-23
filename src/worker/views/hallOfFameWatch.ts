@@ -12,6 +12,8 @@ import {
 import { hofWatchFor, seasonFracs } from "../core/hallOfFame/watch.ts";
 import { getBestPos } from "../core/player/checkJerseyNumberRetirement.ts";
 import type { Player } from "../../common/types.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+import { loadCollegeHallOfFameWatch } from "./collegeHallOfFame.ts";
 
 // Active players below this chance (and retired ones below this share of the threshold) are left off
 const MIN_CHANCE = 0.01;
@@ -39,6 +41,20 @@ export default defineView({
 		}
 
 		const season = g.get("season");
+
+		// College leagues: the College Hall of Fame's watch
+		if (isCollege()) {
+			const college = await loadCollegeHallOfFameWatch();
+			return {
+				active: [] as NonNullable<ReturnType<typeof toRow>>[],
+				ballotOn: false,
+				college,
+				retired: [] as NonNullable<ReturnType<typeof toRow>>[],
+				season,
+				wait: college.wait,
+			};
+		}
+
 		const ballotOn = hofBallotOn();
 		const fracs = await seasonFracs();
 		const teamInfoCache = g.get("teamInfoCache");
@@ -107,6 +123,7 @@ export default defineView({
 		return {
 			active,
 			ballotOn,
+			college: undefined,
 			retired,
 			season,
 			wait: hofBallotWait(),

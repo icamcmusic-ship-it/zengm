@@ -2168,6 +2168,10 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 								},
 							],
 						},
+						// College Hall of Fame: the season he was inducted
+						collegeHof: {
+							type: "integer",
+						},
 						imgURL: {
 							type: "string",
 						},

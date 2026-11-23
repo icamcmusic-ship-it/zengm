@@ -8,6 +8,7 @@ import {
 import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import type { View } from "../../common/types.ts";
 import HideableSection from "../components/HideableSection.tsx";
+import { CollegeHallOfFameWatch } from "./CollegeHallOfFame.tsx";
 
 type Row = View<"hallOfFameWatch">["active"][number];
 
@@ -81,10 +82,17 @@ const toRows = (rows: Row[]): DataTableRow[] =>
 const HallOfFameWatch = ({
 	active,
 	ballotOn,
+	college,
 	retired,
 	wait,
 }: View<"hallOfFameWatch">) => {
-	useTitleBar({ title: "Hall of Fame Watch" });
+	useTitleBar({
+		title: college ? "College Hall of Fame Watch" : "Hall of Fame Watch",
+	});
+
+	if (college) {
+		return <CollegeHallOfFameWatch college={college} />;
+	}
 
 	const cols = [...getCols(["Name", "Pos", "Age", "Team"]), ...scoreCols()];
 

@@ -30,6 +30,8 @@ import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import { storeHofStoryAtInduction } from "../../util/hofStory.ts";
 import addAward from "../player/addAward.ts";
 import { hofScoreBasketball } from "../player/madeHof.basketball.ts";
+import { isCollege } from "../college/isCollege.ts";
+import { runCollegeHallOfFame } from "./college.ts";
 
 type HofRecord = NonNullable<Awards["hof"]>;
 type BallotRow = NonNullable<HofRecord["ballot"]>[number];
@@ -559,6 +561,11 @@ const classEvent = (
  */
 export const runHallOfFame = async (conditions: Conditions) => {
 	if (__SPORT !== "basketball") {
+		return;
+	}
+	// College leagues have their own Hall of Fame (players who left school, college coaches) in place of all of this
+	if (isCollege()) {
+		await runCollegeHallOfFame(conditions);
 		return;
 	}
 	const season = g.get("season");

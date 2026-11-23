@@ -22,6 +22,8 @@ import {
 	hofBallotOn,
 	mostTidOf,
 } from "../core/hallOfFame/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+import { loadCollegeHallOfFame } from "./collegeHallOfFame.ts";
 
 // gpF is used on processPlayersHallOfFame for baseball
 export const extraStats = bySport({
@@ -57,6 +59,19 @@ export default defineView({
 				football: ["keyStats", "av"],
 				hockey: ["keyStats", "ops", "dps", "ps"],
 			} as const);
+
+			// College leagues: the College Hall of Fame (players who left school, college coaches)
+			if (isCollege()) {
+				return {
+					ballotOn: false,
+					college: await loadCollegeHallOfFame(),
+					players: [],
+					plaques: [] as HofPlaque[],
+					stats,
+					wing: [],
+					words: [] as HofWords[],
+				};
+			}
 			const formatOptions = {
 				attrs: [
 					"pid",
@@ -255,6 +270,7 @@ export default defineView({
 
 			return {
 				ballotOn: hofBallotOn(),
+				college: undefined,
 				wing,
 				players: addFirstNameShort(processPlayersHallOfFame(players)),
 				plaques,

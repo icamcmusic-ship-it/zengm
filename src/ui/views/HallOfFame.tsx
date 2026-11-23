@@ -10,26 +10,23 @@ import { HallOfFamePlaques } from "./HallOfFamePlaques.tsx";
 import { HallOfFameSpeeches } from "./HallOfFameSpeeches.tsx";
 import { useIsCollege } from "../util/collegeMode.ts";
 import HideableSection from "../components/HideableSection.tsx";
+import { CollegeHallOfFame } from "./CollegeHallOfFame.tsx";
 
 const HallOfFame = ({
 	ballotOn,
+	college: collegeHof,
 	players,
 	plaques,
 	stats,
 	wing,
 	words,
 }: View<"hallOfFame">) => {
-	useTitleBar({ title: "Hall of Fame" });
-	const { userTid } = useLocal(["userTid"]);
 	const college = useIsCollege();
+	useTitleBar({ title: college ? "College Hall of Fame" : "Hall of Fame" });
+	const { userTid } = useLocal(["userTid"]);
 
-	if (college) {
-		return (
-			<p>
-				College leagues have no Hall of Fame. Players leave for the pros or
-				graduate rather than retire, so nobody is ever inducted.
-			</p>
-		);
+	if (collegeHof) {
+		return <CollegeHallOfFame college={collegeHof} />;
 	}
 
 	const wingRows: DataTableRow[] = wing.map((row) => ({

@@ -42,9 +42,7 @@ const PRO_ONLY_PAGES = new Set([
 	"pro_scouting",
 	// Scouting, the draft board and coaching staff depth, all pro-only League extras
 	"staff_report",
-	// Nobody is inducted in a college league: players leave for the pros, they don't retire
-	"hall_of_fame",
-	"hall_of_fame_watch",
+	// College leagues have the College Hall of Fame (Hall of Fame and Watch tabs), with no ballot
 	"hall_of_fame_ballot",
 ]);
 

@@ -389,7 +389,12 @@ export default defineView({
 								}
 
 								// Ring of Honor: Hall of Famers who played here and players whose jersey the team retired
-								if (pRaw.hof || retiredByPid[pRaw.pid]) {
+								// (College leagues: the College Hall of Fame, players inducted from this school)
+								if (
+									pRaw.hof ||
+									pRaw.collegeHof !== undefined ||
+									retiredByPid[pRaw.pid]
+								) {
 									const regular = stats.filter(
 										(r) => !r.playoffs && (r.gp ?? 0) > 0,
 									);
@@ -398,10 +403,12 @@ export default defineView({
 										pid: pRaw.pid,
 										name: `${pRaw.firstName} ${pRaw.lastName}`,
 										pos: row.pos,
-										hof: !!pRaw.hof,
-										inducted: pRaw.awards.find(
-											(a) => a.type === "Inducted into the Hall of Fame",
-										)?.season,
+										hof: !!pRaw.hof || pRaw.collegeHof !== undefined,
+										inducted:
+											pRaw.collegeHof ??
+											pRaw.awards.find(
+												(a) => a.type === "Inducted into the Hall of Fame",
+											)?.season,
 										jerseys: [...(retiredByPid[pRaw.pid] ?? [])],
 										firstSeason:
 											seasons.length > 0 ? Math.min(...seasons) : undefined,
