@@ -1019,8 +1019,14 @@ export const bestSystems = (fit: ReturnType<typeof rosterSchemeFit>) => {
 // Effects of scheme fit and coaching on the make probability: a team 1 SD better in fit makes this much more of its shots (and holds the
 // other team to this much less, for the defense system)
 export const FIT_MAKE_FACTOR = 0.004;
-// Strengths: offense/defense ratings of the head coach and coordinator ((x - 50) / 15, bounded +-2): make probability per unit
-export const STRENGTH_MAKE_FACTOR = 0.0015;
+// Strengths: offense/defense ratings of the head coach and coordinator ((x - 50) / 15, bounded +-2): make probability per unit. 0.0015
+// before (and no MOTIVATION_MAKE_FACTOR), when an elite head coach (the league's top 5%) was worth 1.2 wins (SE 0.6) a season more
+// than a poor one (bottom 5%) with the same roster; now 5.3 (SE 0.6; COACH_IMPACT=1 coachImpact.script.test.ts, 180 rosters x 40 games
+// each way), still under roster talent
+export const STRENGTH_MAKE_FACTOR = 0.0055;
+// The head coach's motivation ((x - 50) / 15): make probability per unit at both ends (effort and focus over the whole game, on top of
+// the late-game effect)
+export const MOTIVATION_MAKE_FACTOR = 0.0025;
 // A new system not yet installed costs this much (make probability, both ends) at the start
 export const INSTALL_MAKE_PENALTY = 0.005;
 // How far tendencies go in the first game with a new system (then ramp up to full)
@@ -1108,6 +1114,7 @@ export const coachSimEffects = ({
 	const k = clamp(install, 0, 1);
 	const offStrength = z(0.6 * head.off + 0.4 * (offCoord?.off ?? 30));
 	const defStrength = z(0.6 * head.def + 0.4 * (defCoord?.def ?? 30));
+	const motivation = z(head.mot);
 	const crash = profile.crash;
 	const fouls = profile.fouls;
 	// The old style dials still steer a little within the system
@@ -1129,7 +1136,8 @@ export const coachSimEffects = ({
 		make:
 			OFFENSE_MAKE_ADJ[profile.off] * k +
 			FIT_MAKE_FACTOR * offFit * k +
-			STRENGTH_MAKE_FACTOR * offStrength -
+			STRENGTH_MAKE_FACTOR * offStrength +
+			MOTIVATION_MAKE_FACTOR * motivation -
 			INSTALL_MAKE_PENALTY * (1 - k),
 		dThree: toward(d.three, k),
 		dMid: toward(d.mid, k),
@@ -1145,6 +1153,7 @@ export const coachSimEffects = ({
 			DEFENSE_MAKE_ADJ[profile.def] * k -
 			FIT_MAKE_FACTOR * defFit * k -
 			STRENGTH_MAKE_FACTOR * defStrength -
+			MOTIVATION_MAKE_FACTOR * motivation -
 			0.004 * fouls +
 			INSTALL_MAKE_PENALTY * (1 - k),
 		clutchMake: 0.006 * z(profile.mgmt) + 0.003 * z(head.mot),
@@ -1210,18 +1219,26 @@ export const normalizeCoachSims = (sims: CoachSim[]) => {
 	return out;
 };
 
+// The leading coach's counter-adjustments, as a share of what the same coach would do trailing by as many games
+export const COUNTER_ADJUST_SHARE = 0.5;
+
 // Playoff adjustments: a coach trailing in a series shifts his shot mix toward what the other defense concedes and his defense toward taking
-// away what the other offense likes, more so the more adaptable he is and the further behind
+// away what the other offense likes, more so the more adaptable he is and the further behind. The leading coach counter-adjusts the same
+// way, by COUNTER_ADJUST_SHARE of that (an adaptable leader takes back part of the trailer's edge; a stubborn one lets it ride), so a long
+// series swings back and forth instead of drifting toward the trailing team
 export const seriesAdjustment = (
 	own: CoachSim,
 	opp: CoachSim,
 	adapt: number,
 	gamesBehind: number,
 ): CoachSim => {
-	if (gamesBehind <= 0) {
+	if (gamesBehind === 0 || !Number.isFinite(gamesBehind)) {
 		return own;
 	}
-	const a = clamp(adapt / 100, 0, 1) * Math.min(1, gamesBehind / 2);
+	const a =
+		clamp(adapt / 100, 0, 1) *
+		Math.min(1, Math.abs(gamesBehind) / 2) *
+		(gamesBehind < 0 ? COUNTER_ADJUST_SHARE : 1);
 	const toward2 = (mine: number, theirs: number, f: number) =>
 		mine * theirs ** f;
 	return {

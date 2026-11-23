@@ -23,6 +23,7 @@ import {
 	getTeamStaff,
 	headTenure,
 	maxCoachContractExp,
+	onPreseason,
 	philosophyLeagueMean,
 	philosophyLevelDelta,
 	runOffseason,
@@ -36,6 +37,12 @@ import {
 } from "./systems.ts";
 import { rosterFitPlayers } from "../../views/staffShared.ts";
 import type { Coach } from "../../../common/types.ts";
+import {
+	coachAgeOffset,
+	coachOvr,
+	coachRatingDrift,
+	coachRatingRef,
+} from "../../../common/staff.ts";
 
 const realRandom = Math.random;
 
@@ -257,7 +264,8 @@ describe("coaching audit fixes", () => {
 		} finally {
 			(idb.cache.events as any).add = realAdd;
 		}
-		assert.isBelow((await idb.cache.coaches.get(head.cid))!.tid, 0);
+		// (gone from the user's team: a free agent, or already hired by an AI team with an open job)
+		assert.notStrictEqual((await idb.cache.coaches.get(head.cid))!.tid, tid);
 		assert.isTrue(
 			events.some(
 				(e) =>
@@ -360,3 +368,55 @@ describe("coaching audit fixes", () => {
 });
 
 const range13 = () => Array.from({ length: 13 }, (_, i) => i);
+
+describe("coach rating progression", () => {
+	test("a coach on his age's curve stays on it; above it he is pulled back", () => {
+		for (const age of [32, 45, 60]) {
+			const ref = coachRatingRef("off", "off") + coachAgeOffset(age);
+			// Expected change equals the age trend, which is what the curve itself does from this age to the next
+			assert.closeTo(
+				coachRatingDrift(ref, "off", "off", age),
+				coachAgeOffset(age + 1) - coachAgeOffset(age),
+				0.11,
+			);
+			assert.isBelow(
+				coachRatingDrift(ref + 20, "off", "off", age),
+				coachRatingDrift(ref, "off", "off", age),
+			);
+		}
+		// The job matters: an offensive coordinator's offense is made higher than a development coach's
+		assert.isAbove(coachRatingRef("off", "off"), coachRatingRef("off", "dev"));
+		assert.isAbove(coachRatingRef("mot", "head"), coachRatingRef("mot", "off"));
+	});
+
+	test("the league's coach ratings and salaries don't drift up over the decades (associate head coaches included)", async () => {
+		await setup({ seed: 3, market: true, systems: true });
+		g.setWithoutSavingToDB("userTids", []);
+		const snapshot = async () => {
+			const employed = (await idb.cache.coaches.getAll()).filter(
+				(c) => c.tid >= 0,
+			);
+			const heads = employed.filter((c) => c.role === "head");
+			const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+			return {
+				head: mean(heads.map((c) => coachOvr(c.ratings, "head"))),
+				salary: mean(employed.map((c) => c.contract.amount)),
+			};
+		};
+		const start = await snapshot();
+		for (let i = 0; i < 15; i++) {
+			const season = g.get("season");
+			await finishSeason(() => 31 + Math.floor(Math.random() * 21));
+			await runOffseason();
+			g.setWithoutSavingToDB("season", season + 1);
+			g.setWithoutSavingToDB("phase", PHASE.PRESEASON);
+			await onPreseason();
+			g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		}
+		const end = await snapshot();
+		// Before: head coach ovr about +10 and salaries about +40% over 15 seasons
+		assert.isBelow(Math.abs(end.head - start.head), 3.5);
+		assert.isBelow(end.salary / start.salary, 1.15);
+		assert.isAbove(end.salary / start.salary, 0.8);
+	});
+});

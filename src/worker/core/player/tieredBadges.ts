@@ -25,6 +25,7 @@ import {
 	gatesMet,
 	entryForSeason,
 	progressToNext,
+	recenterHeldTiers,
 	sortedBadges,
 	tbValue,
 	tierCandidates,
@@ -203,30 +204,40 @@ export const updateTieredBadges = async () => {
 		}
 		return scores;
 	};
+	// Each set of tiers with last season's (hysteresis, the one-tier floor), re-centered on the tier counts without them
+	// (recenterHeldTiers), so held-over badges don't pile up season after season
+	const assignAll = (
+		rowFor: (p: Player) => Record<string, any>,
+		display: boolean,
+	) => {
+		const out = players.map((p) => {
+			const r = rowFor(p);
+			const prev = prevTiers(p, season, display);
+			const { t, capped } = assignTiers(r, r.ovr ?? 0, cutoffs, prev);
+			const fresh = prev ? assignTiers(r, r.ovr ?? 0, cutoffs).t : t;
+			return {
+				p,
+				pid: p.pid,
+				t,
+				capped,
+				fresh,
+				scoreOf: (key: string) =>
+					tieredBadgeScore(r, TIERED_BADGES_BY_KEY[key]!),
+				r,
+				scores: {} as Record<string, number>,
+			};
+		});
+		recenterHeldTiers(out);
+		for (const x of out) {
+			x.scores = scoresOf(x.r, x.t);
+		}
+		enforceLegendLimit(out);
+		return out;
+	};
 	// The sim's tiers, from the true ratings
-	const assigned = players.map((p) => {
-		const r = rowOf(p);
-		const { t, capped } = assignTiers(
-			r,
-			r.ovr ?? 0,
-			cutoffs,
-			prevTiers(p, season),
-		);
-		return { p, pid: p.pid, t, capped, scores: scoresOf(r, t) };
-	});
-	enforceLegendLimit(assigned);
+	const assigned = assignAll(rowOf, false);
 	// The shown tiers, from the ratings as scouted (fuzz), so the pills never give away a true rating
-	const shown = players.map((p) => {
-		const r = scoutedRowOf(p);
-		const { t } = assignTiers(
-			r,
-			r.ovr ?? 0,
-			cutoffs,
-			prevTiers(p, season, true),
-		);
-		return { pid: p.pid, t, scores: scoresOf(r, t) };
-	});
-	enforceLegendLimit(shown);
+	const shown = assignAll(scoutedRowOf, true);
 	for (const [i, { p, t, capped }] of assigned.entries()) {
 		const entry: TieredBadgeEntry = { season, t };
 		if (capped.length > 0) {

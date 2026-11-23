@@ -7,11 +7,14 @@ import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import {
 	COACH_FREE_AGENT,
 	COACH_ROLE_NAMES,
+	coachAgeOffset,
 	coachOvr,
+	coachRatingRef,
 	coachSalaryDemand,
 } from "../../../common/staff.ts";
 import {
 	HEIR_GROWTH_MAX,
+	HEIR_GROWTH_ROOM,
 	MAX_INTERVIEWS,
 	MIN_INTEREST,
 	PREF_NAMES,
@@ -565,8 +568,12 @@ export const heirOffseason = async () => {
 			continue;
 		}
 		const rng = new Rng(`heirGrowth|${seed}|${c.cid}|${season}`);
+		const ageOffset = coachAgeOffset(season - c.born.year);
 		for (const key of HEIR_RATINGS) {
-			if (c.ratings[key] < 78) {
+			if (
+				c.ratings[key] <
+				coachRatingRef(key, "head") + ageOffset + HEIR_GROWTH_ROOM
+			) {
 				c.ratings[key] = Math.min(
 					100,
 					c.ratings[key] + rng.int(0, HEIR_GROWTH_MAX),
