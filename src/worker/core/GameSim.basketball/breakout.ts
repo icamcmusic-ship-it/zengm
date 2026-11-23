@@ -38,9 +38,9 @@ export const BREAKOUT = {
 	matchK: 0.12,
 	// The league's mean perimeter and interior defense composites (healthy top 8 by value, 2026 preset), and how far below it is the full
 	// edge
-	perimRef: 0.5,
+	perimRef: 0.52,
 	perimSpan: 0.06,
-	intRef: 0.5,
+	intRef: 0.533,
 	intSpan: 0.06,
 	// A shooter: three-point threat from threatLo, full at threatLo + threatSpan; a finisher: rim composite from rimLo, full at + rimSpan
 	threatLo: 0.4,
@@ -60,7 +60,7 @@ export const BREAKOUT = {
 	closerEff: 1.2,
 	// Calibration: taken off the make probability of every shot from the shooter draw (more of the shots now go to whoever is shooting
 	// well tonight, so league FG% and 3P% would go up)
-	makeCal: 0.003,
+	makeCal: 0.0045,
 };
 
 const clamp = (x: number, lo: number, hi: number) =>

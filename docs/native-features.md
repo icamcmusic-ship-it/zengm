@@ -46,7 +46,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Best games & top plays](#best-games--top-plays) | Daily Schedule → Best Games tab | bball | `featureBestGames` | on / on |
 | [Award vote](#award-vote) | Award Races → Award Vote tab | bball | `featureAwardVote` | on / on |
 | [Coach & Executive of the Year](#coach--executive-of-the-year) | Award Races, Award History, Award Settings, History, Coaches, Front Offices, GM History | bball | `featureCoachExecAwards` | always on (core) |
-| [Shot Share Model](#shot-share-model) | game sim (who takes the shots), Roster (game plan), player page (Shot diet), box score | bball | `shotShareModel` | always on (core) |
+| [Shot Share Model](#shot-share-model) | game sim (who takes the shots, [breakout nights](#breakout-nights)), Roster (game plan), player page (Shot diet), box score | bball | `shotShareModel` | always on (core) |
 | [League achievements](#league-achievements) | League → League achievements, dashboard | bball | `featureLeagueAchievements` | on / on |
 | [Trade grader](#trade-grader) | League → Trade Grader, trade summaries | bball | `featureTradeGrader` | on / on |
 | [Contract value](#contract-value) | League → Contract Value, player pages | bball | `featureContractValue` | on / on |
@@ -1295,6 +1295,33 @@ season). Never for an edited face. Measured over 3,000 seeds:
   Shot diet of the league: 27% normal draw, 43% self-created, 5% putbacks, 7% late clock, 3.5% hot hand, 4% kick-outs, 10% mismatch hunting.
 
 - **Known limits:** 20+ FGA players stay below the 8–15 target (about 6 a season): the stars' on-court shares are NBA-like, but they play 33–35 minutes (NBA stars 35–37), which is Realistic Rotations, not this model; pushing their shares further put the top usage above 37%. The calibration test asserts 4–16.
+
+### Breakout nights
+
+- **Setting:** part of the _Shot Share Model_ (`shotShareModel`, core): on wherever it is on, never in All-Star games. Off: nothing runs and no random number is drawn (`outcomeInvariance.test.ts` unchanged). On, it draws nothing from `Math.random` either: each player's one new draw per game is a seeded stream of the game and the player (`Rng("breakout|gid|pid")`, salted by the league), so every other random number of the sim stays where it was. Code: constants `BREAKOUT` and pure helpers in `src/worker/core/GameSim.basketball/breakout.ts`; hooks in `GameSim.basketball/index.ts` (`breakoutSetup`, `ssMiss`, the hot hand in `doFg`, `ssMakeDelta`, `adjustMinutes`, `pickHotClosers`); flavor in `common/pbpFlavor` (`benchHotLine`, `feedHotLine`, the session's `reserves`); news in `player/checkStatisticalFeat.ts`. Tests: `breakout.test.ts`, `common/pbpFlavor/benchHot.test.ts`; measurement: `BREAKOUT=1 [BREAKOUT_SEED=1 BREAKOUT_SEASONS=2 BREAKOUT_OUT=x.jsonl BREAKOUT_SETTINGS='{}'] breakoutNights.script.test.ts`.
+- **Why:** shot volume followed the role, so a role player's hot shooting night stayed a modest one (no bench 30-point nights to speak of). Now role players' volume moves from night to night with their form, the team feeds the hot hand, and the coach rides it.
+- **Role factor** rf, 0 to 1, from his rank on his team by usage composite among its healthy top 9 by value: 0, 0.35, 0.7, then 1 (the 4th and below). Stars are fed every night; everything below scales with rf, so the top scorer's game is as before.
+- **Usage form:** his shooter-draw weight × exp(sd × uz − sd²/2), mean 1 over his games, sd from 0.06 (rf 0) to 0.22 (rf 1), uz = 0.6 × gameZ (his shooting form for the game, Player traits) + 0.8 × his own draw (within ±2.5). A good shooting night is also a more aggressive one.
+- **Career night:** with probability rf / 150 (a role player about 1 game in 150) his usage form × 1.55 and his shooter-draw shots +.035 make probability.
+- **Openings:** each injured player among his team's top 5 by value (up to 2) × 1 + 0.07 × rf. The game plan goes at the opponent's weakness: a shooter (three-point threat 0.4 → 0.6) against a poor perimeter defense, a finisher (rim composite 0.5 → 0.7) against a poor interior one (the opponent's healthy top 8 by value, mean composite below the league's 0.52 / 0.533, full at 0.06 below): × 1 + 0.12 × rf × the edge (−0.5 to 1; a strong defense takes a little away).
+- **Hot hand:** a role player's boost is 0.25 + 0.35 × rf (× the consistency term as before) and lasts 4 + 6 × rf shooter draws; a miss no longer ends it, two straight misses do (a star's still ends on a miss). It also starts on a heater: a make with 12+ points at 1.3+ points per shot (FGA + 0.44 FTA).
+- **The coach rides it** (coaching adjustments, Realistic Rotations): a hot bench player (the usual hot-hand thresholds) in a game within 15 points gets 4 × weight × (1 + skill) / 2 more planned minutes on top of the usual bump, up to 8 from his tip-off plan (about +4 at halftime). In the last 5 minutes of a close game a role player with 16+ points at 1.2+ points per shot counts as 1.15 × his value for the closing lineup (not the last-minute offense/defense substitutions of End-of-Game Intelligence).
+- **Calibration:** every shot from the shooter draw −.0045 make probability: more of the shots now go to whoever is shooting well tonight.
+- **Flavor (text only):** a reserve (his first time on the court was a substitution) with 3 straight makes gets "X is feeling it off the bench" lines instead of the 4-in-a-row hot lines, and 8 straight team points "They keep going to the hot hand". A bench player's career high of 25+ points (× the feat scale factor) that isn't a statistical feat is a news item (from Feat Rarity's career-high tracking, so only with Feat Rarity & Streaks on).
+- **Results:** new leagues, 2026 preset, seeds 1–3 × 2 seasons each with offseasons (`breakoutNights.script.test.ts`), regular season, per league-season, before → after:
+
+  |                                                                   | before                            | after                             |
+  | ----------------------------------------------------------------- | --------------------------------- | --------------------------------- |
+  | 20 / 25 / 30+ point games by non-starters                         | 242 / 61 / 13                     | 339 / 110 / 28                    |
+  | same, players outside their team's top 3 in usage                 | 935 / 284 / 78                    | 1132 / 420 / 137                  |
+  | same, outside their team's top 3 scorers (PPG)                    | 928 / 273 / 71                    | 1122 / 411 / 132                  |
+  | game-to-game points SD (40+ games, 15+ MPG): top 3 usage / others | 8.08 / 5.00 (SD/PPG .383 / .561)  | 8.30 / 5.58 (.399 / .619)         |
+  | team pts / FG% / 3P% / AST / TOV                                  | 116.8 / .480 / .368 / 27.7 / 14.0 | 116.7 / .480 / .366 / 27.6 / 14.1 |
+  | scoring leader PPG / 25+ PPG players                              | 37.2 / 23.8                       | 36.4 / 24.0                       |
+  | MPG by minutes rank in a team-game (1st, 5th, 6th, 8th, 10th)     | 37.3, 25.4, 21.8, 16.2, 7.9       | 37.2, 25.4, 21.9, 16.3, 7.9       |
+  | 40+ minute games per team-game / minutes in a bench 20-point game | .382 / 23.9                       | .371 / 24.9                       |
+
+  Per league-season: about 380 career nights, about 2,100 bench hot-hand minute bumps. Rough NBA reference (approximate, from recent seasons): bench players score 30+ a few dozen times a season and 20+ several hundred; the 30-point bench nights are now in that range. **Known limits:** outside-the-top-3 30-point games were already above the "some dozens" of the NBA before this, and are higher now.
 
 ### Load, fatigue & venue
 

@@ -25,7 +25,7 @@ import { FLOW_DIAG } from "./gameFlow.ts";
 const env = (globalThis as any).process.env;
 
 const mean = (xs: number[]) =>
-	xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN;
+	xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : Number.NaN;
 const sd = (xs: number[]) => {
 	const m = mean(xs);
 	return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
