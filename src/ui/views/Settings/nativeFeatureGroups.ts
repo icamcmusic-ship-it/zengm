@@ -69,6 +69,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	tradeRequests: "League extras: Contracts",
 	holdouts: "League extras: Contracts",
 	capExceptions: "League extras: Contracts",
+	aiRosterBalance: "League extras: Contracts",
 	competitiveBalance: "League extras: Contracts",
 	parityBalance: "League extras: Contracts",
 	tradeExplain: "League extras: Trades",

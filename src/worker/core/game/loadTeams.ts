@@ -6,7 +6,7 @@ import { isHoldingOut } from "../contract/unrest.ts";
 import { idb } from "../../db/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { isRedshirting } from "../college/redshirt.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, local } from "../../util/index.ts";
 import type { Player, Conditions } from "../../../common/types.ts";
 import {
 	COMPOSITE_WEIGHTS,
@@ -788,6 +788,15 @@ export const processTeam = async (
 		) {
 			// (Load, Fatigue & Venue: so is the third game in four nights)
 			t.backToBack = isBackToBack(teamSeason.lastGameDay) || threeInFour;
+			// The user's own team: the plan follows his roster order (his starters get a minutes floor) and playing time buttons. Not with
+			// the AI running it (spectator, auto play)
+			if (
+				g.get("userTids").includes(t.id) &&
+				!g.get("spectator") &&
+				local.autoPlayUntil === undefined
+			) {
+				t.userRotation = true;
+			}
 			// No Visible Ratings challenge: the user's own minutes plan ranks his players by the fuzzed value he sees (the one auto sort
 			// uses), so the box score's minutes order doesn't give away the true value order. Only the plan's order: the substitutions
 			// themselves still use the true value
