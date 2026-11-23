@@ -36,6 +36,8 @@ import {
 	type RBTeamSeason,
 } from "../../common/recordsBook.ts";
 import type { Game, Player } from "../../common/types.ts";
+import type { EraAdjuster } from "../../common/eraAdjust.ts";
+import { getEraAdjuster } from "./eraBaselines.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers, local, lock, logEvent } from "./index.ts";
 import { featureOn, featureOption } from "./nativeFeatures.ts";
@@ -59,7 +61,19 @@ const toRow = (s: any): RBRow => ({
 	stl: num(s.stl),
 	blk: num(s.blk),
 	tp: num(s.tp),
+	tsa: num(s.fga) + 0.44 * num(s.fta),
 });
+
+// Era-adjusted rows (common/eraAdjust.ts): each stat times its season's factor, and what TS+ needs
+const eraRow = (r: RBRow, adj: EraAdjuster): RBRow => {
+	const out: RBRow = { ...r, ptsRaw: r.pts };
+	for (const k of RB_STATS) {
+		out[k] = r[k] * adj.factor(r.season, k);
+	}
+	const lgTs = adj.leagueRate(r.season, "tsp");
+	out.xpts = lgTs === undefined ? 0 : 2 * (r.tsa ?? 0) * lgTs;
+	return out;
+};
 
 export const toRBPlayer = (p: Player): RBPlayer => ({
 	pid: p.pid,
@@ -644,7 +658,7 @@ const ctxNow = async () => {
 	};
 };
 
-export const getRecordsBook = async (scope: RBScope) => {
+export const getRecordsBook = async (scope: RBScope, era = false) => {
 	// The state is brought up to date first, so single-game highs include today's games
 	if (!busy() && !running) {
 		running = true;
@@ -659,6 +673,20 @@ export const getRecordsBook = async (scope: RBScope) => {
 		loadTeamSeasons(),
 		ctxNow(),
 	]);
+	if (era) {
+		const adj = await getEraAdjuster();
+		return buildBook({
+			players: players.map((p) => ({
+				...p,
+				rows: p.rows.map((r) => eraRow(r, adj)),
+			})),
+			teamSeasons,
+			state: getState(),
+			ctx,
+			scope,
+			era: true,
+		});
+	}
 	return buildBook({
 		players,
 		teamSeasons,

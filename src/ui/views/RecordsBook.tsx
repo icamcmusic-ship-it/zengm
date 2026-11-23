@@ -13,7 +13,7 @@ const fmtValue = (list: Pick<RBList, "d" | "pct">, v: number) =>
 		? helpers.roundWinp(v)
 		: list.d > 0
 			? v.toFixed(list.d)
-			: helpers.numberWithCommas(v);
+			: helpers.numberWithCommas(Math.round(v));
 
 export const ActiveMark = () => (
 	<span
@@ -164,7 +164,7 @@ const ListCard = ({ list, teams }: { list: RBList; teams: TeamInfo[] }) => {
 	);
 };
 
-const RecordsBook = ({ sections, tid }: View<"recordsBook">) => {
+const RecordsBook = ({ era, sections, tid }: View<"recordsBook">) => {
 	useTitleBar({
 		title: "Records Book",
 		dropdown: {
@@ -173,6 +173,14 @@ const RecordsBook = ({ sections, tid }: View<"recordsBook">) => {
 					key: "team",
 					options: { type: "teams", all: true },
 					value: tid,
+				},
+				{
+					key: "era",
+					options: [
+						{ key: "raw", label: "Raw stats" },
+						{ key: "era", label: "Era-adjusted" },
+					],
+					value: era ? "era" : "raw",
 				},
 			],
 			view: "recordsBook",
@@ -201,6 +209,16 @@ const RecordsBook = ({ sections, tid }: View<"recordsBook">) => {
 				triple-doubles and other feats on{" "}
 				<a href={helpers.leagueUrl(["player_feats"])}>Statistical Feats</a>.
 			</p>
+			{era ? (
+				<p className="text-body-secondary">
+					Era-adjusted: each season's stats relative to that season's league
+					average per team game (pace and scoring environment together), put
+					back on the scale of the league's average season, so marks from
+					different eras compare. TS+ is 100 × true shooting % / the league's
+					that season. Single games and team records are not adjusted; switch to
+					raw stats to see them.
+				</p>
+			) : null}
 			<p>
 				Jump to:{" "}
 				{sections.map((s, i) => (

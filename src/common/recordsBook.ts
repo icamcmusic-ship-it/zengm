@@ -25,6 +25,11 @@ export type RBRow = {
 	tid: number;
 	playoffs: boolean;
 	gp: number;
+	// Era-adjusted book only (common/eraAdjust.ts): his points (not adjusted), his true shooting attempts (fga + 0.44 fta) and the points
+	// a league-average true shooting percentage that season would have scored on them, for TS+
+	ptsRaw?: number;
+	tsa?: number;
+	xpts?: number;
 } & Record<RBStat, number>;
 
 export type RBPlayer = {
@@ -363,9 +368,15 @@ export type RBContext = {
 	regularSeasonDone: boolean;
 };
 
-type Tot = { gp: number } & Record<RBStat, number>;
+type Tot = { gp: number; ptsRaw: number; tsa: number; xpts: number } & Record<
+	RBStat,
+	number
+>;
 const zero = (): Tot => ({
 	gp: 0,
+	ptsRaw: 0,
+	tsa: 0,
+	xpts: 0,
 	pts: 0,
 	trb: 0,
 	ast: 0,
@@ -375,6 +386,9 @@ const zero = (): Tot => ({
 });
 const addTo = (a: Tot, r: RBRow) => {
 	a.gp += r.gp;
+	a.ptsRaw += r.ptsRaw ?? 0;
+	a.tsa += r.tsa ?? 0;
+	a.xpts += r.xpts ?? 0;
 	for (const k of RB_STATS) {
 		a[k] += r[k];
 	}
@@ -389,6 +403,13 @@ const top = <T>(arr: T[], n: number, val: (x: T) => number, low = false) =>
 const N = 10;
 
 export type RBScope = { tid?: number };
+
+// Era-adjusted book: the players' rows already adjusted (see worker/util/recordsBookData.ts); TS+ lists need this many true shooting
+// attempts per game in a season, and in a career
+export const ERA_TS_MIN_PER_GAME = 8;
+export const ERA_TS_MIN_CAREER = 3000;
+const tsPlus = (t: Tot) =>
+	t.xpts > 0 ? (100 * t.ptsRaw) / t.xpts : Number.NaN;
 
 type Line = {
 	pid: number;
@@ -635,12 +656,15 @@ export const buildBook = ({
 	state,
 	ctx,
 	scope,
+	era = false,
 }: {
 	players: RBPlayer[];
 	teamSeasons: RBTeamSeason[];
 	state: RBState | undefined;
 	ctx: RBContext;
 	scope: RBScope;
+	// Era-adjusted: the players' rows are adjusted, single games and team records are left out (they aren't adjusted) and TS+ is added
+	era?: boolean;
 }): RBSection[] => {
 	const fr = scope.tid;
 	const isActive = (p: RBPlayer) =>
@@ -690,7 +714,28 @@ export const buildBook = ({
 				(c) => c.seasons.size,
 				(c) => c.seasonsBefore,
 			),
+			...(era
+				? [
+						{
+							...careerList(
+								"career:tsplus",
+								"True shooting+ (TS+)",
+								"TS+",
+								reg.filter((c) => c.now.tsa >= ERA_TS_MIN_CAREER),
+								(c) => tsPlus(c.now),
+								(c) =>
+									c.before.tsa >= ERA_TS_MIN_CAREER
+										? tsPlus(c.before)
+										: Number.NaN,
+							),
+							d: 1,
+						},
+					]
+				: []),
 		],
+		note: era
+			? `Era-adjusted. TS+: at least ${ERA_TS_MIN_CAREER.toLocaleString()} true shooting attempts.`
+			: undefined,
 	});
 
 	// Single season
@@ -723,8 +768,23 @@ export const buildBook = ({
 					1,
 				),
 			),
+			...(era
+				? [
+						seasonList(
+							"season:tsplus",
+							"True shooting+ (TS+)",
+							"TS+",
+							qualified.filter((l) => l.t.tsa >= ERA_TS_MIN_PER_GAME * l.t.gp),
+							(l) => tsPlus(l.t),
+							ctx,
+							1,
+						),
+					]
+				: []),
 		],
-		note: "Per game: at least 70% of the team's games.",
+		note: era
+			? `Era-adjusted. Per game: at least 70% of the team's games. TS+ (100 × his true shooting % / the league's that season): also at least ${ERA_TS_MIN_PER_GAME} true shooting attempts per game.`
+			: "Per game: at least 70% of the team's games.",
 	});
 
 	// Single game
@@ -743,15 +803,17 @@ export const buildBook = ({
 				ctx.season,
 			),
 		);
-	sections.push({
-		id: "game",
-		title: "Single game",
-		lists: games(false),
-		note:
-			fr === undefined
-				? undefined
-				: `Top ${GAME_TOP_FR} per franchise are kept.`,
-	});
+	if (!era) {
+		sections.push({
+			id: "game",
+			title: "Single game",
+			lists: games(false),
+			note:
+				fr === undefined
+					? undefined
+					: `Top ${GAME_TOP_FR} per franchise are kept.`,
+		});
+	}
 
 	// Playoffs
 	const po = careers(players, true, scope, isActive, ctx.season);
@@ -790,12 +852,21 @@ export const buildBook = ({
 					false,
 				),
 			),
-			...games(true).map((l) => ({
-				...l,
-				label: `${l.label} in a playoff game`,
-			})),
+			...(era
+				? []
+				: games(true).map((l) => ({
+						...l,
+						label: `${l.label} in a playoff game`,
+					}))),
 		],
+		note: era
+			? "Era-adjusted by each season's regular season league averages."
+			: undefined,
 	});
+
+	if (era) {
+		return sections;
+	}
 
 	// Teams
 	const ts = teamSeasons.filter((t) => fr === undefined || t.tid === fr);

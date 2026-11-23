@@ -59,6 +59,7 @@ const Leaders = ({
 	playoffs,
 	season,
 	statType,
+	era,
 }: View<"leaders">) => {
 	useTitleBar({
 		title: "League Leaders",
@@ -81,6 +82,18 @@ const Leaders = ({
 					options: dropdownOptions.playoffsCombined,
 					value: playoffs,
 				},
+				...(__SPORT === "basketball"
+					? [
+							{
+								key: "era" as const,
+								options: [
+									{ key: "raw", label: "Raw stats" },
+									{ key: "era", label: "Era-adjusted" },
+								],
+								value: era ? "era" : "raw",
+							},
+						]
+					: []),
 			],
 			view: "leaders",
 		},
@@ -106,6 +119,16 @@ const Leaders = ({
 				statType={statType}
 			/>
 			<LeadersTopText includeHighlight={highlightActiveAndHOF} />
+			{era ? (
+				<p className="text-body-secondary">
+					Era-adjusted: each season's stats relative to that season's league
+					average per team game (pace and scoring together), put back on the
+					scale of the league's average season; percentages relative to the
+					league's rate that season. Careers use each season's adjustment,
+					weighted by games. Advanced stats are already relative and are not
+					changed.
+				</p>
+			) : null}
 
 			{noQualifiedLeaders ? (
 				<p>No data yet.</p>

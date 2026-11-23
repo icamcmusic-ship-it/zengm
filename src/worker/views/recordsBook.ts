@@ -8,6 +8,8 @@ import { getRecordsBook } from "../util/recordsBookData.ts";
 
 const processInputs = (params: RouteParams<"recordsBook">) => ({
 	tid: validateTeam(params.team, ["all"]),
+	// Era-adjusted (common/eraAdjust.ts)
+	era: params.era === "era",
 });
 
 export default defineView({
@@ -22,12 +24,14 @@ export default defineView({
 			updateEvents.has("firstRun") ||
 			updateEvents.has("gameSim") ||
 			updateEvents.has("newPhase") ||
-			inputs.tid !== prevInputs?.tid
+			inputs.tid !== prevInputs?.tid ||
+			inputs.era !== prevInputs?.era
 		) {
 			const tid = inputs.tid === "all" ? undefined : inputs.tid;
-			const sections = await getRecordsBook({ tid });
+			const sections = await getRecordsBook({ tid }, inputs.era);
 			return {
 				tid: inputs.tid,
+				era: inputs.era,
 				season: g.get("season"),
 				userTid: g.get("userTid"),
 				sections,

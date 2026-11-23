@@ -22,6 +22,8 @@ import { validateSeason } from "../util/processInputs.ts";
 import { validateSeasonType } from "../util/processInputs.ts";
 import { getProStats } from "../../common/preDraft.ts";
 import { validateStatType } from "../util/processInputs.ts";
+import { getEraAdjuster } from "../util/eraBaselines.ts";
+import { careerEraFactor } from "../../common/eraAdjust.ts";
 
 const processInputs = (params: RouteParams<"leaders">) => {
 	let season: "career" | "all" | number;
@@ -35,6 +37,8 @@ const processInputs = (params: RouteParams<"leaders">) => {
 		season,
 		playoffs: validateSeasonType(params.playoffs),
 		statType: validateStatType(params.statType),
+		// Era-adjusted (basketball): each season's stats relative to its league average, see common/eraAdjust.ts
+		era: __SPORT === "basketball" && params.era === "era",
 	};
 };
 
@@ -741,9 +745,12 @@ export default defineView({
 			(inputs.season === g.get("season") && updateEvents.has("gameSim")) ||
 			inputs.season !== prevInputs?.season ||
 			inputs.playoffs !== prevInputs?.playoffs ||
-			inputs.statType !== prevInputs?.statType
+			inputs.statType !== prevInputs?.statType ||
+			inputs.era !== prevInputs?.era
 		) {
 			const { categories, stats } = getCategoriesAndStats();
+			// (read before iterating the players: no database access inside that transaction)
+			const eraAdj = inputs.era ? await getEraAdjuster() : undefined;
 
 			const outputCategories = categories.map((category) => ({
 				titleOverride: category.titleOverride,
@@ -892,16 +899,34 @@ export default defineView({
 					return;
 				}
 				const { p, playerStats, skills, badges, getTeamAndPos } = info;
+				// Era-adjusted: a season's factor, or for a career his seasons' factors weighted by his games
+				const careerRows =
+					eraAdj && season === "career"
+						? pRaw.stats
+								.filter((row) =>
+									inputs.playoffs === "combined"
+										? true
+										: row.playoffs === (inputs.playoffs === "playoffs"),
+								)
+								.map((row) => ({ season: row.season, gp: row.gp ?? 0 }))
+						: undefined;
+				const eraFactor = (stat: string) =>
+					!eraAdj
+						? 1
+						: season === "career"
+							? careerEraFactor(eraAdj, stat, careerRows!)
+							: eraAdj.factor(season, stat);
 
 				for (const [cat, outputCat] of Iterator.zip(
 					[categories, outputCategories],
 					{ mode: "strict" },
 				)) {
-					const value = playerStats[cat.stat];
-					if (typeof value !== "number") {
+					const rawValue = playerStats[cat.stat];
+					if (typeof rawValue !== "number") {
 						// value should only be undefined in historical data before certain stats were tracked. Leader categories are all numeric stats
 						continue;
 					}
+					const value = eraAdj ? rawValue * eraFactor(cat.stat) : rawValue;
 					const lastValue = outputCat.leaders.at(-1)?.stat;
 					if (
 						lastValue !== undefined &&
@@ -978,6 +1003,7 @@ export default defineView({
 				playoffs: inputs.playoffs,
 				season: inputs.season,
 				statType: inputs.statType,
+				era: inputs.era,
 			};
 		}
 	},
