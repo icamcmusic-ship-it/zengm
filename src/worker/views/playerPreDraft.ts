@@ -97,6 +97,8 @@ import {
 	getHsClassRanks,
 	getRecruitBasis,
 } from "../core/draft/recruiting.ts";
+import { combineAthleticFor, getProspectRadar } from "../core/draft/radar.ts";
+import { offRadarText } from "../../common/collegeStats/radar.ts";
 import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
 import { expandedRatingsApply } from "../core/player/expandedRatings.ts";
 
@@ -711,6 +713,28 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		story: career?.story,
 	});
 
+	// Why a lowly recruited or unproductive prospect is on the radar (or that nothing explains it: off the radar)
+	const radarFound = getProspectRadar(pRaw, {
+		recruitRank: recruiting ? (recruiting.nationalRank ?? null) : undefined,
+		athletic: await combineAthleticFor(pRaw, classPlayers),
+	});
+	// Not when his story already tells it (a late bloomer or unranked riser, an injury-shortened season, a 7-footer project)
+	const storyKind = career?.story;
+	const told =
+		radarFound &&
+		((radarFound.kind === "lateBloomer" &&
+			(storyKind === "lateBloomer" || storyKind === "unranked")) ||
+			(radarFound.kind === "injury" && storyKind === "injury") ||
+			(radarFound.kind === "tools" && storyKind === "project"));
+	const radar =
+		radarFound && !told
+			? {
+					kind: radarFound.kind,
+					title: radarFound.title,
+					text: radarFound.text ?? offRadarText(finalPick <= numPicks),
+				}
+			: undefined;
+
 	// His story, if he is one of his class's unusual prospects
 	let story;
 	const lastEntry = entries.at(-1);
@@ -827,6 +851,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		comps,
 		story,
 		route,
+		radar,
 		scoutingReport,
 		// Scouting System setting: your scouts' ranges and notes on a prospect (only here and on his other pages, not on the Draft
 		// Board or Draft Scouting)

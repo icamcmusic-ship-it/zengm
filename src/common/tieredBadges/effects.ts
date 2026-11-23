@@ -1,6 +1,7 @@
 // 2K Badges: what each badge does in the game sim, in plain words, for the badge popup (ui/components/SkillsBlock.tsx). The numbers are
 // the Hall of Fame tier effects of GameSim.basketball/tieredBadgesSim.ts (BADGE_SIM), scaled per tier by TIER_SCALE; effects.test.ts
-// checks they match. Badges without an entry have no direct game effect: they describe the player's game (and count toward his 6).
+// checks they match. Badges without an entry have no direct game effect: they describe the player's game (and count toward his 6, but
+// within a tier the badges with an entry here come first when the cap and the limit of 6 choose: compute.ts simRelevant).
 
 // Effect scale of a tier: Bronze ... Legend (Hall of Fame = 1), the same as the sim's
 export const TIER_EFFECT_SCALE = [0, 0.3, 0.55, 0.8, 1, 1.15] as const;

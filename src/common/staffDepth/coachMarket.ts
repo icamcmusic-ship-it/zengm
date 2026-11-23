@@ -12,6 +12,10 @@ export const PREMIUMS = [0, 0.1, 0.2] as const;
 
 // Associate head coach: each offseason he grows toward head coach ratings by up to this much per rating
 export const HEIR_GROWTH_MAX = 2;
+// ... while the rating is below what a head coach of his age is generated with (common/staff.ts coachRatingRef + coachAgeOffset) plus
+// this much. Before: below 78 at any age, which with every AI team naming an heir lifted the league's coach ratings and salaries for
+// decades (coachDrift.script.test.ts)
+export const HEIR_GROWTH_ROOM = 10;
 
 export type CoachPrefs = { success: number; market: number; salary: number };
 

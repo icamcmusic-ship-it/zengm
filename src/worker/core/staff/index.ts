@@ -10,7 +10,9 @@ import {
 	COACH_FREE_AGENT,
 	COACH_RETIRED,
 	COACH_ROLE_NAMES,
+	coachAgeOffset,
 	coachOvr,
+	coachRatingDrift,
 	coachSalaryDemand,
 	STAFF_DEV_SCORE_REF,
 	staffDevScore,
@@ -128,20 +130,17 @@ export const generateCoach = async ({
 	} else {
 		ratings[role as "dev" | "off" | "def"] += gauss(15, 5);
 	}
-	if (young) {
-		for (const key of helpers.keys(ratings)) {
-			ratings[key] -= 4;
-		}
-	}
-	for (const key of helpers.keys(ratings)) {
-		ratings[key] = bound(ratings[key]!);
-	}
-
 	const age = young
 		? randInt(29, 42)
 		: role === "head"
 			? randInt(38, 66)
 			: randInt(31, 62);
+	// Where the age curve puts a coach of his age (common/staff.ts coachAgeOffset: young coaches start lower and grow into it, so the
+	// league's ratings don't drift up as the first generation ages). Before: young coaches -4, everyone else the same at any age
+	const ageOffset = coachAgeOffset(age);
+	for (const key of helpers.keys(ratings)) {
+		ratings[key] = bound(ratings[key]! + ageOffset);
+	}
 
 	const c: CoachWithoutKey = {
 		firstName,
@@ -861,17 +860,24 @@ const age = (c: CoachWithoutKey) => g.get("season") - c.born.year;
 // the next to swing his team's development effect on its own (docs/rating-inflation.md)
 const COACH_PROGRESS_SD = 1;
 
+// Age- and job-aware (common/staff.ts coachRatingDrift): the age trend, pulled toward what a coach of his age and job is made with, so
+// the league's coach ratings (and salaries) stay where they started over the decades instead of drifting up
 const progress = (c: Coach) => {
 	const a = age(c);
-	const mu = a < 45 ? 1.2 : a < 58 ? 0.2 : -1.2;
 	for (const key of ["dev", "off", "def", "mot"] as const) {
-		c.ratings[key] = bound(c.ratings[key] + gauss(mu, COACH_PROGRESS_SD));
+		c.ratings[key] = bound(
+			c.ratings[key] +
+				gauss(
+					coachRatingDrift(c.ratings[key], key, c.role, a),
+					COACH_PROGRESS_SD,
+				),
+		);
 	}
-	// Coaching Staff Depth: the extra jobs' ratings follow the same age trend (no random draws, so the other ratings draw as before)
+	// Coaching Staff Depth: the extra jobs' ratings follow the same trend (no random draws, so the other ratings draw as before)
 	for (const key of ["sht", "cnd", "vid"] as const) {
 		const v = c.ratings[key];
 		if (v !== undefined) {
-			c.ratings[key] = bound(v + mu);
+			c.ratings[key] = bound(v + coachRatingDrift(v, key, c.role, a));
 		}
 	}
 };

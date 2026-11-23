@@ -6,6 +6,7 @@ import {
 	getStoryText,
 	isJuco,
 	type CareerYear,
+	type PreDraftCareer,
 } from "./career.ts";
 import { COLLEGES, SMALL_COLLEGES } from "./colleges.ts";
 import { makeClass } from "./career.testutil.ts";
@@ -543,11 +544,19 @@ describe("career model", () => {
 				...options,
 				ncaaSeason,
 			});
-			// Careers are the same with or without the college season
+			// Careers are the same with or without the college season (all but the recruiting rank, which is fitted to the production
+			// the seasons show: radar.ts fitHsRank)
 			const plain = generateCollegeClass(prospects, options);
+			const noRank = (career: PreDraftCareer | undefined) => {
+				if (!career) {
+					return career;
+				}
+				const { hsRank: _hsRank, ...rest } = career;
+				return rest;
+			};
 			assert.deepStrictEqual(
-				results.map((x) => x.career),
-				plain.map((x) => x.career),
+				results.map((x) => noRank(x.career)),
+				plain.map((x) => noRank(x.career)),
 			);
 			for (const result of results) {
 				if (!result.ncaa) {

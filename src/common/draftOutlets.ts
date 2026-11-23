@@ -150,6 +150,9 @@ export type OutletProspect = {
 	production?: number;
 	// Athletic signal (0-100): his combine athletic score once tested, else a read of the tape
 	athletic: number;
+	// Off the radar (collegeStats/radar.ts): lowly recruited (or never recruited), little production and nothing in his story to explain
+	// why he would be a prospect. The media can't vouch for him
+	offRadar?: boolean;
 };
 
 const standardize = (xs: (number | undefined)[]) => {
@@ -173,6 +176,8 @@ const drifting = (key: string, edition: number) => {
 // Shared public perception error (sd in class standard deviations): what every outlet hears, so averaging the outlets doesn't recover
 // the truth; and each outlet's own error
 const PUBLIC_SD = 0.32;
+// How far every outlet drops a prospect who is off the radar, in class standard deviations
+export const OFF_RADAR_PENALTY = 0.35;
 const OUTLET_SD = 0.3;
 // Public perception: a read of each prospect the media shares for the whole class (seeded per class and prospect, the same in every
 // edition, so it doesn't shrink as the season goes on). With it the final consensus misses by about 0.3 class standard deviations,
@@ -228,7 +233,8 @@ export const outletBoards = ({
 			}
 			const score =
 				zValue[i]! +
-				outlet.leanWeight * lean +
+				outlet.leanWeight * lean -
+				(p.offRadar ? OFF_RADAR_PENALTY : 0) +
 				perception[i]! +
 				scale * (PUBLIC_SD * pub + OUTLET_SD * outlet.noise * own);
 			return { pid: p.pid, score };

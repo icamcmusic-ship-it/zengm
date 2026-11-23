@@ -15,6 +15,7 @@ import {
 	coachSimEffects,
 	deriveCoachProfile,
 	normalizeCoachSims,
+	COUNTER_ADJUST_SHARE,
 	seriesAdjustment,
 	type CoachSim,
 } from "../../../common/coachSystems.ts";
@@ -209,7 +210,7 @@ describe("coaching systems", () => {
 		assert.isBelow(diff, 0.01);
 	});
 
-	test("playoff adjustments: only for the team behind in the series, toward what the other defense concedes", () => {
+	test("playoff adjustments: toward what the other defense concedes, the trailing coach more than the leading one", () => {
 		const own = { ...neutral };
 		const opp = { ...neutral, dThree: 1.2, dRim: 0.8 };
 		assert.deepEqual(seriesAdjustment(own, opp, 80, 0), own);
@@ -218,6 +219,19 @@ describe("coaching systems", () => {
 		assert.isBelow(adj.rim, 1);
 		const stubborn = seriesAdjustment(own, opp, 10, 2);
 		assert.isBelow(stubborn.three, adj.three);
+		// The leader counter-adjusts: the same direction, half as far, scaled by his adaptability
+		const counter = seriesAdjustment(own, opp, 80, -2);
+		assert.isAbove(counter.three, 1);
+		assert.isBelow(counter.three, adj.three);
+		assert.isAbove(counter.make, own.make);
+		assert.isBelow(counter.make - own.make, adj.make - own.make);
+		assert.closeTo(
+			Math.log(counter.three),
+			COUNTER_ADJUST_SHARE * Math.log(adj.three),
+			1e-9,
+		);
+		const stubbornLeader = seriesAdjustment(own, opp, 10, -2);
+		assert.isBelow(stubbornLeader.three, counter.three);
 	});
 
 	test("league averages stay the same with random coaches", async () => {

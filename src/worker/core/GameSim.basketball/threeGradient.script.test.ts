@@ -28,6 +28,13 @@ import * as simSettings from "./simSettings.ts";
 import { SIM_FIX_SHOT_CHOICE, SIM_FIX_THREE } from "./simSettings.ts";
 import { FLOW_DIAG } from "./gameFlow.ts";
 import { BADGE_DIAG } from "./tieredBadgesSim.ts";
+import {
+	badgePointCap,
+	badgePoints,
+	displayTiersOf,
+	entryForSeason,
+} from "../../../common/tieredBadges/index.ts";
+import { badgeRowOf } from "../player/tieredBadges.ts";
 
 const env = (globalThis as any).process.env;
 // THREE_GRAD_CONST changes the sim's constants (for tuning)
@@ -141,10 +148,42 @@ test.skipIf(!env.THREE_GRAD)(
 
 		const leagues = [];
 		const players = [];
+		const badgeSeasons = [];
 		for (let i = 0; i < numSeasons; i++) {
 			const s = g.get("season");
 			await phase.newPhase(PHASE.REGULAR_SEASON, {});
 			await lock.set("gameSim", false);
+			// 2K Badges by season (tier creep): tier counts of the players on teams (the sim's and the shown tiers), how many are over
+			// their badge-point cap or hold more than 6, and the season's mean raw sim effects (calibration)
+			const badgeSeason = {
+				season: s,
+				t: [0, 0, 0, 0, 0, 0],
+				d: [0, 0, 0, 0, 0, 0],
+				players: 0,
+				overCap: 0,
+				over6: 0,
+				cal: {},
+			};
+			for (const p of await idb.cache.players.getAll()) {
+				const e = p.tid >= 0 ? entryForSeason(p.badges2k, s) : undefined;
+				if (!e) {
+					continue;
+				}
+				badgeSeason.players++;
+				for (const tier of Object.values(e.t)) {
+					badgeSeason.t[tier]++;
+				}
+				for (const tier of Object.values(displayTiersOf(e))) {
+					badgeSeason.d[tier]++;
+				}
+				if (badgePoints(e.t) > badgePointCap(badgeRowOf(p).ovr ?? 0)) {
+					badgeSeason.overCap++;
+				}
+				if (Object.keys(e.t).length > 6) {
+					badgeSeason.over6++;
+				}
+			}
+			const diagBefore = { sum: { ...BADGE_DIAG.sum }, n: { ...BADGE_DIAG.n } };
 			let guard = 0;
 			while (
 				g.get("phase") === PHASE.REGULAR_SEASON ||
@@ -154,6 +193,22 @@ test.skipIf(!env.THREE_GRAD)(
 				if (++guard > 50) {
 					throw new Error("stuck");
 				}
+			}
+			for (const [k, v] of Object.entries(BADGE_DIAG.sum)) {
+				const n = BADGE_DIAG.n[k] - (diagBefore.n[k] ?? 0);
+				if (n > 0) {
+					badgeSeason.cal[k] = Number(
+						((v - (diagBefore.sum[k] ?? 0)) / n).toFixed(5),
+					);
+				}
+			}
+			badgeSeasons.push(badgeSeason);
+			console.log(`BADGE SEASON ${JSON.stringify(badgeSeason)}`);
+			if (out) {
+				appendFileSync(
+					out,
+					`${JSON.stringify({ kind: "badgeSeason", seed, ...badgeSeason })}\n`,
+				);
 			}
 
 			const sum = {

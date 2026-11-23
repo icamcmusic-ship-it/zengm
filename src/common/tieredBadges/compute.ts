@@ -14,8 +14,14 @@ import {
 	type TieredBadgeDef,
 	type Tier,
 } from "./definitions.ts";
+import { BADGE_EFFECTS } from "./effects.ts";
 
 type Row = Record<string, any>;
+
+// Badges with a game sim effect (effects.ts, the same list as the sim's BADGE_SIM). Within a tier they come before the ones that only
+// describe a player's game, when the badge-point cap and the limit of MAX_BADGES choose: an athletic big's Pogo Stick and Fast Twitch
+// used to push his Rim Protector out of his 6
+export const simRelevant = (key: string) => (BADGE_EFFECTS[key] ? 1 : 0);
 
 // Saved each season (game attribute tieredBadgeCutoffs, by season): per badge the scores where Bronze, Silver, Gold, Hall of Fame and
 // Legend start, and the medians of the median-gated inputs
@@ -195,9 +201,11 @@ export const tierCandidates = (
 };
 
 /**
- * A player's tiers for a season: the candidates under the badge-point cap (the deepest ones first; one that doesn't fit at its tier
- * takes what points are left), then no badge drops more than one tier from last season (that can go a little over the cap), then only
- * his best MAX_BADGES are kept (highest tier, then furthest into it; the others are "next up" on the player page, not earned).
+ * A player's tiers for a season: the candidates under the badge-point cap (highest tier first, badges with a sim effect before the others
+ * in a tier, then the deepest; one that doesn't fit at its tier takes what points are left), then no badge drops more than one tier from
+ * last season as long as the cap has points left for it (the floor used to go over the cap: about 6% of players, every season), then
+ * only his best MAX_BADGES are kept (highest tier, sim effect, then furthest into it; the others are "next up" on the player page, not
+ * earned).
  */
 export const assignTiers = (
 	r: Row,
@@ -206,7 +214,11 @@ export const assignTiers = (
 	prev?: Partial<Record<string, Tier>>,
 ): { t: Record<string, Tier>; capped: string[] } => {
 	const candidates = tierCandidates(r, cutoffs, prev).sort(
-		(a, b) => b.depth - a.depth || a.key.localeCompare(b.key),
+		(a, b) =>
+			b.tier - a.tier ||
+			simRelevant(b.key) - simRelevant(a.key) ||
+			b.depth - a.depth ||
+			a.key.localeCompare(b.key),
 	);
 	const progressByKey = new Map(
 		candidates.map((c) => [c.key, c.depth - c.tier]),
@@ -228,12 +240,21 @@ export const assignTiers = (
 		}
 	}
 	if (prev) {
-		for (const [key, before] of Object.entries(prev)) {
-			if (before && before >= 2 && TIERED_BADGES_BY_KEY[key]) {
-				const floor = (before - 1) as Tier;
-				if ((t[key] ?? 0) < floor) {
-					t[key] = floor;
-				}
+		// Within the cap: the points the candidates left, the highest tiers last season first
+		const floors = Object.entries(prev)
+			.filter(
+				([key, before]) => before && before >= 2 && TIERED_BADGES_BY_KEY[key],
+			)
+			.sort(
+				([ka, a], [kb, b]) =>
+					b! - a! || simRelevant(kb) - simRelevant(ka) || ka.localeCompare(kb),
+			);
+		for (const [key, before] of floors) {
+			const now = t[key] ?? 0;
+			const floor = Math.min(before! - 1, now + left);
+			if (floor > now) {
+				t[key] = floor as Tier;
+				left -= floor - now;
 			}
 		}
 	}
@@ -247,8 +268,8 @@ export const assignTiers = (
 };
 
 /**
- * The best MAX_BADGES of a set of tiers: highest tier, then furthest into it (progress), then definition order. The result's keys are
- * in that order (kept when stored), so displays can show them best first.
+ * The best MAX_BADGES of a set of tiers: highest tier, then badges with a sim effect, then furthest into it (progress), then definition
+ * order. The result's keys are in that order (kept when stored), so displays can show them best first.
  */
 export const keepBest = (
 	t: Record<string, Tier>,
@@ -259,11 +280,67 @@ export const keepBest = (
 		.toSorted(
 			(a, b) =>
 				t[b]! - t[a]! ||
+				simRelevant(b) - simRelevant(a) ||
 				(progressByKey?.get(b) ?? 0) - (progressByKey?.get(a) ?? 0) ||
 				(TIERED_BADGE_INDEX[a] ?? 0) - (TIERED_BADGE_INDEX[b] ?? 0),
 		)
 		.slice(0, MAX_BADGES);
 	return Object.fromEntries(kept.map((key) => [key, t[key]!]));
+};
+
+// Re-centering: a badge's holders at a tier or better may exceed the holders without last season's tiers (no hysteresis, no floor) by at
+// most this share (rounded up), so held-over badges don't pile up season after season
+export const RECENTER_TOLERANCE = 0.1;
+
+/**
+ * Keep the tier counts where the league's percentiles put them. Hysteresis and the one-tier floor keep badges whose score has fallen
+ * below their tier, and with players' ratings moving every season the held-over badges added up (in a synthetic run Silver grew about
+ * 50% and Bronze 15-20% by the 4th-7th season). For each badge and tier, top down: if more players hold it at that tier or better than
+ * would without last season's tiers (fresh) by more than RECENTER_TOLERANCE, the held-over ones at that tier with the lowest scores drop
+ * a tier until it fits. Deterministic (score, then pid). Mutates the entries' t; returns the number of demotions.
+ */
+export const recenterHeldTiers = (
+	players: {
+		pid: number;
+		t: Record<string, Tier>;
+		fresh: Partial<Record<string, Tier>>;
+		scoreOf: (key: string) => number;
+	}[],
+) => {
+	let demoted = 0;
+	for (const def of TIERED_BADGES) {
+		const key = def.key;
+		for (let tier = 4; tier >= 1; tier--) {
+			let count = 0;
+			let target = 0;
+			for (const p of players) {
+				if ((p.t[key] ?? 0) >= tier) {
+					count++;
+				}
+				if ((p.fresh[key] ?? 0) >= tier) {
+					target++;
+				}
+			}
+			const excess = count - Math.ceil(target * (1 + RECENTER_TOLERANCE));
+			if (excess <= 0) {
+				continue;
+			}
+			const held = players
+				.filter((p) => p.t[key] === tier && (p.fresh[key] ?? 0) < tier)
+				.map((p) => ({ p, score: p.scoreOf(key) }))
+				.sort((a, b) => a.score - b.score || a.p.pid - b.p.pid)
+				.slice(0, excess);
+			for (const { p } of held) {
+				if (tier === 1) {
+					delete p.t[key];
+				} else {
+					p.t[key] = (tier - 1) as Tier;
+				}
+				demoted++;
+			}
+		}
+	}
+	return demoted;
 };
 
 /** Total badge points of a set of tiers. */
