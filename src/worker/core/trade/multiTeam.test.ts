@@ -205,10 +205,18 @@ describe("three-team trades", () => {
 				[[a0, 1]],
 			);
 
+			// Playing time and the load management flag: reset by the trade, restored by undo
+			const pa = (await idb.cache.players.get(a0!))!;
+			pa.ptModifier = 1.25;
+			pa.loadManagement = true;
+			await idb.cache.players.put(pa);
+
 			const numEventsBefore = (await idb.cache.events.getAll()).length;
 			const undo = await processMulti(multi);
 
 			assert.strictEqual((await idb.cache.players.get(a0!))!.tid, 1);
+			assert.strictEqual((await idb.cache.players.get(a0!))!.ptModifier, 1);
+			assert.isUndefined((await idb.cache.players.get(a0!))!.loadManagement);
 			assert.strictEqual((await idb.cache.players.get(b0!))!.tid, 2);
 			assert.strictEqual((await idb.cache.players.get(c0!))!.tid, 0);
 
@@ -233,6 +241,8 @@ describe("three-team trades", () => {
 
 			assert.isTrue(await undo());
 			assert.strictEqual((await idb.cache.players.get(a0!))!.tid, 0);
+			assert.strictEqual((await idb.cache.players.get(a0!))!.ptModifier, 1.25);
+			assert.isTrue((await idb.cache.players.get(a0!))!.loadManagement);
 			assert.strictEqual((await idb.cache.players.get(b0!))!.tid, 1);
 			assert.strictEqual((await idb.cache.players.get(c0!))!.tid, 2);
 		});

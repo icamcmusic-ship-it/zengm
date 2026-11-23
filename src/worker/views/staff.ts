@@ -177,6 +177,7 @@ export default defineView({
 						tenure: number;
 						mentor: { cid: number; name: string } | undefined;
 						numProteges: number;
+						fitHidden: boolean;
 				  })
 				| undefined;
 			if (byRole.head && rosterFit) {
@@ -200,7 +201,25 @@ export default defineView({
 						.length,
 					mentor: tree.up[0],
 					numProteges: tree.down.length,
+					fitHidden: false,
 				};
+				// No Visible Ratings challenge: another team's fit comes from its players' ratings, so its numbers aren't sent
+				if (g.get("challengeNoRatings") && !g.get("userTids").includes(tid)) {
+					head = {
+						...head,
+						fitHidden: true,
+						fit: 0,
+						fitText: "",
+						offFit: 0,
+						defFit: 0,
+						bestOffenseName: head.offenseName,
+						bestOffenseFit: 0,
+						bestDefenseName: head.defenseName,
+						bestDefenseFit: 0,
+						helping: [],
+						hurting: [],
+					};
+				}
 			}
 
 			const ts = await idb.cache.teamSeasons.indexGet(

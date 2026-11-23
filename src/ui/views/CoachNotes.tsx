@@ -128,8 +128,14 @@ const CoachNotes = ({
 					<div className="col-lg-5 mb-3">
 						<h3>Scheme fit</h3>
 						<p data-testid="coach-notes-fit">
-							Roster fit: <b>{coach.fit}</b> ({coach.fitText}) · offense{" "}
-							{coach.offFit}, defense {coach.defFit}
+							{coach.fitHidden ? (
+								"Hidden (No Visible Ratings challenge)."
+							) : (
+								<>
+									Roster fit: <b>{coach.fit}</b> ({coach.fitText}) · offense{" "}
+									{coach.offFit}, defense {coach.defFit}
+								</>
+							)}
 							<br />
 							<span className="text-body-secondary small">
 								{coach.install < 100
@@ -137,7 +143,10 @@ const CoachNotes = ({
 									: "System fully installed."}
 							</span>
 						</p>
-						<div className="d-flex gap-4 flex-wrap">
+						{/* (No Visible Ratings: no fit tables, their lists are empty) */}
+						<div
+							className={coach.fitHidden ? "d-none" : "d-flex gap-4 flex-wrap"}
+						>
 							<table className="table table-sm w-auto">
 								<thead>
 									<tr>

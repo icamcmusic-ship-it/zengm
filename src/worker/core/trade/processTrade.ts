@@ -66,6 +66,7 @@ const processTrade = async (
 			jerseyNumber: string | undefined;
 			ptModifier: number;
 			rosterOrder: number;
+			loadManagement?: true;
 		}
 	>();
 	type UndoInfoTeams = {
@@ -107,16 +108,20 @@ const processTrade = async (
 				p.tid = tids[k];
 			}
 
-			// p.gamesUntilTradable = 14; // Don't make traded players untradable
-			p.ptModifier = 1; // Reset
-			delete p.shotPlan;
-			delete p.shotProfile;
-
+			// Saved for undo before the resets below (before, ptModifier was saved after it was reset, so undo always gave "normal")
 			undoInfoPlayers.set(p.pid, {
 				jerseyNumber: p.jerseyNumber,
 				ptModifier: p.ptModifier,
 				rosterOrder: p.rosterOrder,
+				...(p.loadManagement ? { loadManagement: true as const } : {}),
 			});
+
+			// p.gamesUntilTradable = 14; // Don't make traded players untradable
+			p.ptModifier = 1; // Reset
+			delete p.shotPlan;
+			delete p.shotProfile;
+			// Injury Depth: the old team's load management flag doesn't follow him
+			delete p.loadManagement;
 
 			if (duringSeason && !stashed) {
 				// If two players being traded for each other have the same jersey number, that shouldn't be treated as conflict and they should be able to keep their jersey numbers - that's what the pids[k] part does.

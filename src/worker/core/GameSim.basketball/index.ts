@@ -2208,12 +2208,16 @@ class GameSim extends GameSimBase {
 		this.rotationQuarterSeconds = this.ga.quarterLength * 60;
 		this.rotationFoulsToFoulOut = this.ga.foulsNeededToFoulOut;
 		for (const t of this.team) {
+			// (No Visible Ratings: the user's team plans by the fuzzed value he sees, game/loadTeams.ts)
+			const planValue = (p: PlayerGameSim): number =>
+				(p as any).planValue ?? p.valueNoPot;
 			const targets = planMinutes(
 				t.player.map((p) => ({
-					valueNoPot: p.valueNoPot,
+					valueNoPot: planValue(p),
 					injured: p.injured,
 					ptModifier: this.allStarGame ? 1 : p.ptModifier,
 					minutesRestriction: (p as any).minutesRestriction,
+					injuryRestriction: (p as any).injuryRestriction,
 					coachMinutesMult: (p as any).coachMinutesMult,
 				})),
 				{
@@ -2232,7 +2236,12 @@ class GameSim extends GameSimBase {
 			for (const [i, p] of t.player.entries()) {
 				this.minutesTargets.set(p, targets[i]!);
 			}
-			const byValue = t.player.toSorted((a, b) => b.valueNoPot - a.valueNoPot);
+			// Healthy players first (injured and rested players last), so garbage time and the stars-by-score rule rank the players who
+			// can play. Before, with the two best players out only 3 healthy starters counted as starters
+			const byValue = t.player.toSorted(
+				(a, b) =>
+					Number(a.injured) - Number(b.injured) || planValue(b) - planValue(a),
+			);
 			for (const [rank, p] of byValue.entries()) {
 				this.valueRanks.set(p, rank);
 			}
@@ -3530,7 +3539,13 @@ class GameSim extends GameSimBase {
 							(!lateGame ? uniform(0.9, 1.1) : 1);
 
 						if (!this.allStarGame) {
-							ovr *= p.ptModifier;
+							// (Realistic Rotations: an Injury Depth minutes restriction, also in ptModifier, is already in his minutes plan, so
+							// it isn't taken off here a second time)
+							ovr *=
+								this.realisticRotations &&
+								(p as any).injuryRestriction !== undefined
+									? p.ptModifier / (p as any).injuryRestriction
+									: p.ptModifier;
 						}
 
 						// Also scale based on margin late in games, so stars play less in blowouts (this doesn't really work that well, but better than nothing)

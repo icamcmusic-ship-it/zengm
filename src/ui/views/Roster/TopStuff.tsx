@@ -308,10 +308,19 @@ const TopStuff = ({
 									{t.coachSystem.defense}
 								</a>
 								<div className="text-body-secondary small">
-									Scheme fit {t.coachSystem.fit} ({t.coachSystem.fitText})
-									{t.coachSystem.install < 100
-										? `, system ${t.coachSystem.install}% installed`
-										: ""}
+									{/* No Visible Ratings: no fit number (the word only for the user's roster) */}
+									{[
+										t.coachSystem.fit !== undefined
+											? `Scheme fit ${t.coachSystem.fit} (${t.coachSystem.fitText})`
+											: t.coachSystem.fitText !== undefined
+												? `Scheme fit: ${t.coachSystem.fitText}`
+												: undefined,
+										t.coachSystem.install < 100
+											? `system ${t.coachSystem.install}% installed`
+											: undefined,
+									]
+										.filter((x) => x !== undefined)
+										.join(", ")}
 								</div>
 							</div>
 						) : null}

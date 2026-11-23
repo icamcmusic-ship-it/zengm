@@ -46,7 +46,7 @@ export const findStarters = (positions: string[]): number[] => {
 			continue;
 		}
 
-		if (numC >= 1 && pos === "c") {
+		if (numC >= 1 && pos === "C") {
 			continue;
 		}
 

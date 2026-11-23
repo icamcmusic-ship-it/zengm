@@ -17,7 +17,7 @@ const PLAYOFF_TARGETS = [43, 41, 38, 36, 34, 24, 15, 9];
 // Second night of a back-to-back: starters play a little less, the bench a little more
 const BACK_TO_BACK_STARTER_CUT = 2;
 
-// The most a player is planned for (before ptModifier above 1)
+// The most a player is planned for (before ptModifier above 1), for 5 on court (it scales with numPlayersOnCourt, up to 48)
 const MAX_TARGET_REGULAR_SEASON = 42;
 const MAX_TARGET_PLAYOFFS = 44;
 // A star (this much better than the team's 5th best player) gets a little more, up to the max
@@ -28,8 +28,11 @@ export type RotationPlayer = {
 	valueNoPot: number;
 	injured: boolean;
 	ptModifier: number;
-	// Injury Depth minutes restriction (1 = none), also already in ptModifier
+	// A cap on his planned minutes, as a share of 36 (Career Aging's old-player caps; 1 = none)
 	minutesRestriction?: number;
+	// Injury Depth minutes restriction on return (1 = none). Already in ptModifier, so it is divided back out of it and applied once
+	// to the plan: he is planned for about this share of the minutes he'd normally get (and not rescaled up)
+	injuryRestriction?: number;
 	// Coaching systems: the coach's trust in young players or veterans (1 = none)
 	coachMinutesMult?: number;
 };
@@ -83,29 +86,44 @@ export const planMinutes = (
 		.sort((a, b) => b.p.valueNoPot - a.p.valueNoPot);
 
 	const targets = players.map(() => 0);
-	const fifthValue = order[Math.min(4, order.length - 1)]?.p.valueNoPot ?? 0;
+	// The table's starters and the next five: with another number on court the whole table is scaled, so they stay its top 5 and next 5
+	const numStarters = 5;
+	const fifthValue =
+		order[Math.min(numStarters - 1, order.length - 1)]?.p.valueNoPot ?? 0;
 	const urgency =
 		options.playoffs && !options.allStarGame
 			? Math.max(-1, Math.min(1, options.seriesUrgency ?? 0))
 			: 0;
-	const max =
+	const max = Math.min(
 		((options.playoffs ? MAX_TARGET_PLAYOFFS : MAX_TARGET_REGULAR_SEASON) +
 			URGENCY_MAX_EXTRA * Math.max(0, urgency) -
 			URGENCY_REST_MAX * Math.max(0, -urgency)) *
-		Math.min(1, scale);
+			scale,
+		// (more than 5 on court: the cap scales with the table, up to the whole game)
+		48,
+	);
 
+	// Players whose plan isn't rescaled up (an injury restriction), and the most each one is rescaled up to
+	const frozen = new Set<number>();
+	const caps = players.map(() => max);
+	const backToBackCut =
+		(options.backToBackCut ?? BACK_TO_BACK_STARTER_CUT) * scale;
 	for (const [rank, { p, i }] of order.entries()) {
 		let target = (table[rank] ?? 0) * scale;
-		if (rank < 5 && !options.allStarGame) {
+		if (rank < numStarters && !options.allStarGame) {
 			// Stars play a bit more
 			const gap = p.valueNoPot - fifthValue;
 			target += STAR_BONUS * Math.max(0, Math.min(1, gap / STAR_VALUE_GAP));
 			if (options.backToBack) {
-				target -= options.backToBackCut ?? BACK_TO_BACK_STARTER_CUT;
+				target -= backToBackCut;
 			}
-		} else if (options.backToBack && rank < 10 && !options.allStarGame) {
-			// ... and the next five get those minutes
-			target += (options.backToBackCut ?? BACK_TO_BACK_STARTER_CUT) * scale;
+		} else if (
+			options.backToBack &&
+			rank < 2 * numStarters &&
+			!options.allStarGame
+		) {
+			// ... and the next ones get those minutes
+			target += backToBackCut;
 		}
 		if (p.coachMinutesMult !== undefined) {
 			target *= p.coachMinutesMult;
@@ -128,28 +146,54 @@ export const planMinutes = (
 		target = Math.min(target, max);
 		if (p.minutesRestriction !== undefined && p.minutesRestriction < 1) {
 			target = Math.min(target, 36 * p.minutesRestriction);
+			// (a cap: not rescaled up past it either)
+			caps[i] = Math.min(max, 36 * p.minutesRestriction);
 		}
-		targets[i] = Math.max(0, target * Math.min(p.ptModifier, 1.5));
+		const injuryRestriction =
+			p.injuryRestriction !== undefined &&
+			p.injuryRestriction > 0 &&
+			p.injuryRestriction < 1
+				? p.injuryRestriction
+				: 1;
+		if (injuryRestriction < 1) {
+			frozen.add(i);
+		}
+		targets[i] = Math.max(
+			0,
+			target *
+				Math.min(p.ptModifier / injuryRestriction, 1.5) *
+				injuryRestriction,
+		);
 	}
 
-	// Rescale to the minutes there are, without going over the max (more than once, since capped players can't take more)
-	for (let iter = 0; iter < 4; iter++) {
+	// Rescale to the minutes there are, never above the max (more than once, since capped players can't take more). Short-handed, when
+	// everybody is at the max, the plan sums to less than the minutes there are: the sim plays whoever is healthy anyway. Before, the
+	// rescale went up to 1.25 times the max while the best player stayed at the max, so the 2nd-5th best were planned for more than him
+	for (let iter = 0; iter <= order.length; iter++) {
 		let sum = 0;
-		let sumUncapped = 0;
+		let sumScalable = 0;
 		for (const { i } of order) {
 			sum += targets[i]!;
-			if (targets[i]! < max - 1e-9) {
-				sumUncapped += targets[i]!;
+			if (!frozen.has(i) && targets[i]! < caps[i]! - 1e-9) {
+				sumScalable += targets[i]!;
 			}
 		}
 		const missing = totalMinutes - sum;
-		if (Math.abs(missing) < 0.01 || sumUncapped <= 0) {
+		if (missing < 0) {
+			// Too many: everybody down
+			const factor = totalMinutes / sum;
+			for (const { i } of order) {
+				targets[i] = targets[i]! * factor;
+			}
 			break;
 		}
-		const factor = 1 + missing / sumUncapped;
+		if (missing < 0.01 || sumScalable <= 0) {
+			break;
+		}
+		const factor = 1 + missing / sumScalable;
 		for (const { i } of order) {
-			if (targets[i]! < max - 1e-9 || missing < 0) {
-				targets[i] = Math.min(max * 1.25, targets[i]! * factor);
+			if (!frozen.has(i) && targets[i]! < caps[i]! - 1e-9) {
+				targets[i] = Math.min(caps[i]!, targets[i]! * factor);
 			}
 		}
 	}

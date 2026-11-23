@@ -788,15 +788,32 @@ export const processTeam = async (
 		) {
 			// (Load, Fatigue & Venue: so is the third game in four nights)
 			t.backToBack = isBackToBack(teamSeason.lastGameDay) || threeInFour;
-			// Injury Depth minutes restrictions (already in ptModifier, also a cap on the planned minutes)
+			// No Visible Ratings challenge: the user's own minutes plan ranks his players by the fuzzed value he sees (the one auto sort
+			// uses), so the box score's minutes order doesn't give away the true value order. Only the plan's order: the substitutions
+			// themselves still use the true value
+			if (
+				g.get("challengeNoRatings") &&
+				g.get("userTids").includes(t.id) &&
+				!g.get("spectator")
+			) {
+				const playersByPid = new Map(players.map((p) => [p.pid, p]));
+				for (const p2 of t.player) {
+					const p = playersByPid.get(p2.id);
+					if (p && Number.isFinite(p.valueNoPotFuzz) && p.valueNoPot > 0) {
+						// (with the same playing-through-injury factor as valueNoPot)
+						p2.planValue = (p.valueNoPotFuzz * p2.valueNoPot) / p.valueNoPot;
+					}
+				}
+			}
+			// Injury Depth minutes restrictions (already in ptModifier; the planner applies them once to the plan, see rotationPlanner.ts)
 			if (isInjuryDepthEnabled()) {
 				const playersByPid = new Map(players.map((p) => [p.pid, p]));
 				for (const p2 of t.player) {
 					const restriction = getRestrictionFactor(
 						playersByPid.get(p2.id)?.health,
 					);
-					if (restriction < 1) {
-						p2.minutesRestriction = restriction;
+					if (restriction > 0 && restriction < 1) {
+						p2.injuryRestriction = restriction;
 					}
 				}
 			}

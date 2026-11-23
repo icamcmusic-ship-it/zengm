@@ -184,15 +184,50 @@ test("realisticRotations: minutes plan", () => {
 	assert.isBelow(b2b[0]!, regular[0]!);
 	assert.isAbove(b2b[6]!, regular[6]!);
 
-	// Injured players and a minutes restriction
+	// Injured players and a Career Aging cap
 	const players = roster(14);
 	players[0]!.injured = true;
-	players[1]!.ptModifier = 0.6;
 	(players[1] as any).minutesRestriction = 0.6;
 	const restricted = planMinutes(players, opts);
 	assert.strictEqual(restricted[0], 0);
 	assert.isAtMost(restricted[1]!, 36 * 0.6);
 	assert.closeTo(sum(restricted), 240, 0.1);
+
+	// An Injury Depth restriction (already in ptModifier) is applied once: 0.55 of his normal minutes. Before, it was applied twice
+	// (a 40-minute star at 0.55 was planned for 12) and the rescale gave his minutes to the next man (45 minutes)
+	for (const r of [0.55, 0.8]) {
+		const injuryRestricted = roster(14);
+		injuryRestricted[0]!.ptModifier = r;
+		(injuryRestricted[0] as any).injuryRestriction = r;
+		const plan = planMinutes(injuryRestricted, opts);
+		assert.closeTo(plan[0]!, r * regular[0]!, 1.5);
+		assert.isAtMost(plan[1]!, 42);
+		assert.closeTo(sum(plan), 240, 0.1);
+		// ... times the user's own playing time setting
+		injuryRestricted[0]!.ptModifier = r * 0.75;
+		assert.closeTo(
+			planMinutes(injuryRestricted, opts)[0]!,
+			r * 0.75 * regular[0]!,
+			1.5,
+		);
+	}
+
+	// Short-handed: never above the cap, and the better player never planned for less
+	const isSorted = (xs: number[]) =>
+		xs.every((x, i) => i === 0 || x <= xs[i - 1]! + 1e-9);
+	for (const n of [4, 5, 6, 7]) {
+		const plan = planMinutes(roster(n), opts);
+		assert.isTrue(isSorted(plan), `${n} healthy: ${plan.join(", ")}`);
+		assert.isAtMost(Math.max(...plan), 42 + 1e-9);
+	}
+
+	// More than 5 on court: the cap scales too, so the bench isn't planned above the stars
+	for (const numPlayersOnCourt of [3, 8]) {
+		const plan = planMinutes(roster(14), { ...opts, numPlayersOnCourt });
+		assert.isTrue(isSorted(plan), `${numPlayersOnCourt} on court`);
+		assert.isAtMost(Math.max(...plan), 48 + 1e-9);
+		assert.closeTo(sum(plan), 48 * numPlayersOnCourt, 0.1);
+	}
 
 	// Coach style hook: a tight rotation gives the top players more
 	const tight = planMinutes(roster(14), { ...opts, rotationStyle: -1 });
