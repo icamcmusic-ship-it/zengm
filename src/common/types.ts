@@ -1366,6 +1366,8 @@ export type MoodComponents = {
 	lockerRoom: number;
 	// Coaching systems: his fit in the head coach's systems, the coach's personality and reputation. 0 with the setting off
 	coachFit: number;
+	// Player–coach relationships: his bond with the team's head coach. 0 with the setting off (missing in old mood snapshots)
+	coachRel: number;
 	custom?: {
 		text: string;
 		amount: number;
@@ -1843,6 +1845,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	scoutLooks?: import("./staffDepth/types.ts").ProspectLooks;
 	// Coaching Staff Depth: this season's development plan
 	devPlan?: import("./staffDepth/types.ts").PlayerDevPlan;
+	// Player–coach relationships (featurePlayerCoachRel): his bonds with the head coaches he played for, most recent first
+	coachRels?: import("./playerCoachRel.ts").PlayerCoachRel[];
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts
 	collegeSeason?: StoredCollegeSeason;
 	// Basketball: his years before the draft (schools, redshirt years, transfers, junior college), his story if he is one of the class's unusual prospects, and his recruiting ranking, see common/collegeStats/career.ts. Only on prospects whose college stats were generated with the career model

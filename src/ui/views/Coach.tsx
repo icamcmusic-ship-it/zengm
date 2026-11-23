@@ -33,6 +33,7 @@ const Coach = ({
 	awards,
 	coach: c,
 	colors,
+	relationships,
 	stats,
 	transactions,
 	tree,
@@ -237,6 +238,39 @@ const Coach = ({
 							</ul>
 						</>
 					) : null}
+				</div>
+			) : null}
+
+			{relationships && relationships.length > 0 ? (
+				<div data-testid="coach-relationships">
+					<h2>Player relationships</h2>
+					<p className="text-body-secondary small mb-1">
+						Built over the seasons together: playing time against the player's
+						role, his development, personalities and winning. A close bond lifts
+						the player's mood (and his wish to re-sign) and his development plan
+						a little; a strained one does the opposite.
+					</p>
+					<ul className="small">
+						{relationships.map((r) => (
+							<li key={r.pid}>
+								<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>
+								{r.abbrev ? ` (${r.abbrev})` : ""}:{" "}
+								<span
+									className={
+										r.v >= 0.3
+											? "text-success"
+											: r.v <= -0.15
+												? "text-danger"
+												: undefined
+									}
+								>
+									{r.label}
+								</span>
+								, {r.seasons} {r.seasons === 1 ? "season" : "seasons"}
+								{r.current ? "" : `, last ${r.last}`}
+							</li>
+						))}
+					</ul>
 				</div>
 			) : null}
 

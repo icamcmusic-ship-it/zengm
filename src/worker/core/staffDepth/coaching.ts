@@ -1,5 +1,6 @@
 // Coaching Staff Depth (featureCoachingDepth, needs Coaching Staff): the three extra jobs' effects, development plans and the Development
 // Report. Nothing here draws from the game's random stream (plans use seeded streams), and nothing runs while the setting is off.
+import { headCoachByTid, relDevRatingBoost } from "../staff/relationships.ts";
 import {
 	ALL_COACH_ROLES,
 	COACH_ROLES,
@@ -409,6 +410,8 @@ export const prepareDevelopment = async (
 		}
 	}
 	const subsOn = subRatingsOn();
+	// Player–coach relationships: a player close to his head coach buys into his plan more (empty when off)
+	const heads = await headCoachByTid();
 
 	// Every rostered player's plan, planned now from his latest ratings (the new row devFor sees is a copy of them), and the league's
 	// average plan: its rating deltas and its sub-rating tilt. The staff picks some plans far more often than others (finishing and threes
@@ -432,7 +435,9 @@ export const prepareDevelopment = async (
 		if (!plan) {
 			continue;
 		}
-		const devRating = teams.get(p.tid)?.devRating ?? VACANT_RATING;
+		const devRating =
+			(teams.get(p.tid)?.devRating ?? VACANT_RATING) +
+			relDevRatingBoost(p, heads);
 		const planned = planDevelopment(
 			p,
 			plan.f,
@@ -484,7 +489,8 @@ export const prepareDevelopment = async (
 			} else {
 				delete p.devPlan;
 			}
-			const devRating = dt?.devRating ?? VACANT_RATING;
+			const devRating =
+				(dt?.devRating ?? VACANT_RATING) + relDevRatingBoost(p, heads);
 			const cached = plannedByPid.get(p.pid);
 			const centered = cached !== undefined && cached.plan.f === plan?.f;
 			const planned = centered

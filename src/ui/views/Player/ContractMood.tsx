@@ -32,6 +32,7 @@ const COMPONENT_LABELS: Record<keyof MoodSnapshot["components"], string> = {
 	relatives: "Relatives",
 	lockerRoom: "Locker room",
 	coachFit: "Coach & system",
+	coachRel: "Coach relationship",
 };
 
 // Tiny line chart, values plotted left to right. A dashed line marks 0.
@@ -116,7 +117,7 @@ const MoodHistory = ({ history }: { history: MoodSnapshot[] }) => {
 		COMPONENT_LABELS,
 	) as (keyof MoodSnapshot["components"])[];
 	const shownKeys = keys.filter((key) =>
-		history.some((row) => row.components[key] !== 0),
+		history.some((row) => (row.components[key] ?? 0) !== 0),
 	);
 	const first = history[0]!;
 	const lastRow = history.at(-1)!;
@@ -145,15 +146,15 @@ const MoodHistory = ({ history }: { history: MoodSnapshot[] }) => {
 							<td className="py-0">{COMPONENT_LABELS[key]}</td>
 							<td className="py-0">
 								<Sparkline
-									values={history.map((row) => row.components[key])}
+									values={history.map((row) => row.components[key] ?? 0)}
 									width={100}
 									height={18}
 									title={COMPONENT_LABELS[key]}
 								/>
 							</td>
 							<td className="py-0 text-end">
-								{lastRow.components[key] > 0 ? "+" : ""}
-								{lastRow.components[key]}
+								{(lastRow.components[key] ?? 0) > 0 ? "+" : ""}
+								{lastRow.components[key] ?? 0}
 							</td>
 						</tr>
 					))}
@@ -428,6 +429,32 @@ export const ContractMood = ({
 					</table>
 				</div>
 				<div className="col-md-12 col-xxl-4">
+					{data.coachRels ? (
+						<div className="mb-2" data-testid="coach-relationships">
+							<h3 className="h5">Coaches</h3>
+							<ul className="list-unstyled mb-0">
+								{data.coachRels.map((r) => (
+									<li key={r.cid}>
+										<a href={helpers.leagueUrl(["coach", r.cid])}>{r.name}</a>
+										{r.abbrev ? ` (${r.abbrev})` : ""}:{" "}
+										<span
+											className={
+												r.v >= 0.3
+													? "text-success"
+													: r.v <= -0.15
+														? "text-danger"
+														: undefined
+											}
+										>
+											{r.label}
+										</span>
+										, {r.seasons} {helpers.plural("season", r.seasons)} together
+										{r.current ? " · current head coach" : ""}
+									</li>
+								))}
+							</ul>
+						</div>
+					) : null}
 					<h3 className="h5">Mood history</h3>
 					<MoodHistory history={data.moodHistory} />
 				</div>

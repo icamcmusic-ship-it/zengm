@@ -35,6 +35,7 @@ import { getExpectedWinps } from "../college/expectations.ts";
 import { awardCoachOfTheYear } from "../awards/coachExecAwards.ts";
 import { COACH_OF_THE_YEAR } from "../../../common/coachExecAwards.ts";
 import { collegeFireProb, runCollegeCarousel } from "./collegeCarousel.ts";
+import { updateRelationships } from "./relationships.ts";
 import {
 	afterHeadFired,
 	beforeUserHire,
@@ -902,6 +903,8 @@ export const runOffseason = async () => {
 	const season = g.get("season");
 	await commitDevCarry();
 	await recordSeason();
+	// Player–coach relationships: the season's bonds, before coaches change jobs
+	await updateRelationships();
 	await coachOfTheYear();
 	// Coaching systems: expectation, development and systems on the season rows; league system trends
 	await ensureProfiles();

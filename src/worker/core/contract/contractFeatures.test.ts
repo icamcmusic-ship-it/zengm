@@ -499,6 +499,7 @@ describe("mood history and projections", () => {
 			relatives: 0,
 			lockerRoom: 0,
 			coachFit: 0,
+			coachRel: 0,
 			custom: [{ amount: 1, text: "x" }],
 		};
 		assert.closeTo(sumMoodComponents(components), 0.23, 1e-9);

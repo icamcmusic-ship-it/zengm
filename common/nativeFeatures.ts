@@ -1380,6 +1380,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "playerCoachRel",
+		college: false,
+		key: "featurePlayerCoachRel",
+		name: "Player–Coach Relationships",
+		description:
+			"Each player builds a relationship with his head coach over the seasons they spend together: playing time against his role, how he developed, the coach's personality against his ego, winning and loyalty move it a little each season (Very close, Good, Neutral, Strained, Broken). It nudges his mood (a Coach relationship mood item, at most ±1.5, so re-signing with a coach he trusts is easier and a coach he clashed with harder, also as a free agent choosing a team whose coach he knows), and the size of his development plan. Shown on the player's contract & mood panel and on the coach page. Needs Coaching Staff.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "scoutSpecialties",
 		college: false,
 		key: "featureScoutSpecialties",

@@ -90,6 +90,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	ownerOffice: "League extras: Team",
 	commercial: "League extras: Team",
 	coachMarket: "League extras: Team",
+	playerCoachRel: "League extras: Team",
 	scoutSpecialties: "League extras: Draft",
 	customShotClock: "League extras: Game Simulation",
 	oneAndOne: "League extras: Game Simulation",
