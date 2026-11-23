@@ -176,6 +176,10 @@ export const types: Partial<
 		text: "Revenue Sharing",
 		category: "team",
 	},
+	ownerRequest: {
+		text: "Owner",
+		category: "team",
+	},
 	minPayroll: {
 		text: "Minimum Payroll",
 		category: "team",
