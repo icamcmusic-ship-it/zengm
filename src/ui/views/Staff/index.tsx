@@ -57,6 +57,19 @@ type StaffActionArgs =
 	| { type: "fire"; cid: number }
 	| { type: "extend"; cid: number; years: number };
 
+// No Visible Ratings challenge: another team's scheme fit comes from its players' ratings, so it isn't shown (or sent)
+const FitMeter = ({
+	hidden,
+	...props
+}: Parameters<typeof Meter>[0] & { hidden: boolean }) =>
+	hidden ? (
+		<p data-testid={props.testId}>
+			{props.label}: hidden (No Visible Ratings challenge).
+		</p>
+	) : (
+		<Meter {...props} />
+	);
+
 const formatPct = (x: number) => `${x >= 0 ? "+" : ""}${(100 * x).toFixed(1)}%`;
 
 // Returns true when the action went through
@@ -740,7 +753,8 @@ const Staff = ({
 											</div>
 											<div className="row mt-3">
 												<div className="col-md-6">
-													<Meter
+													<FitMeter
+														hidden={h.fitHidden}
 														testId="staff-fit"
 														label={<Term term="fit" />}
 														value={h.fit}

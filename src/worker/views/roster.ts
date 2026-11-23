@@ -30,13 +30,19 @@ const getRosterCoachSystem = async (tid: number) => {
 	if (!s) {
 		return undefined;
 	}
+	// No Visible Ratings challenge: the fit number comes from the players' ratings, so it isn't sent (the word only for the user's own
+	// roster)
+	const noRatings = !!g.get("challengeNoRatings");
 	return {
 		cid: s.cid,
 		coachName: s.name,
 		offense: OFFENSE_NAMES[s.profile.off],
 		defense: DEFENSE_NAMES[s.profile.def],
-		fit: s.fit,
-		fitText: fitLabel(s.fit),
+		fit: noRatings ? undefined : s.fit,
+		fitText:
+			noRatings && !g.get("userTids").includes(tid)
+				? undefined
+				: fitLabel(s.fit),
 		install: Math.round(100 * s.install),
 	};
 };

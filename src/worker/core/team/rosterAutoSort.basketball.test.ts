@@ -57,6 +57,14 @@ describe("findStarters", () => {
 		assert.deepStrictEqual(starters, [0, 1, 2, 3, 4]);
 	});
 
+	test("no second pure C after the requirements are met", () => {
+		// (the check compared with a lowercase "c", so the third C started)
+		assert.deepStrictEqual(
+			findStarters(["G", "G", "C", "C", "C", "F"]),
+			[0, 1, 2, 3, 5],
+		);
+	});
+
 	test("put two Gs in starting lineup", () => {
 		let starters = findStarters([
 			"PG",

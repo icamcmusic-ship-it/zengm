@@ -119,9 +119,12 @@ export default defineView({
 						}
 						if (systemsOn) {
 							const system = await getTeamCoachSystem(c.tid);
+							// (No Visible Ratings challenge: another team's fit comes from its players' ratings, so it isn't sent)
+							const hideFit =
+								!!g.get("challengeNoRatings") && c.tid !== userTid;
 							if (system) {
-								fit = system.fit;
-								fitText = fitLabel(system.fit);
+								fit = hideFit ? undefined : system.fit;
+								fitText = hideFit ? undefined : fitLabel(system.fit);
 								install = Math.round(100 * system.install);
 							}
 							hotSeat = await hotSeatNow(c);

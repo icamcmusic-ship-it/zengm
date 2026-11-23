@@ -199,6 +199,43 @@ test("garbage time: on with a big lead late, off only when the lead shrinks well
 	);
 });
 
+test("value ranks: injured and rested players don't count, so the healthy starters sit in garbage time", async () => {
+	const sim = await newSim(3);
+	const players = sim.team[0].player.toSorted(
+		(a: any, b: any) => b.valueNoPot - a.valueNoPot,
+	);
+	players[0].injured = true;
+	players[1].injured = true;
+	sim.planRotations();
+	const healthy = players.slice(2);
+	for (const [i, p] of healthy.entries()) {
+		assert.strictEqual(sim.valueRanks.get(p), i);
+	}
+	assert.isAtLeast(sim.valueRanks.get(players[0]), healthy.length);
+	// The 4th and 5th best healthy players sit with the other starters (before: rotation players, they stayed in blowouts)
+	assert.strictEqual(
+		sim.garbageFactor(healthy[4]),
+		sim.garbageFactor(healthy[0]),
+	);
+});
+
+test("No Visible Ratings: the minutes plan ranks by planValue (the fuzzed value the user sees) when it's set", async () => {
+	const sim = await newSim(3);
+	const players = sim.team[0].player.toSorted(
+		(a: any, b: any) => b.valueNoPot - a.valueNoPot,
+	);
+	// The user sees the 10th best player as the best one
+	for (const [i, p] of players.entries()) {
+		p.planValue = i === 9 ? 1000 : p.valueNoPot;
+	}
+	sim.planRotations();
+	assert.strictEqual(sim.valueRanks.get(players[9]), 0);
+	assert.isAbove(
+		sim.minutesTargets.get(players[9]),
+		sim.minutesTargets.get(players[0]),
+	);
+});
+
 test("coaching adjustments: the hot hand gets more minutes from a good coach, the rotation gives them", async () => {
 	const minutesGain = async (mgmt: number, adapt: number) => {
 		const sim = await newSim(4);

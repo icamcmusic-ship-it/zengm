@@ -71,6 +71,9 @@ export default defineView({
 			const defCoord = coaches.find((c) => c.tid === tid && c.role === "def");
 			const rep = coachReputation(head);
 			const heat = await hotSeatNow(head);
+			// No Visible Ratings challenge: another team's fit comes from its players' ratings, so it isn't sent
+			const fitHidden =
+				!!g.get("challengeNoRatings") && !g.get("userTids").includes(tid);
 			coach = {
 				cid: head.cid,
 				name: `${head.firstName} ${head.lastName}`,
@@ -94,20 +97,25 @@ export default defineView({
 					mot: head.ratings.mot,
 				},
 				install: Math.round(system.install * 100),
-				fit: system.fit,
-				fitText: fitLabel(system.fit),
-				offFit: system.offFit,
-				defFit: system.defFit,
-				offFits: OFFENSE_SYSTEMS.map((s) => ({
-					system: s,
-					name: OFFENSE_NAMES[s],
-					score: fitToScore(fit.off[s]),
-				})).sort((a, b) => b.score - a.score),
-				defFits: DEFENSE_SYSTEMS.map((s) => ({
-					system: s,
-					name: DEFENSE_NAMES[s],
-					score: fitToScore(fit.def[s]),
-				})).sort((a, b) => b.score - a.score),
+				fitHidden,
+				fit: fitHidden ? undefined : system.fit,
+				fitText: fitHidden ? undefined : fitLabel(system.fit),
+				offFit: fitHidden ? undefined : system.offFit,
+				defFit: fitHidden ? undefined : system.defFit,
+				offFits: fitHidden
+					? []
+					: OFFENSE_SYSTEMS.map((s) => ({
+							system: s,
+							name: OFFENSE_NAMES[s],
+							score: fitToScore(fit.off[s]),
+						})).sort((a, b) => b.score - a.score),
+				defFits: fitHidden
+					? []
+					: DEFENSE_SYSTEMS.map((s) => ({
+							system: s,
+							name: DEFENSE_NAMES[s],
+							score: fitToScore(fit.def[s]),
+						})).sort((a, b) => b.score - a.score),
 				reputation: rep,
 				reputationText: reputationLabel(rep),
 				hotSeat: heat,

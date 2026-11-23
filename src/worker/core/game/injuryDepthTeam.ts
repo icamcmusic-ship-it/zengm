@@ -42,6 +42,8 @@ export const applyInjuryDepth = (
 		g.get("spectator") ||
 		local.autoPlayUntil !== undefined;
 
+	const userTeam = g.get("userTids").includes(t.id);
+
 	let numHealthy = t.player.filter((p2) => !p2.injured).length;
 	const rankByPid = new Map(
 		players
@@ -64,7 +66,8 @@ export const applyInjuryDepth = (
 
 		if (backToBack) {
 			const rest = shouldRest({
-				p,
+				// The per-player flag is the user's: on an AI team it's ignored (one set before a trade or release in an older league)
+				p: userTeam ? p : { ...p, loadManagement: undefined },
 				age: g.get("season") - p.born.year,
 				teamLoadManagement: teamInput.loadManagement,
 				aiControlled,
