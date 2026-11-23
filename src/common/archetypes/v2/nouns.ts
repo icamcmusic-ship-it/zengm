@@ -728,6 +728,8 @@ export type NounPick = (
 	tie?: false;
 	// archcov: read with this slack (last season's label re-checked: NounInput.slack)
 	slack?: number;
+	// archfam: whether the main name covers his top two skills (families): last season's label is kept only while it does
+	coversTop2?: boolean;
 };
 
 // How sure the name is (0..1): how clearly his named nouns clear the bar and stand above the next one he isn't named for
@@ -837,7 +839,11 @@ export const nameProblem = (name: string): string | undefined => {
 		.split(/[\s-]+/)
 		.map((t) => t.toLowerCase())
 		.filter((t) => t.length > 2 && !STOP_WORDS.has(t));
-	if (new Set(toks).size !== toks.length) {
+	if (
+		new Set(toks).size !== toks.length ||
+		// (archfam: "Post-Scoring Scorer")
+		/Scoring\b.*\bScorer\b/.test(name)
+	) {
 		return "repeats a word";
 	}
 	const cs = conceptsOf(name);
@@ -887,14 +893,6 @@ type WordReq =
 	// a trait at its bar (no traits: never)
 	| { re: RegExp; trait: string; min: number; why: string }
 	| { re: RegExp; check: (c: NameCtx) => boolean; why: string };
-const OFF_NOUNS: NounKey[] = [
-	"three",
-	"mid",
-	"post",
-	"finish",
-	"handle",
-	"pass",
-];
 export const WORD_REQ: WordReq[] = [
 	// shooting
 	{
@@ -909,8 +907,17 @@ export const WORD_REQ: WordReq[] = [
 	},
 	{
 		re: /Three-Level|3-Level/,
-		nouns: ["three", "mid"],
+		nouns: ["three", "mid", "finish"],
 		why: "three levels",
+	},
+	// (archfam: 3-Level: 3PT, mid-range and finishing all at the 78th percentile)
+	{
+		re: /Three-Level|3-Level/,
+		check: (c) =>
+			c.pct("three") >= THREE_LEVEL_PCT &&
+			c.pct("mid") >= THREE_LEVEL_PCT &&
+			c.pct("finish") >= THREE_LEVEL_PCT,
+		why: "3PT, mid-range and finishing in the top 22%",
 	},
 	{
 		re: /Scorer|Bucket|\bScoring\b/,
@@ -997,10 +1004,11 @@ export const WORD_REQ: WordReq[] = [
 	},
 	{
 		re: /Two-Way|2-Way/,
+		// (archfam: his best defensive and best offensive skill both in the top 20%)
 		check: (c) =>
-			(c.cleared.has("perimD") || c.cleared.has("rimD")) &&
-			OFF_NOUNS.some((n) => c.cleared.has(n)),
-		why: "two ways (a defensive and an offensive skill in the top 30%)",
+			Math.max(c.pct("perimD"), c.pct("rimD"), c.pct("steal")) >= 0.8 &&
+			Math.max(...[...OFFENSE].map((n) => c.pct(n))) >= 0.8,
+		why: "two ways (his best defensive and best offensive skill in the top 20%)",
 	},
 	{
 		re: /Rim-Protect|Rim Protector|Shot-Block|Shot Blocker|Eras|Anchor|Swat|Post-Defend|Post Defender|Protector/,
@@ -1084,6 +1092,8 @@ export const WORD_REQ: WordReq[] = [
 		why: "ovr 30 or below, or no skill",
 	},
 ];
+// archfam: a 3-Level name needs 3PT, mid-range and finishing at this standing (cover.ts THREE_LEVEL_BAR)
+export const THREE_LEVEL_PCT = 0.78;
 // Four skills in the top 30% for a versatility name (the user's audit says three; the coordinator's ask: more breadth)
 export const JACK_CLEARED = 4;
 // A High-Flying name also needs his finishing at this standing
@@ -2292,7 +2302,8 @@ export const END_WORDS: {
 			Math.max(c.pct.perimD, c.pct.rimD) < 0.7,
 	},
 	{ key: "eFour", ok: (c) => c.pos === "PF" },
-	{ key: "eFive", ok: (c) => c.pos === "C" },
+	// (archfam: "Five" names only a center: C or FC)
+	{ key: "eFive", ok: (c) => c.pos === "C" || c.pos === "FC" },
 ];
 
 // ---- the defensive label ----
@@ -2357,7 +2368,7 @@ export const HONEST_NOUNS: Record<string, (NounKey | "none")[]> = {
 // name (the engine keeps those), an id of another size group, or a name the nouns never give.
 export type PrevMain = { id: string } & (
 	| { kind: "special"; sp: Special }
-	| { kind: "custom"; c: CustomSpecial }
+	| { kind: "custom"; c: CustomSpecial; twoWay?: true }
 	| { kind: "jack" }
 	| { kind: "keyword"; role: string; name: string }
 	| {
@@ -2454,6 +2465,13 @@ export const prevMainOf = (x: NounInput, pos: Pos): PrevMain | undefined => {
 	}
 	const key = pc.role.key;
 	const name = composeName(pc.role, pc.descs, pc.group, pc.pick);
+	// (archfam: the user's own name with a 2-Way prefix)
+	if (pc.descs.length === 1 && pc.descs[0]!.key === "twoWay") {
+		const c = CUSTOM_SPECIALS.find((cs) => cs.key === key);
+		if (c) {
+			return { id, kind: "custom", c, twoWay: true };
+		}
+	}
 	if (pc.descs.length === 0) {
 		const c = CUSTOM_SPECIALS.find((cs) => cs.key === key);
 		if (c) {
@@ -2565,30 +2583,105 @@ export const coverScores = (
 	shift = 0,
 ): CoverScore[] => {
 	const group = groupOfPos(pos);
+	// (reports only: standings given outright, as an audit quotes them)
+	const given = (r as { __standings?: Partial<Record<NounKey, number>> })
+		.__standings;
 	// (archcov: the league standing against the league's own table of the noun's value; without the league's tables, a
 	// league's rating tables when given, else the reference league's values)
 	return nounScores(r, rq)
 		.map((s) => {
 			const lt =
 				ng?.all?.[s.key] ?? (rq ? undefined : NOUN_GROUP_REF.all?.[s.key]);
-			const l = lt ? percentileIn(lt, s.value) : s.pct;
+			const gv = given?.[s.key];
+			const l = gv ?? (lt ? percentileIn(lt, s.value) : s.pct);
 			const t = groupTable(group, s.key, ng);
-			const g0 = t ? percentileIn(t, s.value) : l;
+			const g0 = gv ?? (t ? percentileIn(t, s.value) : l);
 			const league = Math.max(0, Math.min(1, l + shift));
 			const g = Math.max(0, Math.min(1, g0 + shift));
 			return { ...s, league, group: g, pct: Math.min(league, g) };
 		})
 		.sort(byCover());
 };
-// His basketball skills that clear their bar, best first; a near tie (STICK_TIE) goes to the nouns last season's label
-// named
+// archfam (reading 28, the user's 2070 audit): skills that say much the same thing count once, as a family: shooting
+// (3PT and mid-range, correlated 0.67), creation (ball handling and shot creation) and perimeter D (perimeter D and
+// steals). A family stands where its best member stands, and is named by one word: shooting by 3PT unless mid-range
+// leads it by MID_EDGE (or 3PT doesn't clear its bar), creation and perimeter D by the higher member. No name spends two
+// words on one family.
+export const FAMILY_HEAD: Partial<Record<NounKey, NounKey>> = {
+	mid: "three",
+	creator: "handle",
+	steal: "perimD",
+};
+export const familyOf = (k: NounKey): NounKey => FAMILY_HEAD[k] ?? k;
+export const familyMembers = (head: NounKey): NounKey[] =>
+	[head, ...(Object.keys(FAMILY_HEAD) as NounKey[])].filter(
+		(k) => familyOf(k) === head,
+	);
+// Mid-range names the shooting family only with this lead over 3PT
+export const MID_EDGE = 0.06;
+// archfam: mid-range and offensive IQ lead his skills only with this edge (a mid-range lead within a few points of his
+// 3PT is the same jumper; offensive IQ is mostly a flavor word)
+export const LEAD_EDGE = 0.03;
+// The word that names a family, from each member's standing
+export const familyRep = (
+	head: NounKey,
+	pct: (k: NounKey) => number,
+): NounKey => {
+	if (head === "three") {
+		return pct("mid") >= pct("three") + MID_EDGE ||
+			pct("three") < coverBar("three")
+			? "mid"
+			: "three";
+	}
+	if (head === "handle") {
+		return pct("creator") > pct("handle") ? "creator" : "handle";
+	}
+	if (head === "perimD") {
+		return pct("steal") > pct("perimD") ? "steal" : "perimD";
+	}
+	return head;
+};
+// His basketball skills that clear their bar, best first, one per family (its naming word, at the family's standing);
+// a near tie (STICK_TIE) goes to the families last season's label named
 export const coverSkills = (
 	scores: readonly CoverScore[],
 	favored?: ReadonlySet<NounKey>,
-): CoverScore[] =>
-	scores
-		.filter((s) => !ATH_KEYS.has(s.key) && s.pct >= coverBar(s.key))
-		.sort(byCover((s) => s.pct + (favored?.has(s.key) ? STICK_TIE : 0)));
+): CoverScore[] => {
+	const at = new Map(scores.map((s) => [s.key, s]));
+	const pctOf = (k: NounKey) => at.get(k)?.pct ?? 0;
+	const out: CoverScore[] = [];
+	const seen = new Set<NounKey>();
+	for (const s of scores) {
+		if (ATH_KEYS.has(s.key) || s.pct < coverBar(s.key)) {
+			continue;
+		}
+		const head = familyOf(s.key);
+		if (seen.has(head)) {
+			continue;
+		}
+		seen.add(head);
+		const members = familyMembers(head)
+			.map((k) => at.get(k))
+			.filter((m): m is CoverScore => m !== undefined);
+		const rep = at.get(familyRep(head, pctOf)) ?? s;
+		out.push({
+			...rep,
+			pct: Math.max(...members.map((m) => m.pct)),
+			league: Math.max(...members.map((m) => m.league)),
+			group: Math.max(...members.map((m) => m.group)),
+		});
+	}
+	const fav = (k: NounKey) =>
+		familyMembers(familyOf(k)).some((m) => favored?.has(m));
+	return out.sort(
+		byCover(
+			(s) =>
+				s.pct -
+				(s.key === "mid" || s.key === "crafty" ? LEAD_EDGE : 0) +
+				(fav(s.key) ? STICK_TIE : 0),
+		),
+	);
+};
 
 export type CoverCtx = {
 	// standing (lower of league and position) and league standing
@@ -2634,18 +2727,18 @@ export const coverCtxOf = (x: NounInput): CoverCtx => {
 		...(crt === undefined ? {} : { crtPct: pctOf("drb", crt, x.rq) }),
 	};
 };
-// (handle and shot creation stand in for each other where a name's skill must be among his best)
-const EQUIV: Partial<Record<NounKey, NounKey>> = {
-	creator: "handle",
-	handle: "creator",
-};
-// The rank of a skill among his best (Infinity when it doesn't clear)
+// The rank of a skill among his best (Infinity when it doesn't clear): its family's rank (archfam), when the skill itself
+// clears its bar
 export const skillRank = (c: CoverCtx, n: NounKey): number => {
 	const i = c.skills.indexOf(n);
-	const e = EQUIV[n];
-	const j = e ? c.skills.indexOf(e) : -1;
-	const best = Math.min(i < 0 ? Infinity : i, j < 0 ? Infinity : j);
-	return best;
+	if (i >= 0) {
+		return i;
+	}
+	if (ATH_KEYS.has(n) || c.pct(n) < coverBar(n)) {
+		return Infinity;
+	}
+	const j = c.skills.findIndex((k) => familyOf(k) === familyOf(n));
+	return j < 0 ? Infinity : j;
 };
 const WHY_NOUN: Record<NounKey, string> = {
 	three: "3PT",
@@ -2812,7 +2905,7 @@ const WORD_NOUNS: [RegExp, NounKey][] = [
 	[/\b(Driver|Glider)$/, "speed"],
 	[/\bDriver$/, "handle"],
 	[/\b(Point|Dimer|Facilitator|Wizard|Architect|Engine|General)$/, "pass"],
-	[/\b(Spacer|Deadeye)$/, "three"],
+	[/\b(Spacer|Deadeye|Walking-Bucket)$/, "three"],
 	[/\b(Acrobat|Artist|Attacker|Cutter)$/, "finish"],
 	[/\bMaestro$/, "mid"],
 	[/\bInterceptor$/, "steal"],
@@ -2865,6 +2958,13 @@ export const nounsOfName = (
 	const custom = CUSTOM_NAME_NOUNS()[name];
 	if (custom) {
 		return { nouns: custom, twoWay: false };
+	}
+	// (archfam: the user's own name with a 2-Way prefix)
+	const custom2 = /^2-Way /.test(name)
+		? CUSTOM_NAME_NOUNS()[name.slice("2-Way ".length)]
+		: undefined;
+	if (custom2) {
+		return { nouns: custom2, twoWay: true };
 	}
 	const nick = NICKNAMES[name];
 	if (nick) {

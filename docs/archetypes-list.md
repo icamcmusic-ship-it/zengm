@@ -1,26 +1,29 @@
-# Archetypes (reading 27)
+# Archetypes (reading 28)
 
-Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is a main name, plus a defensive tag after a · for a defensive skill at the league's 85th percentile (or his second best) that the main name doesn't name.
+Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is one name: there is no defensive tag. A two-way player's name takes the prefix 2-Way when his best defensive skill and his best offensive skill are both at the 80th percentile; 2-Way covers all his defensive skills.
 
 ## How a main name is built
 
 Each skill is read against the league and against his position group (guards, wings, bigs): its standing is the lower of the two, so a skill counts only when it is good outright and good for his position. A skill may be named from the 65th percentile (offensive IQ from the 75th percentile); its weight ramps from nothing at the 60th percentile to full at the 80th percentile, so there is no cliff. Speed, leaping and strength are modifiers, not skills: they lead a name only when no basketball skill reaches the 70th percentile, and else add at most a word next to a skill (from the 85th percentile).
 
-Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his 4 best skills it names (the defensive tag counts 0.9 of one), minus 2 times the weight of either of his top two it leaves out, minus 0.3 for a second skill named and 0.6 for each beyond two. Its skills must be among his best 4 and include his best one. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name.
+Skills that say the same thing count once, as a family: shooting (3PT and mid-range), creation (handle and shot creation) and perimeter D (perimeter D and steals). A family stands where its best member stands and is named by one word: shooting by 3PT unless mid-range leads it by 0.06 of standing, creation and perimeter D by the higher member. No name spends two words on one family; 3-Level is the one word for shooting and finishing, when 3PT, mid-range and finishing are all at the 78th percentile. Mid-range and offensive IQ need 0.03 of standing over the next skill to lead; offensive IQ is mostly a flavor word (it covers 0.5 of a skill word, costs nothing to name or to leave out).
 
-Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of 0.02 on each standing, so a point of noise doesn't take it away) and this season's best name doesn't cover more by 0.1 or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.
+Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his 4 best families it names (2-Way names all his defensive ones), minus 2 times the weight of either of his top two it leaves out, minus 0.3 for a second skill named and 0.6 for each beyond two (2-Way counts as one; a noun name says at most 3). Its skills must be among his best 4 families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets 0.15 over a noun name that covers the same. The many-skills names are gated by how many elite skills (the 90th percentile) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most 3 and covers each of his best 0.52 of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs 9 or more and covers each 0.9. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name, about the skill he has ("Spot-Up Specialist").
+
+Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of 0.02 on each standing, so a point of noise doesn't take it away), it still covers his top two skills (families), and this season's best name doesn't cover more by 0.1 or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.
 
 ## Every word keeps its promise
 
-A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill, a defensive label's), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best 4, each modifier at its bar. The other words keep these promises:
+A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best 4, each modifier at its bar. The other words keep these promises:
 
 - `Gunner|Shot Hunter|Shotmaker|Shot-Maker|Jumper\b/`: a jumper (3PT or mid-range): one of them among the name's skills
+- `Three-Level|3-Level/`: 3PT, mid-range and finishing in the top 22%
 - `Scorer|Bucket|\bScoring\b/`: a scoring skill: one of them among the name's skills
 - `\bArtist\b/`: finishing or mid-range touch
 - `Step Back|Step-Back|Live-Dribble|Shot-Creat|Shot Creator|Ankle/`: the shot-creation sub-rating
 - `Slash|Open-Lane/`: a slasher's handle (top 50%) and speed
 - `High-Flying|Flyer|Flier|Highlight|Above-the-Rim|Aerial/`: finishing in the top 40%, or leaping in the top 5% (a high flyer uses his leaping at the rim)
-- `Two-Way|2-Way/`: two ways (a defensive and an offensive skill in the top 30%)
+- `Two-Way|2-Way/`: two ways (his best defensive and best offensive skill in the top 20%)
 - `Lockdown|\bLock\b|Clamp/`: mobility
 - `Jack|Swiss|Do-It-All|All-Around/`: 4 skills in the top 30%
 - `Wing-Running|Rim-Running|Demon|Motor|Workhorse|Relentless/`: trait motor 50+
@@ -90,26 +93,10 @@ A name's promises come from its own skill list (a special name's skills, a noun 
 - **Four**: A power forward.
 - **Five**: A center.
 
-## Defensive labels (16)
+## 2-Way and 3-Level
 
-- **Switch Defender**: guards the perimeter and the rim, so he can switch
-- **Help-Side Roamer**: roams off his man for steals and blocks
-- **Swatting Guard**: a guard who blocks shots
-- ★ **Shot Eraser**: an elite rim protector
-- **Shot Blocker**: a shot blocker
-- **Post Defender**: a sturdy post defender
-- **Rim Protector**: protects the rim
-- **Perimeter Stalker**: hounds his man all over the floor
-- **Point-of-Attack Pest**: pressures the ball and jumps passing lanes
-- ★ **Lockdown Defender**: locks down the other team's best perimeter player
-- **Cerebral Defender**: defends with positioning and smarts more than feet
-- **On-Ball Stopper**: stays in front of ball handlers
-- **Perimeter Defender**: a solid perimeter defender
-- **Ball-Hawking Menace**: a relentless ball hawk
-- **Passing-Lane Interceptor**: jumps passing lanes for steals
-- **Ball Hawk**: a ball hawk
-
-Any of them may take Long (long arms) or Switchable (defensive versatility 70+) in front.
+- **2-Way**: a prefix any noun name or user's own name may take (the catalog's builds have their own 2-Way forms) when his best defensive skill and his best offensive skill are both at the 80th percentile. It covers all his defensive skills and counts as one skill named.
+- **3-Level**: one word for shooting and finishing, when 3PT, mid-range and finishing are all at the 78th percentile.
 
 ## Special names: the user's own (93)
 
@@ -205,7 +192,7 @@ Any of them may take Long (long arms) or Switchable (defensive versatility 70+) 
 - **Ironclad Defensive Anchor** [PF/FC/C] (rim protection, strength): An elite, durable interior defender.
 - **Relentless Glass Cleaner** [F/PF/FC/C] (rebounding): A rebounder with a nonstop motor.
 - **Slashing Middy Forward** [SF/F/PF] (finishing, handle, mid-range): A forward who attacks the basket and pulls up from mid-range.
-- **Jack-Of-All-Trades** [any]: 4+ real skills, his 4th at the 85th percentile; it covers each of his skills 0.48 of the way.
+- **Jack-Of-All-Trades** [any]: 4+ real skills (families), his 4th at the 85th percentile, at most 3 at the 90th percentile; it covers each of his skills 0.52 of the way.
 
 ## Special names: builds whose words are all nouns (205)
 
