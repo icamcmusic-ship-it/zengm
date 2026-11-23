@@ -15,6 +15,8 @@ import {
 	type FeatGameType,
 	type FeatKind,
 } from "../../common/featKinds.ts";
+import { STREAK_NAMES, TEAM_FEAT_NAMES } from "../../common/featLedger.ts";
+import { ledgerForView } from "../core/player/featLedger.ts";
 
 const processInputs = (params: RouteParams<"playerFeats">) => {
 	let season: number | "all";
@@ -271,7 +273,65 @@ export default defineView({
 					"sv",
 				],
 			});
+			// Feat Rarity & Streaks: team feats and streaks (for the team and season picked), names of the streakers
+			const ledger = ledgerForView();
+			let ledgerView;
+			if (ledger) {
+				const pids = new Set<number>([
+					...ledger.running.map((r) => r.pid),
+					...Object.values(ledger.longest).flatMap((rows) =>
+						(rows ?? []).map((r) => r.pid),
+					),
+				]);
+				const names = new Map<number, { name: string; tid: number }>();
+				for (const pid of pids) {
+					const p = await idb.cache.players.get(pid);
+					if (p) {
+						names.set(pid, {
+							name: `${p.firstName} ${p.lastName}`,
+							tid: p.tid,
+						});
+					}
+				}
+				const inScope = (tid: number, season: number) =>
+					(typeof inputs.team !== "number" || tid === inputs.team) &&
+					(inputs.season === "all" || season === inputs.season);
+				const teamInfo = g.get("teamInfoCache");
+				ledgerView = {
+					teamFeats: ledger.teamFeats
+						.filter((tf) => inScope(tf.tid, tf.season))
+						.map((tf) => ({
+							...tf,
+							name: TEAM_FEAT_NAMES[tf.kind],
+							abbrev: teamInfo[tf.tid]?.abbrev,
+							oppAbbrev: teamInfo[tf.oppTid]?.abbrev,
+						})),
+					running: ledger.running
+						.map((r) => ({
+							...r,
+							name: names.get(r.pid)?.name ?? "",
+							tid: names.get(r.pid)?.tid ?? -1,
+							kindName: STREAK_NAMES[r.kind],
+						}))
+						.filter(
+							(r) =>
+								r.name !== "" &&
+								(typeof inputs.team !== "number" || r.tid === inputs.team),
+						),
+					longest: (["td", "p30", "dd"] as const).map((kind) => ({
+						kind,
+						kindName: STREAK_NAMES[kind],
+						rows: (ledger.longest[kind] ?? []).map((r) => ({
+							...r,
+							abbrev: teamInfo[r.tid]?.abbrev,
+							exists: names.has(r.pid),
+						})),
+					})),
+				};
+			}
+
 			return {
+				ledger: ledgerView,
 				team: inputs.team,
 				feats: featsProcessed,
 				kindOptions,

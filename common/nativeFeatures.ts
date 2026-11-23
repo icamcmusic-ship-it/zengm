@@ -1545,6 +1545,15 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "featRarity",
+		key: "featureFeatRarity",
+		name: "Feat Rarity & Streaks",
+		description:
+			'Statistical feats get rarity labels when they happen ("first 60-point game since 2041", "3rd quintuple-double ever", "career-high 52 points") and a feat score normalized for the league\'s era and settings (game length, players on the court, league scoring) for ranking them. Team feats (150+ points, 25+ threes, 30-point comebacks) and streaks (consecutive triple-doubles, double-doubles and 30-point games, with running counters and the longest ever) are tracked as games are played, in the news and on Statistical Feats.',
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "recordsBook",
 		key: "featureRecordsBook",
 		name: "Records Book",

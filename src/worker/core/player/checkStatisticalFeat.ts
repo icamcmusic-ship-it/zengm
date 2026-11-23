@@ -9,7 +9,16 @@ import type {
 	Conditions,
 	GamePlayer,
 	GameResults,
+	Player,
 } from "../../../common/types.ts";
+import { ledgerGame } from "./featLedger.ts";
+
+// Streak news without a feat (Feat Rarity & Streaks)
+const STREAK_NEWS_TEXT = {
+	td: "a triple-double",
+	dd: "a double-double",
+	p30: "scored 30 or more",
+} as const;
 import getWinner from "../../../common/getWinner.ts";
 import formatScoreWithShootout from "../../../common/formatScoreWithShootout.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
@@ -30,6 +39,8 @@ const checkStatisticalFeat = (
 	// Playoff games, not counting college mode's NIT (a postseason tournament, but not the playoffs)
 	playoffs: boolean = g.get("phase") === PHASE.PLAYOFFS,
 	nit: boolean = false,
+	// The player's record (Feat Rarity & Streaks: career highs)
+	p2?: Player,
 ) => {
 	const minFactor = helpers.quarterLengthFactor();
 	if (minFactor <= 0.01) {
@@ -80,6 +91,59 @@ const checkStatisticalFeat = (
 	});
 	const allStarGame = results.team[0].id === -1 && results.team[1].id === -2;
 
+	// Feat Rarity & Streaks (basketball): rarity labels, career highs, streaks, team feats and the feat score. Undefined when off
+	const ledger =
+		__SPORT === "basketball" && (p.stat.min ?? 0) > 0
+			? ledgerGame({
+					pid,
+					tid,
+					name: p.name,
+					line: p.stat,
+					p2,
+					results,
+					playoffs,
+					nit,
+					factor,
+					feat: !!feats,
+				})
+			: undefined;
+	if (ledger && ledger.streakNews.length > 0 && !allStarGame) {
+		const s = ledger.streakNews.at(-1)!;
+		logEvent(
+			{
+				type: "playerFeat",
+				text: `<a href="${helpers.leagueUrl(["player", pid])}">${p.name}</a> has ${STREAK_NEWS_TEXT[s.kind]} in ${s.n} straight games.`,
+				showNotification: false,
+				pids: [pid],
+				tids: [tid],
+				score: 0,
+			},
+			conditions,
+		);
+	}
+
+	if (ledger) {
+		for (const tf of ledger.teamNews) {
+			const abbrev = g.get("teamInfoCache")[tf.tid]?.abbrev ?? "";
+			const what =
+				tf.kind === "comeback30"
+					? `came back from ${tf.value} points down`
+					: tf.kind === "pts150"
+						? `scored ${tf.value} points`
+						: `made ${tf.value} threes`;
+			logEvent(
+				{
+					type: "playerFeat",
+					text: `The <a href="${helpers.leagueUrl(["roster", `${abbrev}_${tf.tid}`, tf.season])}">${g.get("teamInfoCache")[tf.tid]?.region ?? ""} ${g.get("teamInfoCache")[tf.tid]?.name ?? ""}</a> ${what} in a <a href="${helpers.leagueUrl(["game_log", `${abbrev}_${tf.tid}`, tf.season, tf.gid])}">${tf.score}</a> game against the ${g.get("teamInfoCache")[tf.oppTid]?.name ?? ""}${tf.rarity ? ` (${tf.rarity})` : ""}.`,
+					showNotification: tf.tid === g.get("userTid"),
+					tids: [tf.tid],
+					score: 10,
+				},
+				conditions,
+			);
+		}
+	}
+
 	const winner = getWinner([results.team[0].stat, results.team[1].stat]);
 	if (feats) {
 		const won = winner === i;
@@ -128,6 +192,9 @@ const checkStatisticalFeat = (
 		featText += `</a> in ${
 			results.team[i].stat.pts.toString().charAt(0) === "8" ? "an" : "a"
 		} ${scoreText} ${endPart}.`;
+		if (ledger && ledger.notes.length > 0) {
+			featText += ` (${ledger.notes.join("; ")})`;
+		}
 
 		logFeat(featText, score);
 
@@ -149,6 +216,12 @@ const checkStatisticalFeat = (
 			numPeriods: g.get("numPeriods"),
 			factor,
 			result,
+			...(ledger
+				? {
+						fs: ledger.fs,
+						...(ledger.notes.length > 0 ? { notes: ledger.notes } : {}),
+					}
+				: {}),
 		});
 	}
 

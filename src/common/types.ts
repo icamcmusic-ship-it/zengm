@@ -905,6 +905,8 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	};
 	// Records Book single-game highs, streaks and record holders (basketball, see worker/util/recordsBookData.ts)
 	recordsBook?: RBState;
+	// Feat rarity, team feats and streaks (basketball, see worker/core/player/featLedger.ts)
+	featLedger?: import("./featLedger.ts").LedgerState;
 	goatSeasonFormula?: string;
 	godMode: boolean;
 	godModeInPast: boolean;
@@ -1619,6 +1621,9 @@ export type PlayerFeatWithoutKey = {
 	// Scale factor of the cutoffs for this game (game length with overtime, players on the court). Missing in feats
 	// from before it was stored
 	factor?: number;
+	// Feat Rarity & Streaks (basketball): rarity labels, career highs and streak notes at the time, and the era-normalized feat score
+	notes?: string[];
+	fs?: number;
 };
 
 export type PlayerFeat = PlayerFeatWithoutKey & {
@@ -1845,6 +1850,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	scoutLooks?: import("./staffDepth/types.ts").ProspectLooks;
 	// Coaching Staff Depth: this season's development plan
 	devPlan?: import("./staffDepth/types.ts").PlayerDevPlan;
+	// Feat Rarity & Streaks: his single-game highs as this league saw them (w: every game of his career was seen)
+	featHi?: { w: boolean; pts: number; trb: number; ast: number };
 	// Player–coach relationships (featurePlayerCoachRel): his bonds with the head coaches he played for, most recent first
 	coachRels?: import("./playerCoachRel.ts").PlayerCoachRel[];
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts

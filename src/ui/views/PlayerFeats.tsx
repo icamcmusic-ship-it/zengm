@@ -14,6 +14,7 @@ import type { Col } from "../components/DataTable/index.tsx";
 const PlayerFeats = ({
 	feats: allFeats,
 	kindOptions,
+	ledger,
 	typeOptions,
 	quarterLengthFactor,
 	season,
@@ -43,7 +44,9 @@ const PlayerFeats = ({
 	// Feat type and game type filters, and the per-player leaderboard
 	const [kind, setKind] = useState("all");
 	const [gameType, setGameType] = useState("all");
-	const [tab, setTab] = useState<"games" | "leaders">("games");
+	const [tab, setTab] = useState<"games" | "leaders" | "team" | "streaks">(
+		"games",
+	);
 	const kindValid = kind === "all" || kindOptions.some((k) => k.key === kind);
 	const typeValid =
 		gameType === "all" || typeOptions.some((t) => t.key === gameType);
@@ -53,16 +56,34 @@ const PlayerFeats = ({
 			(!typeValid || gameType === "all" || feat.type === gameType),
 	);
 
-	const cols = getCols([
-		"Name",
-		"Pos",
-		"Team",
-		...stats.map((stat) => `stat:${stat}`),
-		"Opp",
-		"Result",
-		"Season",
-		"Type",
-	]);
+	const cols: Col[] = [
+		...getCols([
+			"Name",
+			"Pos",
+			"Team",
+			...stats.map((stat) => `stat:${stat}`),
+			"Opp",
+			"Result",
+			"Season",
+			"Type",
+		]),
+		// Feat Rarity & Streaks: the era-normalized feat score and the notes from when it happened
+		...(ledger
+			? [
+					{
+						title: "Feat Score",
+						desc: "Feat score: the line scaled to a reference era (the league's scoring, rebounding, ... that season) and to the game's length and players on the court, weighted like a game score",
+						sortSequence: ["desc", "asc"],
+						sortType: "number",
+					} satisfies Col,
+					{
+						title: "Notes",
+						desc: "Rarity, career highs and streaks when it happened",
+						sortType: "string",
+					} satisfies Col,
+				]
+			: []),
+	];
 
 	const rows: DataTableRow<"player">[] = feats.map((p) => {
 		const result = `${p.result} ${p.score}`;
@@ -126,6 +147,23 @@ const PlayerFeats = ({
 						: p.type === "nit"
 							? "NIT"
 							: "Regular season",
+				...(ledger
+					? [
+							{
+								value: p.fs ?? "",
+								sortValue: p.fs ?? -Infinity,
+							},
+							{
+								value: p.notes ? (
+									<span className="small">{p.notes.join("; ")}</span>
+								) : (
+									""
+								),
+								sortValue: p.notes?.join("; ") ?? "",
+								searchValue: p.notes?.join("; ") ?? "",
+							},
+						]
+					: []),
 			],
 			classNames: {
 				"table-info": p.tid === userTid,
@@ -254,6 +292,24 @@ const PlayerFeats = ({
 					>
 						Leaderboard
 					</button>
+					{ledger ? (
+						<>
+							<button
+								className={`btn btn-sm ${tab === "team" ? "btn-primary" : "btn-light-bordered"}`}
+								data-testid="feats-team-tab"
+								onClick={() => setTab("team")}
+							>
+								Team feats
+							</button>
+							<button
+								className={`btn btn-sm ${tab === "streaks" ? "btn-primary" : "btn-light-bordered"}`}
+								data-testid="feats-streaks-tab"
+								onClick={() => setTab("streaks")}
+							>
+								Streaks
+							</button>
+						</>
+					) : null}
 				</div>
 				{kindOptions.length > 0 ? (
 					<select
@@ -289,7 +345,11 @@ const PlayerFeats = ({
 				) : null}
 			</div>
 
-			{tab === "games" ? (
+			{tab === "team" && ledger ? (
+				<TeamFeats ledger={ledger} userTid={userTid} />
+			) : tab === "streaks" && ledger ? (
+				<Streaks ledger={ledger} userTid={userTid} />
+			) : tab === "games" ? (
 				<DataTable
 					cols={cols}
 					defaultSort={[23, "desc"]}
@@ -308,6 +368,143 @@ const PlayerFeats = ({
 				/>
 			)}
 		</>
+	);
+};
+
+type Ledger = NonNullable<View<"playerFeats">["ledger"]>;
+
+// Feat Rarity & Streaks: team feats (150+ points, 25+ threes, 30-point comebacks), newest first
+const TeamFeats = ({
+	ledger,
+	userTid,
+}: {
+	ledger: Ledger;
+	userTid: number;
+}) => {
+	const cols: Col[] = [
+		{ title: "Team", sortType: "string" },
+		{ title: "Feat", sortType: "string" },
+		{ title: "Value", sortSequence: ["desc", "asc"], sortType: "number" },
+		{ title: "Opp", sortType: "string" },
+		{ title: "Score", sortType: "string" },
+		{ title: "Season", sortType: "number" },
+		{ title: "Type", sortType: "string" },
+		{ title: "Notes", sortType: "string" },
+	];
+	const rows: DataTableRow[] = ledger.teamFeats.map((tf, i) => ({
+		key: i,
+		data: [
+			<a
+				href={helpers.leagueUrl([
+					"roster",
+					`${tf.abbrev}_${tf.tid}`,
+					tf.season,
+				])}
+			>
+				{tf.abbrev}
+			</a>,
+			tf.name,
+			tf.value,
+			tf.oppAbbrev ?? "",
+			{
+				value: (
+					<a
+						href={helpers.leagueUrl([
+							"game_log",
+							`${tf.abbrev}_${tf.tid}`,
+							tf.season,
+							tf.gid,
+						])}
+					>
+						{tf.score}
+					</a>
+				),
+				sortValue: tf.score,
+			},
+			tf.season,
+			tf.playoffs ? "Playoffs" : "Regular season",
+			tf.rarity ?? "",
+		],
+		classNames: { "table-info": tf.tid === userTid },
+	}));
+	return (
+		<div data-testid="feats-team">
+			<p className="text-body-secondary small">
+				Games where a team scored 150+ points or made 25+ threes, or won after
+				trailing by 30+ at the end of a period (cutoffs scale with the game's
+				length and players on the court). Kept as games are played (the last
+				300).
+			</p>
+			{rows.length === 0 ? (
+				<p>None yet.</p>
+			) : (
+				<DataTable
+					cols={cols}
+					defaultSort={[5, "desc"]}
+					name="PlayerFeatsTeam"
+					rows={rows}
+					pagination
+				/>
+			)}
+		</div>
+	);
+};
+
+// Feat Rarity & Streaks: running streaks and the longest ever
+const Streaks = ({ ledger, userTid }: { ledger: Ledger; userTid: number }) => {
+	const { teamInfoCache } = useLocal(["teamInfoCache"]);
+	return (
+		<div data-testid="feats-streaks">
+			<p className="text-body-secondary small">
+				Consecutive regular season games played with a triple-double, a
+				double-double or 30+ points (cutoffs scale like the feats').
+			</p>
+			<h3 className="h5">Active streaks</h3>
+			{ledger.running.length === 0 ? (
+				<p>None right now.</p>
+			) : (
+				<ul>
+					{ledger.running.map((r) => (
+						<li
+							key={`${r.pid}-${r.kind}`}
+							className={r.tid === userTid ? "text-info" : undefined}
+						>
+							<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>
+							{teamInfoCache[r.tid]?.abbrev
+								? ` (${teamInfoCache[r.tid]!.abbrev})`
+								: ""}
+							: {r.n} straight {r.kindName}
+						</li>
+					))}
+				</ul>
+			)}
+			<div className="row">
+				{ledger.longest.map((group) => (
+					<div className="col-md-4" key={group.kind}>
+						<h3 className="h5">Longest: {group.kindName}</h3>
+						{group.rows.length === 0 ? (
+							<p>None yet.</p>
+						) : (
+							<ol>
+								{group.rows.map((r) => (
+									<li key={`${r.pid}-${r.from}`}>
+										{r.exists ? (
+											<a href={helpers.leagueUrl(["player", r.pid])}>
+												{r.name}
+											</a>
+										) : (
+											r.name
+										)}
+										{r.abbrev ? ` (${r.abbrev})` : ""}: {r.n} games,{" "}
+										{r.from === r.to ? r.from : `${r.from}-${r.to}`}
+									</li>
+								))}
+							</ol>
+						)}
+					</div>
+				))}
+			</div>
+		</div>
 	);
 };
 
