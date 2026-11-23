@@ -1869,6 +1869,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	health?: PlayerHealth;
 	// injuryDepth setting: rest this player on the second night of back-to-backs
 	loadManagement?: boolean;
+	// AI Roster Balance: signed to a hardship contract by this team this season (released when the team is healthy again)
+	hardship?: { tid: number; season: number };
 	jerseyNumber?: string; // Should be undefined only for a player who has never been on a team, or a player signed to his first team before the preseason
 	lastName: string;
 	moodTraits: MoodTrait[];

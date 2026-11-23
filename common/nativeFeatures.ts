@@ -940,6 +940,18 @@ export const NATIVE_FEATURES = [
 		defaultNewLeague: true,
 	},
 	{
+		id: "aiRosterBalance",
+		college: false,
+		key: "featureAiRosterBalance",
+		core: true,
+		name: "AI Roster Balance",
+		description:
+			"AI teams keep their rosters balanced by position when they sign free agents, fill out the roster and cut players (at least 2 bigs and 3 guards, no more than about 7 of either), and a team down to fewer than 8 healthy players signs a cheap free agent on a minimum deal (a hardship signing), allowed up to 2 over the maximum roster and released when the team is healthy again unless there is room for him.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "capExceptions",
 		key: "featureCapExceptions",
 		core: true,

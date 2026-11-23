@@ -381,7 +381,7 @@ describe("game export", () => {
 						continue;
 					}
 					// (retired players keep their ratings, as in the player export: someone in the game may have retired since)
-					const pNow = await idb.getCopy.players({ pid: x.pid });
+					const pNow = await idb.merged.players.get(x.pid);
 					if (pNow?.tid === PLAYER.RETIRED) {
 						continue;
 					}

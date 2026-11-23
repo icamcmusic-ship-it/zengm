@@ -23,6 +23,9 @@ import getWinner from "../../../common/getWinner.ts";
 import formatScoreWithShootout from "../../../common/formatScoreWithShootout.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 
+// Breakout nights: the points (times the feat scale factor) of a bench career high that makes the news
+const BENCH_CAREER_HIGH_PTS = 25;
+
 const checkPlayer = bySport({
 	baseball: checkStatisticalFeatBaseball,
 	basketball: checkStatisticalFeatBasketball,
@@ -145,6 +148,45 @@ const checkStatisticalFeat = (
 	}
 
 	const winner = getWinner([results.team[0].stat, results.team[1].stat]);
+
+	// Breakout nights: a career high off the bench (25+ points, not already a feat) is news too
+	const benchHigh = ledger?.notes.find((n) =>
+		/^career-high \d+ points$/.test(n),
+	);
+	if (
+		benchHigh &&
+		!feats &&
+		!allStarGame &&
+		(p.stat.gs ?? 0) === 0 &&
+		p.stat.pts >= BENCH_CAREER_HIGH_PTS * factor
+	) {
+		const won = winner === i;
+		const tied = winner === -1;
+		logEvent(
+			{
+				type: "playerFeat",
+				text: `<a href="${helpers.leagueUrl(["player", pid])}">${p.name}</a> scored a career-high <a href="${helpers.leagueUrl(
+					[
+						"game_log",
+						g.get("teamInfoCache")[tid]?.abbrev ?? "special",
+						g.get("season"),
+						results.gid,
+					],
+				)}">${p.stat.pts} points</a> off the bench in a ${formatScoreWithShootout(
+					results.team[i].stat,
+					results.team[j].stat,
+				)} ${tied ? "tie with the" : won ? "win over the" : "loss to the"} ${
+					g.get("teamInfoCache")[results.team[j].id]?.name
+				}.`,
+				showNotification: false,
+				pids: [pid],
+				tids: [tid],
+				score: 0,
+			},
+			conditions,
+		);
+	}
+
 	if (feats) {
 		const won = winner === i;
 		const tied = winner === -1;

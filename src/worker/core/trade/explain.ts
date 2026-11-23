@@ -69,8 +69,9 @@ export type BuildExplanationInput = {
 	salaryCapType: "hard" | "soft" | "none";
 	warning?: string | null;
 
-	// AI GM personalities (setting): "Name (Win-now, Analytics)" for a team with a GM
-	gm?: { name: string; styleLabels: string[] };
+	// AI GM personalities (setting): "Name (Win-now, Analytics)" for a team with a GM. exact: false (outside God Mode) leaves out how
+	// big his leanings' effects are, so they can't be read off to shop each asset to the one GM who values it most
+	gm?: { name: string; styleLabels: string[]; exact?: boolean };
 };
 
 const assetKey = (detail: AssetValueDetail) =>
@@ -110,6 +111,8 @@ export const explainAsset = (
 	strategy: string,
 	name: string,
 	total: number,
+	// false: the GM leaning's effect in words, without its size (outside God Mode)
+	exactGm = true,
 ): ExplainedAsset => {
 	const give = direction === "give";
 	const terms: ExplanationTerm[] = [];
@@ -167,10 +170,13 @@ export const explainAsset = (
 					: "veterans";
 		terms.push({
 			key: "strategy",
-			text:
-				gf > 1
+			text: exactGm
+				? gf > 1
 					? `Our GM values ${what} more (+${pct(gf - 1)}).`
-					: `Our GM values ${what} less (−${pct(1 - gf)}).`,
+					: `Our GM values ${what} less (−${pct(1 - gf)}).`
+				: gf > 1
+					? `Our GM values ${what} more than most.`
+					: `Our GM values ${what} less than most.`,
 			effect: flip(gf > 1 ? "good" : "bad", give),
 		});
 	}
@@ -178,7 +184,15 @@ export const explainAsset = (
 	if (detail.injuryPenalty > 0.001) {
 		terms.push({
 			key: "injury",
-			text: `Injured, so worth less right now (−${pct(detail.injuryPenalty / Math.max(Math.abs(detail.baseValue), 0.01))}).`,
+			// The discount includes the GM's risk leaning, so outside God Mode it's only shown roughly
+			text: `Injured, so worth less right now (${exactGm ? "−" : "about −"}${pct(
+				exactGm
+					? detail.injuryPenalty / Math.max(Math.abs(detail.baseValue), 0.01)
+					: Math.round(
+							(10 * detail.injuryPenalty) /
+								Math.max(Math.abs(detail.baseValue), 0.01),
+						) / 10,
+			)}).`,
 			effect: "bad",
 		});
 	}
@@ -242,6 +256,7 @@ export const buildTradeExplanation = (
 				input.strategy,
 				input.names[assetKey(detail)] ?? "Unknown",
 				totalAdd,
+				input.gm?.exact ?? true,
 			),
 		),
 		...input.remove.map((detail) =>
@@ -251,6 +266,7 @@ export const buildTradeExplanation = (
 				input.strategy,
 				input.names[assetKey(detail)] ?? "Unknown",
 				totalRemove,
+				input.gm?.exact ?? true,
 			),
 		),
 	];
@@ -465,6 +481,7 @@ const getExplanationGm = async (tid: number) => {
 		? {
 				name: `${gm.firstName} ${gm.lastName}`,
 				styleLabels: gmStyleLabels(gm.traits),
+				exact: !!g.get("godMode"),
 			}
 		: undefined;
 };

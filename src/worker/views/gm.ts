@@ -3,7 +3,12 @@ import { defineView } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { gmEnabled } from "../core/gm/index.ts";
 import { getGmProfile } from "../core/gm/profile.ts";
-import { gmHotSeatLabel, gmStyleLabels } from "../../common/gmPersonality.ts";
+import {
+	gmHotSeatLabel,
+	gmStyleLabels,
+	gmTraitBands,
+} from "../../common/gmPersonality.ts";
+import { g } from "../util/index.ts";
 import { idb } from "../db/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { gmExpHidden } from "./gmShared.ts";
@@ -25,7 +30,8 @@ export default defineView({
 			updateEvents.has("firstRun") ||
 			inputs.gmid !== prevInputs?.gmid ||
 			updateEvents.has("newPhase") ||
-			updateEvents.has("team")
+			updateEvents.has("team") ||
+			updateEvents.has("gameAttributes")
 		) {
 			const profile = Number.isNaN(inputs.gmid)
 				? undefined
@@ -39,13 +45,17 @@ export default defineView({
 					: undefined;
 			// No Visible Ratings challenge: no expected wins (they come from roster ratings)
 			const noRatings = gmExpHidden();
+			// Leanings as bands, the exact numbers only in God Mode
+			const { traits, ...rest } = profile;
 			return {
-				...profile,
+				...rest,
+				traits: g.get("godMode") ? traits : undefined,
+				traitBands: gmTraitBands(traits),
 				seasons: noRatings
 					? profile.seasons.map((row) => ({ ...row, expWon: undefined }))
 					: profile.seasons,
 				noRatings,
-				styleLabels: gmStyleLabels(profile.traits),
+				styleLabels: gmStyleLabels(traits),
 				hotSeatLabel:
 					t?.gm?.gmid === profile.gmid
 						? gmHotSeatLabel(t.gm.hotSeat)

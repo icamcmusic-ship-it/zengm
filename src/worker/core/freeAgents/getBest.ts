@@ -5,6 +5,7 @@ import { getTeamOvrDiffs } from "../draft/runPicks.ts";
 import { last, orderBy } from "../../../common/utils.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { getContractDemand } from "../contract/index.ts";
+import { rosterBalanceOn, sortByNeed } from "./rosterBalance.ts";
 
 // In some sports, extra check for certain important rare positions in case the only one was traded away. These should only be positions with weird unique skills, where you can't replace them easily with another position. Value is the number of players that should be at each position.
 export const KEY_POSITIONS_NEEDED = bySport<Record<string, number> | undefined>(
@@ -62,6 +63,14 @@ const getBest = <T extends PlayerWithoutKey>(
 		}));
 		playersSorted = orderBy(wrapper, (x) => x.teamOvrDiff, "desc").map(
 			(x) => x.p,
+		);
+	} else if (rosterBalanceOn()) {
+		// AI Roster Balance: a gentle positional need term (at least 2 bigs and 3 guards, no more than about 7 of either)
+		playersSorted = sortByNeed(
+			playersOnRoster.map((p) => last(p.ratings).pos),
+			playersAvailable,
+			(p) => last(p.ratings).pos,
+			(p) => p.value,
 		);
 	} else {
 		playersSorted = playersAvailable;

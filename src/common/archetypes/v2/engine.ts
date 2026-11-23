@@ -1298,12 +1298,14 @@ export const classifyV2 = (
 		eff(first) - eff(second) < P.alsoMargin
 			? second
 			: undefined;
+	// (archfam: a build's name where he plays: "Five" only on a center)
+	const atPos = isPos(pos) ? nameAt(a, pos) : a.name;
 	return {
 		...classic,
 		id: a.id,
-		name: isComposedId(a.id) ? a.name : first.classic ? classic.name : a.name,
+		name: isComposedId(a.id) ? a.name : first.classic ? classic.name : atPos,
 		label:
-			(isComposedId(a.id) ? a.name : first.classic ? classic.label : a.name) +
+			(isComposedId(a.id) ? a.name : first.classic ? classic.label : atPos) +
 			(nounDefense ? ` · ${nounDefense}` : ""),
 		...(nounDefense ? { defense: nounDefense } : {}),
 		// archcov: why the label was chosen
@@ -1316,7 +1318,7 @@ export const classifyV2 = (
 								? a.name
 								: first.classic
 									? classic.label
-									: a.name) + (nounDefense ? ` · ${nounDefense}` : ""),
+									: atPos) + (nounDefense ? ` · ${nounDefense}` : ""),
 					},
 				}
 			: {}),

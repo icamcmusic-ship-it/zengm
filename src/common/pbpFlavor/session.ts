@@ -48,6 +48,8 @@ import {
 	heatCheckNote,
 	homeCrowd,
 	hotLine,
+	benchHotLine,
+	feedHotLine,
 	lateClockMiss,
 	pointsMilestone,
 	runEndedLine,
@@ -534,6 +536,8 @@ export class FlavorSession {
 	private tdWatchSaid = new Set<number>();
 	// players who have been subbed out, so coming back in reads as a return
 	private benched = new Set<number>();
+	// players whose first time on the court was a substitution (the bench), for the bench hot hand lines
+	private reserves = new Set<number>();
 	private lastScoreAbs: [number | undefined, number | undefined] = [
 		undefined,
 		undefined,
@@ -730,9 +734,11 @@ export class FlavorSession {
 			zone: "rim" | "post" | "mid" | undefined;
 			made: boolean;
 			line: string;
+			// a late-game isolation (lateIso): most of the time, and the isolation's own sets
+			iso?: boolean;
 		},
 	): { text: string; action: ActionKind } | undefined {
-		if (rng.random() >= (o.made ? 0.2 : 0.16)) {
+		if (rng.random() >= (o.iso ? (o.made ? 0.8 : 0.5) : o.made ? 0.2 : 0.16)) {
 			return undefined;
 		}
 		const d: 0 | 1 = o.t === 0 ? 1 : 0;
@@ -747,6 +753,7 @@ export class FlavorSession {
 			scheme: this.scheme[d],
 			offense: this.the(o.t),
 			defense: this.the(d),
+			iso: o.iso,
 		});
 		if (!sp) {
 			return undefined;
@@ -922,6 +929,19 @@ export class FlavorSession {
 
 	private finalPeriod() {
 		return this.period >= this.numPeriods;
+	}
+
+	// A late-game isolation (the sim's End-of-Game Intelligence clears out for the closer): an unassisted half-court shot that would tie
+	// the game or win it, in the last 24 seconds of the final period or overtime. margin: the shooting team's lead before the shot
+	private lateIso(clock: number | undefined, margin: number) {
+		return (
+			this.finalPeriod() &&
+			clock !== undefined &&
+			Number.isFinite(clock) &&
+			clock <= 24 &&
+			margin <= 0 &&
+			margin >= -3
+		);
 	}
 
 	// What a period of regulation is called in this league (as getPeriodName: halves, quarters, or periods for any other number)
@@ -1756,9 +1776,34 @@ export class FlavorSession {
 		res.text = this.tally(text, ev, { p, ast });
 		this.rememberFoul(ev);
 		this.lastShot = undefined;
+		// A late-game isolation: the clear-out goes first, before any lead-in ("Out of the timeout: the Celtics clear out...")
+		const isoSet =
+			!ast &&
+			!move &&
+			!ctx.trans &&
+			!heave &&
+			!fake &&
+			!meta.tip &&
+			!meta.putback &&
+			!ctx.ptype &&
+			this.lateIso(ev.clock, margin)
+				? this.setFor(rng, res.text, {
+						p,
+						ast,
+						t,
+						three: meta.three,
+						zone: meta.zone,
+						made: true,
+						line: text,
+						iso: true,
+					})
+				: undefined;
+		if (isoSet) {
+			res.text = isoSet.text;
+		}
 		const plain = res.text;
 		res.text = this.leadIn(rng, res.text, t, ev, att, ctx);
-		let action: ActionKind | undefined = move?.action;
+		let action: ActionKind | undefined = move?.action ?? isoSet?.action;
 		if (
 			ctx.trans &&
 			ast &&
@@ -1784,6 +1829,7 @@ export class FlavorSession {
 			}
 		} else if (
 			!move &&
+			!isoSet &&
 			!ctx.trans &&
 			!heave &&
 			!fake &&
@@ -2166,19 +2212,37 @@ export class FlavorSession {
 		res.text = this.tally(text, ev, { p: shooter, blk: blocker });
 		let action: ActionKind | undefined = move?.action;
 		if (shooter && !blocked && !/heave|horn/.test(text)) {
-			const plain = res.text;
-			res.text = this.leadIn(rng, res.text, shotT, ev, att, ctx);
-			if (
+			const halfCourt =
 				!move &&
 				core !== undefined &&
-				res.text === plain &&
 				!ctx.trans &&
 				!meta.putback &&
 				!meta.tip &&
 				!fake &&
 				!ctx.ptype &&
-				!(ctx.lastReb && ctx.lastReb.pid === shooter.pid)
-			) {
+				!(ctx.lastReb && ctx.lastReb.pid === shooter.pid);
+			// A late-game isolation: the clear-out goes first, before any lead-in
+			const isoSet =
+				halfCourt &&
+				this.lateIso(ev.clock, score[shotT] - score[shotT === 0 ? 1 : 0])
+					? this.setFor(rng, res.text, {
+							p: shooter,
+							ast: undefined,
+							t: shotT,
+							three,
+							zone: meta.zone,
+							made: false,
+							line: core!,
+							iso: true,
+						})
+					: undefined;
+			if (isoSet) {
+				res.text = isoSet.text;
+				action = isoSet.action;
+			}
+			const plain = res.text;
+			res.text = this.leadIn(rng, res.text, shotT, ev, att, ctx);
+			if (halfCourt && !isoSet && res.text === plain) {
 				const sp = this.setFor(rng, res.text, {
 					p: shooter,
 					ast: undefined,
@@ -2186,7 +2250,7 @@ export class FlavorSession {
 					three,
 					zone: meta.zone,
 					made: false,
-					line: core,
+					line: core!,
 				});
 				if (sp) {
 					res.text = sp.text;
@@ -2812,6 +2876,11 @@ export class FlavorSession {
 			ejected: this.ejected,
 			back: this.benched,
 		});
+		for (const pid of on) {
+			if (!this.benched.has(pid)) {
+				this.reserves.add(pid);
+			}
+		}
 		for (const pid of off) {
 			this.foulTrouble.delete(pid);
 			this.benched.add(pid);
@@ -3084,9 +3153,12 @@ export class FlavorSession {
 		}
 		this.streak[opp].pid = undefined;
 		let streakNote = "";
+		const reserve = this.reserves.has(p.pid);
 		if (st.pts >= 8 && !st.said) {
 			st.said = true;
-			streakNote = streakLine(rng, p.name, st.pts, this.the(t));
+			streakNote = reserve
+				? feedHotLine(rng, p.name, st.pts, this.the(t))
+				: streakLine(rng, p.name, st.pts, this.the(t));
 		}
 
 		// ---- a drought that just ended ----
@@ -3105,7 +3177,10 @@ export class FlavorSession {
 		if (o.fg) {
 			const h = (this.hot.get(p.pid) ?? 0) + 1;
 			this.hot.set(p.pid, h);
-			if (h >= 4 && !this.hotSaid.has(p.pid)) {
+			if (reserve && h >= 3 && !this.hotSaid.has(p.pid)) {
+				this.hotSaid.add(p.pid);
+				hotNote = benchHotLine(rng, p.name, h);
+			} else if (h >= 4 && !this.hotSaid.has(p.pid)) {
 				this.hotSaid.add(p.pid);
 				hotNote = hotLine(rng, p.name, h);
 			} else if (h >= 6 && !this.fireSaid.has(p.pid)) {

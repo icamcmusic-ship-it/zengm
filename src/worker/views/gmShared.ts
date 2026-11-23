@@ -1,5 +1,10 @@
 // AI GM personalities: shared formatting for the Front Offices page and the team page
-import { gmHotSeatLabel, gmStyleLabels } from "../../common/gmPersonality.ts";
+import {
+	gmHotSeatLabel,
+	gmStyleLabels,
+	gmTraitBands,
+} from "../../common/gmPersonality.ts";
+import { getGmBehaviors, type GmBehavior } from "../core/gm/profile.ts";
 import type { Gm, Team } from "../../common/types.ts";
 import { gmEnabled, seasonsWithTeam, userOwnsTeam } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
@@ -26,7 +31,8 @@ const isTitle = (season: number, playoffRoundsWon: number) =>
 // No Visible Ratings challenge: expected wins come from the roster ratings, so they're not sent
 export const gmExpHidden = () => !!g.get("challengeNoRatings");
 
-export const formatGm = async (gm: Gm, tid?: number) => {
+// behavior: his track record (getGmBehaviors), computed for him alone when not given
+export const formatGm = async (gm: Gm, tid?: number, behavior?: GmBehavior) => {
 	const noRatings = gmExpHidden();
 	const tenure = gm.tenures.at(-1);
 	const current = tid !== undefined ? seasonsWithTeam(gm, tid) : [];
@@ -61,7 +67,10 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 		age: g.get("season") - gm.born.year,
 		born: gm.born,
 		face: gm.face,
-		traits: gm.traits,
+		// Leanings as bands, the exact numbers only in God Mode (so the user cannot shop each asset to the one GM who values it most)
+		traits: g.get("godMode") ? gm.traits : undefined,
+		traitBands: gmTraitBands(gm.traits),
+		behavior: behavior ?? (await getGmBehaviors([gm])).get(gm.gmid)!,
 		styleLabels: gmStyleLabels(gm.traits),
 		// AI GM finance styles, undefined when off
 		finance: financeInfo(gm),

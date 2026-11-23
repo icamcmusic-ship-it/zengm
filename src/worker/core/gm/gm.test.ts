@@ -19,7 +19,7 @@ import { mulberry32 } from "../../../test/ratingInflation/harness.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
-import { player, team } from "../index.ts";
+import { player, team, trade } from "../index.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { getDraftAdjustment } from "../draft/draftNeeds.ts";
 import {
@@ -124,6 +124,7 @@ describe("GM personality weights", () => {
 			"buyerWinpShift",
 			"avoidTaxRankShift",
 			"faStarShift",
+			"faYouthShift",
 			"draftUpside",
 			"optionShift",
 			"strategyShift",
@@ -131,6 +132,8 @@ describe("GM personality weights", () => {
 		] as const) {
 			assert.strictEqual(Math.abs(w[key]), 0, key);
 		}
+		assert.strictEqual(w.overCapResignRank, Infinity);
+		assert.strictEqual(w.faCapRoom, 0);
 	});
 
 	test("traits are bounded, centered and modest", () => {
@@ -148,19 +151,21 @@ describe("GM personality weights", () => {
 			assert.isBelow(Math.abs(mean), 0.05, key);
 			assert.isAtMost(Math.max(...xs.map(Math.abs)), 1, key);
 		}
-		// Trade weights average 1, so league-wide trade volume stays the same
-		const meanWeight =
-			all
-				.map((t) => gmWeightsFromTraits(t).tradeWeight)
-				.reduce((a, b) => a + b, 0) / all.length;
-		assert.closeTo(meanWeight, 1, 0.03);
-		// Extreme leanings move a player's value by at most ~7% through any single factor
+		// Trade weights average about 1 (they're relative chances, so league-wide trade volume stays the same), but spread widely: a
+		// dealmaker is picked several times as often as a quiet GM
+		const weights = all.map((t) => gmWeightsFromTraits(t).tradeWeight);
+		const meanWeight = weights.reduce((a, b) => a + b, 0) / all.length;
+		assert.closeTo(meanWeight, 1, 0.06);
+		const sorted = weights.toSorted((a, b) => a - b);
+		const q = Math.floor(sorted.length / 5);
+		assert.isAbove(sorted[sorted.length - q]! / sorted[q]!, 3);
+		// Extreme leanings move a player's value by at most ~10% through any single factor (picks 20%)
 		const extreme = gmWeightsFromTraits({
 			...NEUTRAL_GM_TRAITS,
 			patience: 1,
 			analytics: 1,
 		});
-		assert.isAtMost(extreme.futureFactor, 1.07 + 1e-9);
+		assert.isAtMost(extreme.futureFactor, 1.1 + 1e-9);
 		assert.isAtMost(Math.abs(extreme.styleStrength), 0.06 + 1e-9);
 	});
 
@@ -1265,11 +1270,11 @@ describe("trade value", () => {
 		assert.isAbove(patientYoung - patientVet, winNowYoung - winNowVet);
 
 		// Bounded: trade values are value ** 7 (basketball), so on the value scale even two extreme leanings combined move a player
-		// by less than 15%, and one extreme leaning a pick by less than the 12% pick factor (less than the team strategy factors)
+		// by less than 15%, and one extreme leaning a pick by less than the 20% pick factor (less than the team strategy factors)
 		for (const [x, base, max] of [
 			[patientYoung, neutralYoung, 0.15],
 			[winNowVet, neutralVet, 0.15],
-			[hoarder, neutralPick, 0.121],
+			[hoarder, neutralPick, 0.201],
 		] as const) {
 			assert.isBelow(Math.abs((x / base) ** (1 / 7) - 1), max);
 		}
@@ -1350,7 +1355,56 @@ describe("AI GM finance styles", () => {
 		assert.strictEqual(balanced.avoidTaxRankShift, 0);
 		assert.isBelow(frugal.avoidTaxRankShift, 0);
 		assert.isAbove(spendthrift.avoidTaxRankShift, 0);
+		// A frugal GM keeps cap room in free agency and only pays his best players over the cap; the others don't
+		assert.isAbove(frugal.faCapRoom, 0);
+		assert.isBelow(frugal.overCapResignRank, 5);
+		assert.isBelow(frugal.dumpPayrollFactor, 1);
+		for (const w of [balanced, spendthrift]) {
+			assert.strictEqual(w.faCapRoom, 0);
+			assert.strictEqual(w.overCapResignRank, Infinity);
+		}
+		assert.isAbove(spendthrift.dumpPayrollFactor, 1);
 		assert.isAbove(spendthrift.faStarShift, frugal.faStarShift);
+		assert.isTrue(frugal.refusesTax);
+		assert.isFalse(balanced.refusesTax);
+		assert.isFalse(spendthrift.refusesTax);
+
+		// In a trade, a frugal GM takes on no salary that leaves him over the luxury tax line; the others do
+		const salaryCap = g.get("salaryCap");
+		const luxuryPayroll = g.get("luxuryPayroll");
+		g.setWithoutSavingToDB("salaryCap", 1e9);
+		g.setWithoutSavingToDB("luxuryPayroll", 1000);
+		const other = player.generate(
+			2,
+			26,
+			g.get("season") - 6,
+			true,
+			DEFAULT_LEVEL,
+		);
+		const otherPid = (await idb.cache.players.add(
+			Object.assign(other, {
+				contract: { amount: 5000, exp: g.get("season") + 1 },
+			}),
+		)) as number;
+		const taxWarning = async () =>
+			(
+				await trade.summary([
+					{ tid, pids: [], dpids: [], pidsExcluded: [], dpidsExcluded: [] },
+					{
+						tid: 2,
+						pids: [otherPid],
+						dpids: [],
+						pidsExcluded: [],
+						dpidsExcluded: [],
+					},
+				])
+			).warning;
+		await set("frugal");
+		assert.include(await taxWarning(), "luxury tax");
+		await set("spendthrift");
+		assert.isNull(await taxWarning());
+		g.setWithoutSavingToDB("salaryCap", salaryCap);
+		g.setWithoutSavingToDB("luxuryPayroll", luxuryPayroll);
 		// A bottom line owner won't let a spendthrift pay tax
 		const blocked = await set("spendthrift", "profit");
 		assert.strictEqual(blocked.avoidTaxRankShift, 0);

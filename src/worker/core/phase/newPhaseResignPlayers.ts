@@ -319,6 +319,19 @@ const newPhaseResignPlayers = async (
 				reSignPlayer = false;
 			}
 
+			// AI GM personalities: a tax-averse GM only pays his best players over the salary cap
+			if (
+				avoidTax &&
+				g.get("salaryCapType") === "soft" &&
+				!draftPick &&
+				payroll !== undefined &&
+				contract.amount + payroll > g.get("salaryCap") &&
+				(teamValueRank.get(p.pid) ?? 0) >=
+					(gms.get(p.tid)?.overCapResignRank ?? Infinity)
+			) {
+				reSignPlayer = false;
+			}
+
 			if (reSignPlayer) {
 				const mood = await player.moodInfo(p, p.tid, {
 					contractAmount: contractDemand.amount,
@@ -338,9 +351,12 @@ const newPhaseResignPlayers = async (
 						tradingPartnerTid: undefined,
 					});
 
-					// Skip re-signing some low value players, otherwise teams fill up their rosters too readily
+					// Skip re-signing some low value players, otherwise teams fill up their rosters too readily. A big spender (AI GM
+					// personalities) keeps his (same random draws either way)
 					const skipBadPlayer =
-						contract.amount < g.get("minContract") * 2 && Math.random() < 0.5;
+						contract.amount < g.get("minContract") * 2 &&
+						Math.random() < 0.5 &&
+						(gms.get(p.tid)?.avoidTaxRankShift ?? 0) < 2;
 
 					// More randomness if hard cap
 					const whatever =
