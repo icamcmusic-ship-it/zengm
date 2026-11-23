@@ -52,6 +52,22 @@ const formatSystems = (c: Coach) => {
 		mgmt: profile.mgmt,
 		adapt: profile.adapt,
 		mentor: profile.mentor,
+		// Coaching trees: what he carried from his mentor, and how familiar his systems were to his team when he took over
+		inherited: profile.mentor
+			? [
+					profile.inherited?.off
+						? `${describeProfile(profile).offense} offense`
+						: undefined,
+					profile.inherited?.def
+						? `${describeProfile(profile).defense} defense`
+						: undefined,
+					profile.inherited?.philosophy ? "part of his philosophy" : undefined,
+				].filter((x): x is string => x !== undefined)
+			: [],
+		familiarity:
+			profile.familiarity !== undefined
+				? Math.round(100 * profile.familiarity)
+				: undefined,
 		reputation: rep,
 		reputationText: reputationLabel(rep),
 		hotSeat: heat,

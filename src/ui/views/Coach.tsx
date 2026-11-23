@@ -121,6 +121,19 @@ const Coach = ({
 									</>
 								) : null}
 							</div>
+							{c.systems.mentor && c.systems.inherited.length > 0 ? (
+								<div data-testid="coach-inherited">
+									Carried from {c.systems.mentor.name}:{" "}
+									{c.systems.inherited.join(", ")}
+								</div>
+							) : null}
+							{c.systems.familiarity !== undefined &&
+							c.tid >= 0 &&
+							c.role === "head" ? (
+								<div title="How familiar his systems were to the team when he took over (the previous coach ran them, the two share a coaching tree, assistants who worked under him or his mentor). Familiar systems start further along and install faster.">
+									System familiarity with his team: {c.systems.familiarity}%
+								</div>
+							) : null}
 							{c.tid >= 0 && c.role === "head" && c.abbrev ? (
 								<a
 									href={helpers.leagueUrl([

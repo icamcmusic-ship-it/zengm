@@ -110,6 +110,10 @@ export type CoachProfile = {
 	expect?: { season: number; tid: number; pct: number };
 	// Coaching tree: the head coach he worked under (assistants who become head coaches)
 	mentor?: { cid: number; name: string };
+	// Coaching tree: the systems he carried from his mentor, and how familiar his systems were to the team he took over (0-1, speeds
+	// installation; reset when he changes his own system)
+	inherited?: { off?: boolean; def?: boolean; philosophy?: boolean };
+	familiarity?: number;
 };
 
 export type CoachTransactionType =

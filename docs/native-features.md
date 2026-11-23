@@ -2402,6 +2402,12 @@ Part of _College & Overseas Stats_ (no toggle of its own): everything here is ma
 
 - **Code:** `common/staffDepth/` (`coaching.ts`, `devPlans.ts`), `common/staff.ts` (roles, ratings), `worker/core/staffDepth/coaching.ts` (z, plans, report), `careers.ts`, hooks in `staff/index.ts`, `staff/systems.ts` (video), `game/loadTeams.ts` (S&C), `phase/newPhasePreseason.ts`, `player/develop.ts`, `player/developSeason.basketball.ts`, `player/subRatings.ts` (`tiltRowSubs`), `player/ovr.basketball.ts` (`ovrRaw`).
 
+### Coaching-tree familiarity
+
+- **What:** a coach promoted to head coach records which of his mentor's systems he carried (`profile.inherited`: offense, defense, philosophy; also set when he happens to run the same system). Every time a head coach is hired, `familiarityWithTeam` (`staff/systems.ts`, deterministic, no random draws) scores how familiar his systems are to the team (`profile.familiarity`, 0-1, `systemFamiliarity` in `common/coachSystems.ts`): the team's previous head coach ran the same offense (+0.35) / defense (+0.25), the two share a coaching tree (mentor, protégé or the same mentor, +0.2), assistants on his new staff who worked under him or his mentor (+0.1 each, at most 2), systems carried from his mentor (+0.05 each).
+- **Effect:** installation (`installAfterGames`) starts at 35% + 25% × familiarity of his tendencies (at most 60%) and takes half a season × (1 − 0.3 × familiarity) (at most 30% faster). Familiarity 0 is exactly the old installation. Reset when he switches his own system (adaptation). Sim multipliers stay normalized over the league, so league averages are unchanged.
+- **Where:** coach page (with Coaching Systems): _Carried from {mentor}: Motion offense, part of his philosophy_ and _System familiarity with his team: N%_. The _Career and coaching tree_ section (Coaching Staff Depth) is the coaching tree view. Test: `staff/coachingTree.test.ts`.
+
 ### Coach market and succession
 
 - **Where:** League Extras → _Coach Market & Succession_ (`featureCoachMarket`, basketball, on for new leagues, off for existing ones; needs Coaching Staff Depth; off in college leagues). Coaching Staff page: an Interest column and Interview button in the hiring table, a salary offer in the hire dialog, a _Coach market_ panel (offers, interviews, interim, heir), "Name associate head coach" on assistant cards. Code: `worker/core/staff/market.ts`, `common/staffDepth/coachMarket.ts`. Off: nothing below runs.
