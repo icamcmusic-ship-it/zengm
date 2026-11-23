@@ -11,6 +11,7 @@ import {
 	endgameRoleScore,
 	endgameValues,
 	foulTargetWeights,
+	foulToGiveProb,
 	runTimeoutSource,
 	runTimeoutThreshold,
 	saveLastTimeout,
@@ -123,6 +124,7 @@ test("off: nothing of the feature runs", async () => {
 			runTimeouts: 0,
 			up3Fouls: 0,
 			odSubs: 0,
+			foulsToGive: 0,
 		});
 		assert.deepStrictEqual(sim.up3Coach, [undefined, undefined]);
 	}
@@ -683,5 +685,83 @@ test("college rules (two 20-minute halves, one-and-one, 30-second shot clock): b
 		assert.strictEqual(sim.getClockFactor(), "intentionalFoul");
 		setState(sim, { period: 1, t: 5, pts: [27, 30], o: 0 });
 		assert.notStrictEqual(sim.getClockFactor(), "intentionalFoul");
+	});
+});
+
+test("foul to give: the window, the bonus and the score", () => {
+	const base = {
+		t: 5,
+		foulsUntilBonus: 3,
+		defLead: 0,
+		finalPeriod: false,
+		mgmt: 0,
+	};
+	assert.strictEqual(foulToGiveProb(base), ENDGAME.ftgProb);
+	// outside the window
+	assert.strictEqual(foulToGiveProb({ ...base, t: 9 }), 0);
+	assert.strictEqual(foulToGiveProb({ ...base, t: 1.5 }), 0);
+	// the next foul is a bonus foul: no foul to give
+	assert.strictEqual(foulToGiveProb({ ...base, foulsUntilBonus: 1 }), 0);
+	// final period: only ahead by 0-2
+	assert.strictEqual(
+		foulToGiveProb({ ...base, finalPeriod: true }),
+		ENDGAME.ftgProb,
+	);
+	assert.strictEqual(
+		foulToGiveProb({ ...base, finalPeriod: true, defLead: -1 }),
+		0,
+	);
+	assert.strictEqual(
+		foulToGiveProb({ ...base, finalPeriod: true, defLead: 5 }),
+		0,
+	);
+	// not in the final period, any score
+	assert.strictEqual(
+		foulToGiveProb({ ...base, defLead: -10 }),
+		ENDGAME.ftgProb,
+	);
+	// good game managers more often
+	assert.isAbove(foulToGiveProb({ ...base, mgmt: 1 }), foulToGiveProb(base));
+});
+
+test("foul to give: the defense fouls without free throws at the end of a quarter, once", async () => {
+	let fouled = 0;
+	let tries = 0;
+	for (const seed of range(30)) {
+		await scenario(1500 + seed, { smartEndgame: true }, (sim) => {
+			setState(sim, { period: 2, t: 7.5, pts: [50, 52] });
+			sim.foulsThisQuarter = [0, 0];
+			const before = sim.team[1].stat.pf;
+			const ftaBefore = sim.team[0].stat.fta;
+			const cf = sim.getClockFactor();
+			tries += 1;
+			if (cf === "intentionalFoul") {
+				const outcome = sim.getPossessionOutcome(cf);
+				assert.strictEqual(outcome, "nonShootingFoul");
+				assert.strictEqual(sim.team[1].stat.pf, before + 1);
+				assert.strictEqual(sim.team[0].stat.fta, ftaBefore);
+				assert.isBelow(sim.t, 7.5);
+				fouled += 1;
+				// (once a period)
+				assert.isFalse(sim.shouldFoulToGive());
+			}
+		});
+	}
+	assert.isAbove(fouled / tries, 0.3);
+	assert.isBelow(fouled / tries, 0.85);
+
+	// in the bonus: no foul to give
+	await scenario(1600, { smartEndgame: true }, (sim) => {
+		setState(sim, { period: 2, t: 6, pts: [50, 52] });
+		sim.foulsThisQuarter = [0, 4];
+		assert.isFalse(sim.shouldFoulToGive());
+	});
+	// off: never
+	await scenario(1601, { smartEndgame: false }, (sim) => {
+		setState(sim, { period: 2, t: 6, pts: [50, 52] });
+		sim.foulsThisQuarter = [0, 0];
+		const { n } = countRandom(() => sim.getClockFactor());
+		assert.strictEqual(sim.endgameCounts.foulsToGive, 0);
+		assert.isAtMost(n, 1);
 	});
 });

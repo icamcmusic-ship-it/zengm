@@ -42,6 +42,15 @@ export const ENDGAME = {
 	// Plays drawn up in a timeout in the last two minutes: the make probability changes by this per unit of game management
 	atoMake: 0.03,
 	atoSeconds: 120,
+
+	// Foul to give: at the end of a period, a defense whose next foul is not yet a bonus foul fouls on purpose (no free throws) between
+	// these many seconds left, so the offense has to inbound with less time and can't run its last-shot play. Once a period per team, this
+	// often (more for good game managers); in the final period and overtime only when the defense is ahead by 0-2 (behind, it fouls for
+	// free throws instead; up 3, see up3)
+	ftgMaxSeconds: 8,
+	ftgMinSeconds: 2,
+	ftgProb: 0.55,
+	ftgProbMgmt: 0.3,
 };
 
 // Unanswered points before a coach stops the run with a timeout. quickTrigger undefined: no coaching systems
@@ -170,6 +179,32 @@ export const upThreeFoulProb = (t: number, mgmt: number) => {
 		return 0;
 	}
 	return Math.min(1, Math.max(0, ENDGAME.up3Prob + ENDGAME.up3ProbMgmt * mgmt));
+};
+
+// Foul to give: the chance that the defense fouls on purpose now (0 when it can't or wouldn't). foulsUntilBonus counts the current foul
+// (1: this one would be a bonus foul), defLead is the defense's lead, finalPeriod includes overtime
+export const foulToGiveProb = ({
+	t,
+	foulsUntilBonus,
+	defLead,
+	finalPeriod,
+	mgmt,
+}: {
+	t: number;
+	foulsUntilBonus: number;
+	defLead: number;
+	finalPeriod: boolean;
+	mgmt: number;
+}) => {
+	if (
+		t > ENDGAME.ftgMaxSeconds ||
+		t <= ENDGAME.ftgMinSeconds ||
+		foulsUntilBonus <= 1 ||
+		(finalPeriod && (defLead < 0 || defLead > 2))
+	) {
+		return 0;
+	}
+	return Math.min(1, Math.max(0, ENDGAME.ftgProb + ENDGAME.ftgProbMgmt * mgmt));
 };
 
 // Late in a game, should the offense keep its last timeout rather than use it to advance the ball: with the game within a basket and

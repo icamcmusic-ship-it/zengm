@@ -114,6 +114,7 @@ import {
 	endgameRole,
 	endgameRoleScore,
 	endgameValues,
+	foulToGiveProb,
 	foulTargetWeights,
 	runTimeoutSource,
 	runTimeoutThreshold,
@@ -804,7 +805,9 @@ class GameSim extends GameSimBase {
 	up3Coach: [boolean | undefined, boolean | undefined] = [undefined, undefined];
 	runTimeoutNow = false;
 	// (for the tests and the calibration script)
-	endgameCounts = { runTimeouts: 0, up3Fouls: 0, odSubs: 0 };
+	endgameCounts = { runTimeouts: 0, up3Fouls: 0, odSubs: 0, foulsToGive: 0 };
+	// The period in which each team (on defense) last decided on a foul to give
+	ftgPeriod: [number, number] = [0, 0];
 	// Load, Fatigue & Venue (League extras, see scheduleLoad.ts): nonlinear fatigue, injury risk with tiredness, the home court split
 	// into base, crowd and referees, travel, and the referee crew. foulMult is each team's foul rate on defense (the referees' lean and
 	// crew). Off: nothing here is used and no extra random numbers are drawn
@@ -1849,6 +1852,9 @@ class GameSim extends GameSimBase {
 		if (this.shouldIntentionalFoul()) {
 			return "intentionalFoul";
 		}
+		if (this.smartEndgame && this.shouldFoulToGive()) {
+			return "intentionalFoul";
+		}
 
 		const period = this.team[this.o].stat.ptsQtrs.length;
 		const pointDifferential =
@@ -2780,6 +2786,41 @@ class GameSim extends GameSimBase {
 			this.endgameCounts.up3Fouls += 1;
 		}
 		return coach;
+	}
+
+	// End-of-Game Intelligence: a foul to give at the end of a period (see endgame.ts foulToGiveProb). Once a period per team; draws a
+	// random number only inside the window with a foul to give
+	shouldFoulToGive() {
+		const period = this.team[0].stat.ptsQtrs.length;
+		if (
+			this.ftgPeriod[this.d] === period ||
+			// (one-and-one setting: it would be a free throw foul)
+			(this.oneAndOneFouls !== undefined &&
+				this.overtimes === 0 &&
+				this.oneAndOneFouls - this.foulsThisQuarter[this.d] <= 1)
+		) {
+			return false;
+		}
+		const prob = foulToGiveProb({
+			t: this.t,
+			foulsUntilBonus: this.getNumFoulsUntilBonus(),
+			defLead: this.team[this.d].stat.pts - this.team[this.o].stat.pts,
+			finalPeriod: period >= this.numPeriods,
+			mgmt: this.endgameMgmt(this.d),
+		});
+		if (prob <= 0) {
+			return false;
+		}
+		// (decided once: a coach who passes on it doesn't change his mind a possession later)
+		this.ftgPeriod[this.d] = period;
+		if (Math.random() >= prob) {
+			return false;
+		}
+		this.endgameCounts.foulsToGive += 1;
+		if (FLOW_DIAG.on) {
+			flowCount("foulToGive");
+		}
+		return true;
 	}
 
 	// Who the defense fouls on purpose: the worst free throw shooter it can get to (one random number, like the pick it replaces)
@@ -5035,6 +5076,9 @@ class GameSim extends GameSimBase {
 
 	getClockFactorRealistic() {
 		if (this.shouldIntentionalFoulRealistic()) {
+			return "intentionalFoul" as const;
+		}
+		if (this.smartEndgame && this.shouldFoulToGive()) {
 			return "intentionalFoul" as const;
 		}
 

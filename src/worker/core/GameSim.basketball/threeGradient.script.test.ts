@@ -166,6 +166,9 @@ test.skipIf(!env.THREE_GRAD)(
 				ast: 0,
 				orb: 0,
 				pf: 0,
+				drb: 0,
+				blk: 0,
+				min: 0,
 			};
 			for (const ts of await idb.cache.teamStats.getAll()) {
 				if (ts.season === s && !ts.playoffs) {
@@ -188,7 +191,34 @@ test.skipIf(!env.THREE_GRAD)(
 				orb: sum.orb / sum.gp,
 				pf: sum.pf / sum.gp,
 				poss: (sum.fga + 0.44 * sum.fta - sum.orb + sum.tov) / sum.gp,
+				drb: sum.drb / sum.gp,
+				blk: sum.blk / sum.gp,
+				min: sum.min / sum.gp,
+				homeWinPct: 0,
+				injuries: 0,
+				injuryGames: 0,
 			};
+			{
+				let won = 0;
+				let lost = 0;
+				for (const ts of await idb.cache.teamSeasons.getAll()) {
+					if (ts.season === s) {
+						won += ts.wonHome;
+						lost += ts.lostHome;
+					}
+				}
+				lg.homeWinPct = won / (won + lost);
+				for (const p of await idb.cache.players.getAll()) {
+					for (const inj of p.injuries) {
+						if (inj.season === s) {
+							lg.injuries += 1;
+							lg.injuryGames += inj.games;
+						}
+					}
+				}
+				lg.injuries /= sum.gp / 2;
+				lg.injuryGames /= sum.gp / 2;
+			}
 			leagues.push(lg);
 			const rows = [];
 			for (const p of await idb.cache.players.getAll()) {
@@ -249,7 +279,7 @@ test.skipIf(!env.THREE_GRAD)(
 
 		const lines = [];
 		lines.push(
-			`LEAGUE pts ${mean(leagues.map((l) => l.pts)).toFixed(2)} 3P% ${f3(mean(leagues.map((l) => l.tpp)))} 3PA rate ${f3(mean(leagues.map((l) => l.tpaRate)))} FG% ${f3(mean(leagues.map((l) => l.fgp)))} TOV ${mean(leagues.map((l) => l.tov)).toFixed(2)} FTA ${mean(leagues.map((l) => l.fta)).toFixed(2)} AST ${mean(leagues.map((l) => l.ast)).toFixed(2)} ORB ${mean(leagues.map((l) => l.orb)).toFixed(2)} PF ${mean(leagues.map((l) => l.pf)).toFixed(2)} poss ${mean(leagues.map((l) => l.poss)).toFixed(2)}`,
+			`LEAGUE pts ${mean(leagues.map((l) => l.pts)).toFixed(2)} 3P% ${f3(mean(leagues.map((l) => l.tpp)))} 3PA rate ${f3(mean(leagues.map((l) => l.tpaRate)))} FG% ${f3(mean(leagues.map((l) => l.fgp)))} TOV ${mean(leagues.map((l) => l.tov)).toFixed(2)} FTA ${mean(leagues.map((l) => l.fta)).toFixed(2)} AST ${mean(leagues.map((l) => l.ast)).toFixed(2)} ORB ${mean(leagues.map((l) => l.orb)).toFixed(2)} PF ${mean(leagues.map((l) => l.pf)).toFixed(2)} poss ${mean(leagues.map((l) => l.poss)).toFixed(2)} DRB ${mean(leagues.map((l) => l.drb)).toFixed(2)} BLK ${mean(leagues.map((l) => l.blk)).toFixed(2)} homeWin ${f3(mean(leagues.map((l) => l.homeWinPct)))} injuries/game ${f3(mean(leagues.map((l) => l.injuries)))} injuryGames/game ${f3(mean(leagues.map((l) => l.injuryGames)))}`,
 		);
 		const shooters = players.filter((p) => p.tpa >= 100);
 		lines.push(
