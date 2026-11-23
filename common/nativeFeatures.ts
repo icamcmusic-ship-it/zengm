@@ -563,6 +563,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "coachDecisions",
+		key: "coachDecisions",
+		core: true,
+		name: "Coach Decisions",
+		description:
+			"Head coaches make the game-to-game calls from two new ratings (Game Prep and Player Management) and their style: who starts (young players, veterans or the best system fit), roles earned and lost on recent form, development minutes on rebuilding teams, promised roles, loyalty to slumping veterans, rest nights for older stars, injury replacements, big or small lineups against the opponent, a defensive stopper on the opponent's best scorer, more minutes for the players who attack the opponent's weaknesses, foul-trouble rules, the closing lineup, halftime and between-game changes in the playoffs. On your team you choose what the coach decides (starters, rotation order, minutes, matchup changes) on the Roster page. League minutes and totals stay the same. Needs Coaching Systems and Realistic Rotations.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "spacingCreation",
 		key: "spacingCreation",
 		core: true,

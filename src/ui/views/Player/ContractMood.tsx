@@ -33,6 +33,7 @@ const COMPONENT_LABELS: Record<keyof MoodSnapshot["components"], string> = {
 	lockerRoom: "Locker room",
 	coachFit: "Coach & system",
 	coachRel: "Coach relationship",
+	rolePromise: "Promised role",
 };
 
 // Tiny line chart, values plotted left to right. A dashed line marks 0.

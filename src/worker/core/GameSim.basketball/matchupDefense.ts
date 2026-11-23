@@ -114,6 +114,9 @@ export const assignMatchups = (
 	// goes to him
 	focus?: MatchupPlayer,
 	focusMult: number = 1,
+	// Coach Decisions: a stopper assigned to an attacker (both on the floor), before everyone else is matched
+	forcedO?: MatchupPlayer,
+	forcedD?: MatchupPlayer,
 ) => {
 	const n = Math.min(offense.length, defense.length);
 	const sizeWeight = switching ? MATCHUP.switchSizeWeight : 1;
@@ -125,6 +128,13 @@ export const assignMatchups = (
 		for (let i = 0; i < n; i++) {
 			scores[j * n + i] =
 				threat * defenderFit(defense[i]!, offense[j]!, sizeWeight);
+		}
+	}
+	if (forcedO !== undefined && forcedD !== undefined) {
+		const j = offense.indexOf(forcedO);
+		const i = defense.indexOf(forcedD);
+		if (j >= 0 && j < n && i >= 0 && i < n) {
+			scores[j * n + i] = Infinity;
 		}
 	}
 	let usedO = 0;

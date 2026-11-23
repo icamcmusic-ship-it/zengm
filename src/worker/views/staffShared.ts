@@ -36,6 +36,14 @@ import {
 	reputationLabel,
 } from "../core/staff/systems.ts";
 import { idb } from "../db/index.ts";
+import {
+	coachDecisionsOn,
+	decisionTraitsOf,
+} from "../core/staff/coachDecisions.ts";
+import {
+	describeDecisions,
+	starterStyleOf,
+} from "../../common/coachDecisions.ts";
 
 // Coaching systems: a coach's identity for the coach pages (undefined with the setting off)
 const formatSystems = (c: Coach) => {
@@ -45,8 +53,17 @@ const formatSystems = (c: Coach) => {
 	const profile = getCoachProfile(c);
 	const rep = coachReputation(c);
 	const heat = c.role === "head" && c.tid >= 0 ? hotSeat(c) : 0;
+	// Coach Decisions: how he makes the game-to-game calls (words only)
+	const decisions = coachDecisionsOn()
+		? describeDecisions({
+				style: starterStyleOf(profile),
+				rest: profile.rest,
+				...decisionTraitsOf(c, profile),
+			})
+		: undefined;
 	return {
 		...describeProfile(profile),
+		decisions,
 		offenseKey: profile.off,
 		defenseKey: profile.def,
 		mgmt: profile.mgmt,

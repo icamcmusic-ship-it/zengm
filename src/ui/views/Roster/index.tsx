@@ -118,6 +118,7 @@ const handleRelease = async (
 };
 
 const Roster = ({
+	coachDecisions,
 	editable,
 	gmInfo,
 	luxuryTaxAmount,
@@ -527,6 +528,7 @@ const Roster = ({
 			<MoreLinks type="team" page="roster" tid={tid} season={season} />
 
 			<TopStuff
+				coachDecisions={coachDecisions}
 				currentSeason={currentSeason}
 				editable={editable}
 				gmInfo={gmInfo}

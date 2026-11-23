@@ -16,6 +16,7 @@ import {
 	trade,
 } from "../index.ts";
 import * as staff from "../staff/index.ts";
+import { applyCoachDecisions } from "../staff/coachDecisions.ts";
 import * as college from "../college/index.ts";
 import loadTeams from "./loadTeams.ts";
 import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
@@ -834,6 +835,8 @@ const play = async (
 				await setPbpGameContext(schedule, teams);
 				// Coaching systems (the coachSystems setting): each team's coach's tendencies for the sim
 				await staff.applyCoachSystems(schedule, teams);
+				// Coach Decisions: each head coach's calls for the game (starters, rotation, minutes, matchups, rest nights)
+				await applyCoachDecisions(schedule, teams);
 				// Offensive Emphasis: each team's play-type dials for the sim
 				await applyOffEmphasis(schedule, teams);
 			}

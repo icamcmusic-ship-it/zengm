@@ -27,6 +27,11 @@ export type CoachRatings = {
 	sht?: number;
 	cnd?: number;
 	vid?: number;
+	// Coach Decisions (coachDecisions setting): game prep / matchups (reading opponents: matchup starters, the stopper, attacking
+	// weaknesses, scouting accuracy) and player management (roles, promises, egos, rest). Missing for coaches from before it (derived
+	// deterministically, see common/coachDecisions.ts decisionRatingsFor)
+	prp?: number;
+	plm?: number;
 };
 
 // Each is -1 to 1. Exposed so team strategy / game sim code can read it later (see getTeamCoachStyle), not used in GameSim yet.
@@ -114,6 +119,13 @@ export type CoachProfile = {
 	// installation; reset when he changes his own system)
 	inherited?: { off?: boolean; def?: boolean; philosophy?: boolean };
 	familiarity?: number;
+	// Coach Decisions (coachDecisions setting), -1 ... 1. Derived deterministically when missing (common/coachDecisions.ts
+	// deriveDecisionTraits). loyalty: -1 "what have you done lately" ... 1 sticks with his veterans through slumps. foulRide: -1 sits
+	// players in foul trouble by the book (earlier than usual) ... 1 rides them. injuryNext: -1 keeps the bench unit together (a deep
+	// reserve starts for an injured starter) ... 1 promotes the next man
+	loyalty?: number;
+	foulRide?: number;
+	injuryNext?: number;
 };
 
 export type CoachTransactionType =

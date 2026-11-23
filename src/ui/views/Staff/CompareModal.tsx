@@ -68,7 +68,15 @@ const Row = ({
 	);
 };
 
-const RATING_KEYS: (keyof CoachRatings)[] = ["dev", "off", "def", "mot"];
+// (Coach Decisions: game prep and player management when he has them)
+const RATING_KEYS: (keyof CoachRatings)[] = [
+	"dev",
+	"off",
+	"def",
+	"mot",
+	"prp",
+	"plm",
+];
 
 export const CompareModal = ({
 	candidate,
@@ -197,7 +205,11 @@ export const CompareModal = ({
 								aText={a ? `${a.ovr} · ${ratingWord(a.ovr)}` : undefined}
 								bText={`${b.ovr} · ${ratingWord(b.ovr)}`}
 							/>
-							{RATING_KEYS.map((key) => (
+							{RATING_KEYS.filter(
+								(key) =>
+									(key !== "prp" && key !== "plm") ||
+									b.ratings[key] !== undefined,
+							).map((key) => (
 								<Row
 									key={key}
 									label={COACH_RATING_NAMES[key]}

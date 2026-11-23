@@ -1,6 +1,7 @@
 // Pure helpers for the coaching staff feature, shared by worker and UI
 import { BUDGET_LEVEL_SCALE, MAX_LEVEL } from "./budgetLevels.ts";
 import type { CoachRatings, CoachRole, CoachStyle } from "./types.staff.ts";
+import { decisionRatingRef } from "./coachDecisions.ts";
 
 export const COACH_FREE_AGENT = -1;
 export const COACH_RETIRED = -3;
@@ -39,6 +40,8 @@ export const COACH_RATING_NAMES: Record<keyof CoachRatings, string> = {
 	sht: "Shooting instruction",
 	cnd: "Conditioning",
 	vid: "Video & analytics",
+	prp: "Game prep",
+	plm: "Player management",
 };
 
 // Coaching Staff Depth ratings of a coach from before it (or a coach made without it): a stable value from his other ratings and his name,
@@ -84,11 +87,19 @@ export const coachOvr = (ratings: CoachRatings, role: CoachRole) => {
 	} else if (role === "video") {
 		ovr = 0.8 * (ratings.vid ?? 40) + 0.1 * ratings.off + 0.1 * ratings.def;
 	} else if (role === "head") {
+		// Coach Decisions: game prep and player management count for a head coach when he has them (they are made with the setting on)
 		ovr =
-			0.3 * ratings.off +
-			0.3 * ratings.def +
-			0.25 * ratings.mot +
-			0.15 * ratings.dev;
+			ratings.prp !== undefined && ratings.plm !== undefined
+				? 0.26 * ratings.off +
+					0.26 * ratings.def +
+					0.2 * ratings.mot +
+					0.13 * ratings.dev +
+					0.075 * ratings.prp +
+					0.075 * ratings.plm
+				: 0.3 * ratings.off +
+					0.3 * ratings.def +
+					0.25 * ratings.mot +
+					0.15 * ratings.dev;
 	} else if (role === "dev") {
 		ovr = 0.8 * ratings.dev + 0.2 * ratings.mot;
 	} else if (role === "off") {
@@ -127,6 +138,8 @@ export const AI_SPEND_REFERENCE_RATINGS: CoachRatings = {
 	sht: 60,
 	cnd: 60,
 	vid: 60,
+	prp: 60,
+	plm: 60,
 };
 
 // Salary in thousands per season at the default $90M salary cap
@@ -178,6 +191,10 @@ export const coachAgeOffset = (age: number) => {
 // assistant's specialty
 export const COACH_BASE_RATING = 42;
 export const coachRatingRef = (key: keyof CoachRatings, role: CoachRole) => {
+	// Coach Decisions: game prep and player management (common/coachDecisions.ts)
+	if (key === "prp" || key === "plm") {
+		return decisionRatingRef(key, role);
+	}
 	if (role === "head") {
 		return key === "dev" ? COACH_BASE_RATING : COACH_BASE_RATING + 9;
 	}

@@ -133,6 +133,7 @@ const PayrollAndPenalties = ({
 };
 
 const TopStuff = ({
+	coachDecisions,
 	currentSeason,
 	editable,
 	gmInfo,
@@ -151,6 +152,7 @@ const TopStuff = ({
 	usePts,
 }: Pick<
 	View<"roster">,
+	| "coachDecisions"
 	| "editable"
 	| "gmInfo"
 	| "luxuryTaxAmount"
@@ -406,6 +408,7 @@ const TopStuff = ({
 				</div>
 			</div>
 			<InstructionsAndSortButtons
+				coachDecisions={coachDecisions}
 				keepRosterSorted={t.keepRosterSorted}
 				editable={editable}
 				tid={tid}

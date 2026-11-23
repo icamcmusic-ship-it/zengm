@@ -14,6 +14,7 @@ import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 import { getEgoScore, getLockerRoomMood, traitsEnabled } from "./traits.ts";
 import { coachMood, coachSystemsEnabled } from "../staff/systems.ts";
 import { coachRelMood } from "../staff/relationships.ts";
+import { coachDecisionsOn, rolePromiseMood } from "../staff/rolePromise.ts";
 
 // A player whose rookie contract just expired, while his team can re-sign him. That's during the re-signing phase, or before then for a player still on his team, which includes when AI teams re-sign players in newPhaseResignPlayers before the phase is updated.
 const isResigningAfterRookieContract = (p: Player) => {
@@ -147,6 +148,7 @@ const moodComponents = async (
 		lockerRoom: 0,
 		coachFit: 0,
 		coachRel: 0,
+		rolePromise: 0,
 	};
 
 	if (p.customMoodItems) {
@@ -395,6 +397,20 @@ const moodComponents = async (
 	{
 		// COACH RELATIONSHIP: his bond with this team's head coach (player–coach relationships)
 		components.coachRel = await coachRelMood(p, tid);
+	}
+
+	{
+		// PROMISED ROLE (Coach Decisions): a promise to him being kept or broken, or the role offered in his negotiation with this team
+		if (__SPORT === "basketball" && coachDecisionsOn()) {
+			let offered: "starter" | "rotation" | undefined;
+			if (p.tid !== tid || p.rolePromise?.tid !== tid) {
+				const negotiation = (await idb.cache.negotiations.getAll()).find(
+					(n) => n.pid === p.pid && n.tid === tid,
+				);
+				offered = negotiation?.rolePromise;
+			}
+			components.rolePromise = rolePromiseMood(p.rolePromise, tid, offered);
+		}
 	}
 
 	// Apply difficulty modulation

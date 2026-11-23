@@ -96,6 +96,10 @@ export const Market = ({
 
 	const tagged = list.filter((c) => c.tags.length > 0);
 
+	// Coach Decisions: game prep and player management, for head coaches who have them
+	const showDecisions =
+		role === "head" && list.some((c) => c.ratings.prp !== undefined);
+
 	const cols: Col[] = [
 		{ title: "Coach", sortType: "name" },
 		{ title: "Age", sortType: "number" },
@@ -104,6 +108,15 @@ export const Market = ({
 		numberCol("Off", "Offense rating"),
 		numberCol("Def", "Defense rating"),
 		numberCol("Mot", "Motivation rating"),
+		...(showDecisions
+			? [
+					numberCol(
+						"Prep",
+						"Game prep: reading opponents (matchups, a stopper on their best scorer, attacking their weaknesses)",
+					),
+					numberCol("PM", "Player management: roles, promises, egos and rest"),
+				]
+			: []),
 		...(showSystems
 			? [
 					{ title: "Offense", desc: COACH_TERMS.systems.text } as Col,
@@ -175,6 +188,7 @@ export const Market = ({
 			c.ratings.off,
 			c.ratings.def,
 			c.ratings.mot,
+			...(showDecisions ? [c.ratings.prp ?? null, c.ratings.plm ?? null] : []),
 			...(showSystems
 				? [
 						c.systems?.offense ?? "",

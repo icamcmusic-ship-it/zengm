@@ -37,6 +37,10 @@ export type RotationPlayer = {
 	coachMinutesMult?: number;
 	// The user's team (options.userControlled): one of the starters he picked (the first numPlayersOnCourt in his roster order)
 	userStarter?: boolean;
+	// Coach Decisions (AI teams, and the user's when the coach runs the rotation): a multiplier of his place in the order (earned and lost
+	// roles, matchups, promises) and the least he is planned for (a starter outside the top 5 of the order, a promised rotation spot)
+	coachKeyMult?: number;
+	coachFloor?: number;
 };
 
 export type RotationPlanOptions = {
@@ -108,7 +112,7 @@ export const planMinutes = (
 	const keyOf = user
 		? (p: RotationPlayer) =>
 				p.valueNoPot * Math.max(1, choiceOf(p)) ** USER_PT_RANK_EXP
-		: (p: RotationPlayer) => p.valueNoPot;
+		: (p: RotationPlayer) => p.valueNoPot * (p.coachKeyMult ?? 1);
 	const order = players
 		.map((p, i) => ({ p, i, key: keyOf(p) }))
 		.filter(({ p }) => !p.injured && p.ptModifier > 0)
@@ -218,6 +222,19 @@ export const planMinutes = (
 				Math.min(p.ptModifier / injuryRestriction, 1.5) *
 				injuryRestriction,
 		);
+		if (
+			p.coachFloor !== undefined &&
+			p.coachFloor > 0 &&
+			p.ptModifier > 0 &&
+			injuryRestriction >= 1 &&
+			!(p.minutesRestriction !== undefined && p.minutesRestriction < 1)
+		) {
+			const floor = Math.min(caps[i]!, p.coachFloor * scale);
+			if (targets[i]! < floor) {
+				targets[i] = floor;
+			}
+			floors[i] = floor;
+		}
 	}
 
 	// Rescale to the minutes there are, never above the max (more than once, since capped players can't take more). Short-handed, when
@@ -237,10 +254,25 @@ export const planMinutes = (
 		}
 		const missing = totalMinutes - sum;
 		if (missing < 0) {
-			// Too many: everybody down
-			const factor = totalMinutes / sum;
+			// Too many: everybody down. Coach Decisions floors: the others first (the user's team has its own rescale)
+			let sumFloored = 0;
 			for (const { i } of order) {
-				targets[i] = targets[i]! * factor;
+				if (floors[i]! > 0) {
+					sumFloored += targets[i]!;
+				}
+			}
+			if (sumFloored > 0 && sumFloored < totalMinutes && sum > sumFloored) {
+				const factor = (totalMinutes - sumFloored) / (sum - sumFloored);
+				for (const { i } of order) {
+					if (!(floors[i]! > 0)) {
+						targets[i] = targets[i]! * factor;
+					}
+				}
+			} else {
+				const factor = totalMinutes / sum;
+				for (const { i } of order) {
+					targets[i] = targets[i]! * factor;
+				}
 			}
 			break;
 		}
@@ -337,6 +369,7 @@ export const foulTroubleSitUntil = ({
 	foulsNeededToFoulOut,
 	quarterSeconds,
 	elapsed,
+	ride,
 }: {
 	pf: number;
 	period: number;
@@ -345,6 +378,9 @@ export const foulTroubleSitUntil = ({
 	quarterSeconds: number;
 	// Elapsed regulation seconds at the foul (only used when numPeriods !== 4)
 	elapsed?: number;
+	// Coach Decisions: the coach's foul-trouble rules, -1 by the book (earlier and longer) ... 1 rides it. Undefined or between
+	// -RIDE_THRESHOLD and RIDE_THRESHOLD: the standard rules
+	ride?: number;
 }) => {
 	if (
 		numPeriods < 1 ||
@@ -369,6 +405,34 @@ export const foulTroubleSitUntil = ({
 	// Elapsed seconds when the clock in "quarter" q shows m minutes (minutes scaled to the quarter length)
 	const at = (q: number, m: number) =>
 		(q - 1) * virtualQuarterSeconds + virtualQuarterSeconds * (1 - m / 12);
+	if (ride !== undefined && ride >= RIDE_THRESHOLD) {
+		// Rides foul trouble: 2 early fouls don't sit him, 3 only in the 1st quarter (to the middle of the 2nd), 4 in the 3rd quarter
+		// sits him to 10:00 of the 4th, 5 to 7:00
+		if (pf >= f - 1) {
+			return at(4, 7);
+		}
+		if (period === 3 && pf >= f - 2) {
+			return at(4, 10);
+		}
+		if (period === 1 && pf >= f - 3) {
+			return at(2, 6);
+		}
+		return undefined;
+	}
+	if (ride !== undefined && ride <= -RIDE_THRESHOLD) {
+		// By the book: 2 fouls in the first half sit him until halftime, 4 in the 3rd quarter until about 6:00 of the 4th, 5 until the
+		// last 4 minutes
+		if (pf >= f - 1) {
+			return at(4, 4);
+		}
+		if (period === 3 && pf >= f - 2) {
+			return at(4, 6);
+		}
+		if (period <= 2 && pf >= f - 4) {
+			return at(3, 12);
+		}
+		return undefined;
+	}
 	if (pf >= f - 1) {
 		// 5 fouls: closing minutes only
 		return at(4, 5);
@@ -387,6 +451,9 @@ export const foulTroubleSitUntil = ({
 	}
 	return undefined;
 };
+
+// Coach Decisions: a coach's foul-trouble dial past this rides foul trouble (or goes by the book below minus it)
+export const RIDE_THRESHOLD = 0.4;
 
 // Closers: the last 5 minutes of close games
 export const CLOSING_SECONDS = 5 * 60;

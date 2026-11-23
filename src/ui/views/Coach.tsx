@@ -122,6 +122,14 @@ const Coach = ({
 									</>
 								) : null}
 							</div>
+							{c.systems.decisions ? (
+								<div data-testid="coach-decisions">
+									Decisions: {c.systems.decisions.starters} ·{" "}
+									{c.systems.decisions.loyalty} ·{" "}
+									{c.systems.decisions.foulTrouble} ·{" "}
+									{c.systems.decisions.injuries} · {c.systems.decisions.rest}
+								</div>
+							) : null}
 							{c.systems.mentor && c.systems.inherited.length > 0 ? (
 								<div data-testid="coach-inherited">
 									Carried from {c.systems.mentor.name}:{" "}

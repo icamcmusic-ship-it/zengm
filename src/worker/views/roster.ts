@@ -24,6 +24,15 @@ import {
 import { isCollege } from "../core/college/isCollege.ts";
 import { canRedshirt, isRedshirting } from "../core/college/redshirt.ts";
 import { getTeamStashView } from "../core/draftStash/index.ts";
+import { coachDecisionsOn } from "../core/staff/rolePromise.ts";
+import { getCoachProfile } from "../core/staff/systems.ts";
+import {
+	delegationFor,
+	STARTER_STYLE_NAMES,
+	starterStyleOf,
+	type CoachDelegation,
+	type LineupPreset,
+} from "../../common/coachDecisions.ts";
 
 const getRosterCoachSystem = async (tid: number) => {
 	const s = await getTeamCoachSystem(tid);
@@ -459,7 +468,42 @@ export default defineView({
 					? await getTeamStashView(inputs.tid)
 					: undefined;
 
+			// Coach Decisions: what the head coach decides on the user's team, the lineup for the next game, how often he was overruled
+			let coachDecisions:
+				| {
+						delegation: CoachDelegation;
+						preset: LineupPreset | "coach";
+						overrides: number;
+						games: number;
+						coachName: string | undefined;
+						style: string | undefined;
+				  }
+				| undefined;
+			if (editable && coachDecisionsOn()) {
+				const tRaw = await idb.cache.teams.get(inputs.tid);
+				const head = (
+					await idb.cache.coaches.indexGetAll("coachesByTid", inputs.tid)
+				).find((c) => c.role === "head");
+				if (tRaw) {
+					const pb =
+						tRaw.coachPushback?.season === g.get("season")
+							? tRaw.coachPushback
+							: undefined;
+					coachDecisions = {
+						delegation: delegationFor(tRaw),
+						preset: tRaw.lineupPreset ?? "coach",
+						overrides: pb?.overrides ?? 0,
+						games: pb?.games ?? 0,
+						coachName: head ? `${head.firstName} ${head.lastName}` : undefined,
+						style: head
+							? STARTER_STYLE_NAMES[starterStyleOf(getCoachProfile(head))]
+							: undefined,
+					};
+				}
+			}
+
 			return {
+				coachDecisions,
 				editable,
 				gmInfo,
 				stash,

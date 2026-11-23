@@ -65,6 +65,12 @@ import {
 	userAutoHiringTids,
 } from "../staffDepth/careers.ts";
 import {
+	coachDecisionsOn,
+	coachFrustration,
+	ensureAllDecisionRatings,
+	ensureDecisionRatings,
+} from "./coachDecisions.ts";
+import {
 	adaptSystems,
 	annotateSeason,
 	clearCoachSystemsCache,
@@ -165,6 +171,10 @@ export const generateCoach = async ({
 	// Coaching Staff Depth: every coach has the extra jobs' ratings, and where his career started
 	if (coachingDepthOn()) {
 		ensureDepthRatings(c);
+	}
+	// Coach Decisions: game prep and player management (from his other ratings, his job and his name: no random draws)
+	if (coachDecisionsOn()) {
+		ensureDecisionRatings(c);
 	}
 	if (coachingCareersOn()) {
 		c.tree = { start: role, startSeason: contractStartSeason() };
@@ -697,6 +707,8 @@ export const ensureStaff = async () => {
 	if (!staffEnabled()) {
 		return false;
 	}
+	// Coach Decisions: every coach has game prep and player management (an existing league: derived, no random draws)
+	await ensureAllDecisionRatings();
 	const coaches = await idb.cache.coaches.getAll();
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const needsStaff =
@@ -874,7 +886,8 @@ const progress = (c: Coach) => {
 		);
 	}
 	// Coaching Staff Depth: the extra jobs' ratings follow the same trend (no random draws, so the other ratings draw as before)
-	for (const key of ["sht", "cnd", "vid"] as const) {
+	// (Coach Decisions: game prep and player management too)
+	for (const key of ["sht", "cnd", "vid", "prp", "plm"] as const) {
 		const v = c.ratings[key];
 		if (v !== undefined) {
 			c.ratings[key] = bound(v + coachRatingDrift(v, key, c.role, a));
@@ -1242,10 +1255,16 @@ export const userExtend = async ({
 			`His contract already runs through ${c.contract.exp}, the longest a coach can sign for.`,
 		);
 	}
+	// Coach Decisions: a head coach the user keeps overruling is less happy in the job, and asks up to 25% more to stay
+	const t = c.role === "head" ? await idb.cache.teams.get(tid) : undefined;
+	const frustration = t && coachDecisionsOn() ? coachFrustration(t) : 0;
 	c.contract = {
 		amount: Math.max(
 			c.contract.amount,
-			coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")),
+			Math.round(
+				coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")) *
+					(1 + 0.25 * frustration),
+			),
 		),
 		exp: Math.min(base + helpers.bound(Math.round(years), 1, 5), maxExp),
 	};
