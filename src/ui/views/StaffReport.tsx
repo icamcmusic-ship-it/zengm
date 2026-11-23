@@ -272,6 +272,137 @@ const Card = ({
 
 const signed = (x: number) => (x > 0 ? `+${x}` : `${x}`);
 
+type Scorecard = View<"staffReport">["scorecards"][number];
+
+const pct = (a: number, b: number) =>
+	b > 0 ? `${Math.round((100 * a) / b)}%` : "–";
+
+// Season over season: development vs the league, draft picks that beat their slot, games lost to injury vs an average team
+const ScorecardTable = ({ cards }: { cards: Scorecard[] }) => (
+	<div className="table-responsive">
+		<table className="table table-sm table-striped mb-2">
+			<thead>
+				<tr>
+					<th>Season</th>
+					<th title="Young players' (25 and under) average change in ovr, yours vs the league's">
+						Development
+					</th>
+					<th title="Your picks in the drafts 2 to 5 years back that beat their slot by career win shares">
+						Scout hits
+					</th>
+					<th title="Games your players missed through injury vs an average team">
+						Injury games
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+				{cards.map((card) => (
+					<tr key={card.season}>
+						<td>{card.season}</td>
+						<td>
+							{card.devYou !== undefined && card.devLeague !== undefined ? (
+								<>
+									<span
+										className={
+											card.devYou >= card.devLeague
+												? "text-success"
+												: "text-danger"
+										}
+									>
+										{signed(card.devYou)}
+									</span>{" "}
+									<span className="text-body-secondary">
+										vs {signed(card.devLeague)}
+									</span>
+								</>
+							) : (
+								(card.devBand ?? "–")
+							)}
+							{card.numDev > 0 ? (
+								<span className="text-body-secondary small">
+									{" "}
+									({card.numDev})
+								</span>
+							) : null}
+						</td>
+						<td>
+							{card.scoutJudged > 0
+								? `${card.scoutHits} of ${card.scoutJudged} (${pct(card.scoutHits, card.scoutJudged)})`
+								: "–"}
+						</td>
+						<td>
+							<span
+								className={
+									card.injuryGames <= card.injuryGamesExpected
+										? "text-success"
+										: "text-danger"
+								}
+							>
+								{card.injuryGames}
+							</span>{" "}
+							<span className="text-body-secondary">
+								vs {card.injuryGamesExpected}
+							</span>
+						</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	</div>
+);
+
+const HistoryTab = ({
+	history,
+}: {
+	history: View<"staffReport">["history"];
+}) => {
+	if (history.length === 0) {
+		return (
+			<p className="text-body-secondary" data-testid="staff-history-empty">
+				No past reports yet. Each season's report is saved here after the
+				playoffs.
+			</p>
+		);
+	}
+	return (
+		<div data-testid="staff-history">
+			{history.map((entry) => (
+				<div key={entry.season} className="card mb-3">
+					<div className="card-header fw-bold">{entry.season} report</div>
+					<div className="card-body">
+						{entry.scorecard ? (
+							<ScorecardTable cards={[entry.scorecard]} />
+						) : null}
+						{entry.recommendations.length > 0 ? (
+							<>
+								<div className="small fw-bold">Recommendations at the time</div>
+								<ul className="small mb-1">
+									{entry.recommendations.map((rec, i) => (
+										<li key={i}>
+											<b>{rec.area}:</b> {rec.text}
+										</li>
+									))}
+								</ul>
+							</>
+						) : (
+							<p className="small mb-1">No open recommendations.</p>
+						)}
+						{entry.digests && entry.digests.length > 0 ? (
+							<div className="small text-body-secondary">
+								Digests sent:{" "}
+								{entry.digests
+									.map((d) => (d === "draft" ? "pre-draft" : "pre-free agency"))
+									.join(", ")}{" "}
+								(<a href={helpers.leagueUrl(["inbox"])}>Inbox</a>)
+							</div>
+						) : null}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+};
+
 const StaffReport = ({
 	season,
 	scoutingOn,
@@ -284,10 +415,44 @@ const StaffReport = ({
 	fit,
 	conditioning,
 	offense,
+	scorecards,
+	budgetRecs,
+	budgetOn,
+	history,
 }: View<"staffReport">) => {
 	useTitleBar({ title: `${season} Staff Report` });
+	const [tab, setTab] = useState<"report" | "history">("report");
+	const tabs = (
+		<ul className="nav nav-tabs mb-3">
+			{(
+				[
+					["report", "Report"],
+					["history", `History (${history.length})`],
+				] as const
+			).map(([key, label]) => (
+				<li key={key} className="nav-item">
+					<button
+						type="button"
+						className={`nav-link${tab === key ? " active" : ""}`}
+						onClick={() => setTab(key)}
+					>
+						{label}
+					</button>
+				</li>
+			))}
+		</ul>
+	);
+	if (tab === "history") {
+		return (
+			<>
+				{tabs}
+				<HistoryTab history={history} />
+			</>
+		);
+	}
 	return (
 		<>
+			{tabs}
 			<p>
 				What your staff sees, and one recommended action per area. Nothing here
 				needs your input: with every area on <b>Auto</b> the staff runs it.{" "}
@@ -380,6 +545,44 @@ const StaffReport = ({
 					</ul>
 				</div>
 			) : null}
+
+			<div className="card mb-3" data-testid="staff-scorecard">
+				<div className="card-header fw-bold">Staff scorecard</div>
+				<div className="card-body">
+					<ScorecardTable cards={scorecards} />
+					<p className="small text-body-secondary mb-2">
+						Development: young players' (25 and under) average change in ovr,
+						yours vs the league's. Scout hits: your picks from the drafts 2-5
+						years back that outperformed their slot by career win shares. Injury
+						games: games missed vs an average team.
+					</p>
+					{budgetOn ? (
+						budgetRecs.length > 0 ? (
+							<>
+								<div className="fw-bold small">Budget</div>
+								<ul className="small mb-1" data-testid="staff-budget-recs">
+									{budgetRecs.map((rec) => (
+										<li key={rec.item}>
+											<b>{rec.title}.</b> {rec.text}
+										</li>
+									))}
+								</ul>
+								<a
+									className="small"
+									href={helpers.leagueUrl(["team_finances"])}
+								>
+									Set budget items on Finances
+								</a>
+							</>
+						) : (
+							<p className="small mb-0">
+								The budget matches what the scorecard shows.{" "}
+								<a href={helpers.leagueUrl(["team_finances"])}>Finances</a>
+							</p>
+						)
+					) : null}
+				</div>
+			</div>
 
 			<div className="row g-3">
 				{scouting ? (

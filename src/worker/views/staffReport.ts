@@ -5,6 +5,13 @@ import { getStaffReport } from "../core/staffDepth/report.ts";
 import { coachingDepthOn } from "../core/staffDepth/coaching.ts";
 import { scoutingDepthOn } from "../core/staffDepth/scouting.ts";
 import { isCollege } from "../core/college/isCollege.ts";
+import {
+	devBand,
+	getBudgetRecs,
+	getScorecards,
+	getStaffHistory,
+} from "../core/staffDepth/scorecard.ts";
+import type { StaffScorecard } from "../../common/types.ts";
 
 // While games are played, the report is redone every few games of the user's team (the Director's board and looks move weekly), not
 // every day
@@ -56,6 +63,31 @@ export default defineView({
 		if (!report) {
 			return { errorMessage: "No team." };
 		}
-		return { ...report, simKey };
+
+		// Scorecard (last 3 seasons), budget recommendations and the History tab. No Visible Ratings: development as a band only
+		const noRatings = !!g.get("challengeNoRatings");
+		const strip = (card: StaffScorecard) => ({
+			...card,
+			devYou: noRatings ? undefined : card.devYou,
+			devLeague: noRatings ? undefined : card.devLeague,
+			devBand: devBand(card),
+		});
+		const cards = await getScorecards(tid);
+		const budgetRecs = await getBudgetRecs(tid, cards.at(-1));
+		const history = getStaffHistory()
+			.filter((x) => x.tid === tid && x.season < g.get("season"))
+			.toReversed()
+			.map((x) => ({
+				...x,
+				scorecard: x.scorecard ? strip(x.scorecard) : undefined,
+			}));
+		return {
+			...report,
+			simKey,
+			scorecards: cards.map(strip),
+			budgetRecs,
+			budgetOn: !!g.get("budget"),
+			history,
+		};
 	},
 });
