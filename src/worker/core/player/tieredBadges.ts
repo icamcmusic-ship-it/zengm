@@ -241,6 +241,90 @@ export const updateTieredBadges = async () => {
 	}
 };
 
+/**
+ * One player who entered the league mid-season (imported, created or cloned in God Mode, ratings edited in God Mode): his tiers for the
+ * current season against the season's saved cutoffs, like updateTieredBadges gives everyone at the preseason. Without it he had no sim
+ * badges and no pills until the next preseason, and his page read live tiers that skipped the one-Legend rule. Legends already held this
+ * season stay with their holders: he can't take one mid-season (Hall of Fame instead). Returns whether it stored an entry.
+ */
+export const refreshTieredBadgesFor = async (p: Player) => {
+	if (
+		!tieredBadgesOn() ||
+		p.tid < PLAYER.FREE_AGENT ||
+		p.ratings.length === 0
+	) {
+		return false;
+	}
+	const season = g.get("season");
+	const cutoffs = getTieredBadgeCutoffs(season);
+	if (!cutoffs) {
+		// No badges this season yet: ensureTieredBadges computes everyone's, him included
+		return false;
+	}
+
+	// Legends held by someone else this season (sim and shown tiers separately, as updateTieredBadges enforces them)
+	const simLegends = new Set<string>();
+	const shownLegends = new Set<string>();
+	const others = await idb.cache.players.indexGetAll("playersByTid", [
+		PLAYER.FREE_AGENT,
+		Infinity,
+	]);
+	for (const p2 of others) {
+		if (p2.pid === p.pid) {
+			continue;
+		}
+		const e = entryForSeason(p2.badges2k, season);
+		if (!e) {
+			continue;
+		}
+		for (const [key, tier] of Object.entries(e.t)) {
+			if (tier === 5) {
+				simLegends.add(key);
+			}
+		}
+		for (const [key, tier] of Object.entries(displayTiersOf(e))) {
+			if (tier === 5) {
+				shownLegends.add(key);
+			}
+		}
+	}
+	const capLegends = (t: Record<string, Tier>, held: Set<string>) => {
+		for (const key of Object.keys(t)) {
+			if (t[key] === 5 && held.has(key)) {
+				t[key] = 4;
+			}
+		}
+	};
+
+	const r = rowOf(p);
+	const { t, capped } = assignTiers(
+		r,
+		r.ovr ?? 0,
+		cutoffs,
+		prevTiers(p, season),
+	);
+	capLegends(t, simLegends);
+	const shownRow = scoutedRowOf(p);
+	const d = assignTiers(
+		shownRow,
+		shownRow.ovr ?? 0,
+		cutoffs,
+		prevTiers(p, season, true),
+	).t;
+	capLegends(d, shownLegends);
+
+	const entry: TieredBadgeEntry = { season, t };
+	if (capped.length > 0) {
+		entry.capped = capped;
+	}
+	if (JSON.stringify(d) !== JSON.stringify(t)) {
+		entry.d = d;
+	}
+	p.badges2k = withTierEntry(p.badges2k, entry);
+	await idb.cache.players.put(p);
+	return true;
+};
+
 /** A league with no badges for this season (an older league, or a season the preseason skipped): compute its cutoffs and tiers once. Returns whether it did. */
 export const ensureTieredBadges = async () => {
 	if (tieredBadgesOn() && !getTieredBadgeCutoffs()) {

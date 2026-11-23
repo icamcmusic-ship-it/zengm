@@ -683,9 +683,11 @@ const keepInterim = (c: Coach, years: number) => {
 };
 
 // Season end (before contracts expire): AI teams keep or replace their interims; the user's stays on until he decides
+// Returns the interims kept, who are safe from this offseason's firings
 export const interimOffseason = async () => {
+	const kept = new Set<number>();
 	if (!coachMarketOn()) {
-		return;
+		return kept;
 	}
 	const season = g.get("season");
 	for (const c of await idb.cache.coaches.getAll()) {
@@ -705,6 +707,7 @@ export const interimOffseason = async () => {
 		const pct = ts ? winPct(ts) : 0.5;
 		if (pct >= 0.5 || rng.chance(0.25)) {
 			keepInterim(c, rng.int(2, 3));
+			kept.add(c.cid);
 			await idb.cache.coaches.put(c);
 			await logEvent({
 				type: "info",
@@ -717,6 +720,7 @@ export const interimOffseason = async () => {
 			await endInterim(c);
 		}
 	}
+	return kept;
 };
 
 export const userInterimDecision = async ({

@@ -85,6 +85,11 @@ const bound = (x: number) => helpers.bound(Math.round(x), 1, 100);
 const contractStartSeason = () =>
 	g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
 
+// The latest season a coach contract can run through: 5 seasons counting the next contract year
+export const MAX_COACH_CONTRACT_YEARS = 5;
+export const maxCoachContractExp = () =>
+	contractStartSeason() - 1 + MAX_COACH_CONTRACT_YEARS;
+
 const genStyle = (): CoachStyle => {
 	const r = () => helpers.bound(Math.round(gauss(0, 0.45) * 100) / 100, -1, 1);
 	return { pace: r(), threes: r(), defense: r(), rotation: r() };
@@ -313,11 +318,18 @@ const userControlsTeam = (tid: number) =>
 	!local.autoPlayUntil &&
 	!g.get("spectator");
 
-const logHeadCoachEvent = async (text: string, tid: number) => {
+// notifyUser: shown as a notification when it's the user's head coach leaving on his own (retired, contract ran out), like assistants
+const logHeadCoachEvent = async (
+	text: string,
+	tid: number,
+	notifyUser = false,
+) => {
 	await logEvent({
 		type: "info",
+		category: "staff",
 		text,
-		showNotification: false,
+		showNotification:
+			notifyUser && g.get("userTids").includes(tid) && !g.get("spectator"),
 		tids: [tid],
 		score: 0,
 	});
@@ -864,10 +876,13 @@ const progress = (c: Coach) => {
 	}
 };
 
-const tenure = (c: Coach) => {
+// Seasons in a row as head coach of his current team, counting the one just recorded. Seasons as an assistant don't count: a promoted
+// assistant, or a coach hired last summer, used to be past the first-season protection before his first season as head coach was over
+export const headTenure = (c: CoachWithoutKey) => {
 	let n = 0;
 	for (let i = c.stats.length - 1; i >= 0; i--) {
-		if (c.stats[i]!.tid !== c.tid) {
+		const row = c.stats[i]!;
+		if (row.tid !== c.tid || row.role !== "head") {
 			break;
 		}
 		n += 1;
@@ -883,6 +898,7 @@ const retire = async (c: Coach) => {
 			await logHeadCoachEvent(
 				`Head coach ${coachLink(c)} of ${teamLink(tid)} retired.`,
 				tid,
+				true,
 			);
 		} else {
 			await logAssistantDeparture(c, tid, c.role, "retired from");
@@ -918,7 +934,7 @@ export const runOffseason = async () => {
 	const gms = await getAllGmWeights();
 	const collegeExpected = isCollege() ? await getExpectedWinps() : undefined;
 	// Coach Market & Succession: interim head coaches are kept or replaced before contracts run out
-	await interimOffseason();
+	const keptInterims = await interimOffseason();
 	for (const c of coaches) {
 		progress(c);
 
@@ -980,6 +996,7 @@ export const runOffseason = async () => {
 					await logHeadCoachEvent(
 						`Head coach ${coachLink(c)} left ${teamLink(tid)} when his contract expired.`,
 						tid,
+						true,
 					);
 				} else {
 					await logAssistantDeparture(
@@ -996,14 +1013,18 @@ export const runOffseason = async () => {
 		// AI firings. The owner doesn't wait forever.
 		if (!userControlsTeam(c.tid)) {
 			let fireProb = 0;
-			if (c.role === "head" && collegeExpected) {
+			if (c.role === "head" && keptInterims.has(c.cid)) {
+				// An interim the team just decided to keep isn't fired a moment later (he had no preseason expectation, so the hot seat
+				// judged his losing record against .500)
+				fireProb = 0;
+			} else if (c.role === "head" && collegeExpected) {
 				// College mode: results against what the program's prestige expects
-				fireProb = collegeFireProb(c, tenure(c), collegeExpected);
+				fireProb = collegeFireProb(c, headTenure(c), collegeExpected);
 			} else if (c.role === "head" && systems) {
 				// Coaching systems: the hot seat (results against expectations, reputation)
-				fireProb = hotSeatFireProb(c, tenure(c));
+				fireProb = hotSeatFireProb(c, headTenure(c));
 			} else if (c.role === "head") {
-				const t = tenure(c);
+				const t = headTenure(c);
 				if (t >= 2 && pct < 0.4) {
 					fireProb = 0.55;
 				} else if (t >= 1 && pct < 0.3) {
@@ -1206,14 +1227,21 @@ export const userExtend = async ({
 	}
 	// The new salary starts now (a coach contract has one amount), so he never takes a pay cut: extending an overpaid coach used to
 	// cut his salary to his lower asking price at once
+	// A coach contract never runs more than 5 seasons from the next contract year, the longest one a hire can get. Extensions used to
+	// stack without limit (five clicks in season = 25 more seasons at today's salary)
+	const base = Math.max(c.contract.exp, contractStartSeason() - 1);
+	const maxExp = maxCoachContractExp();
+	if (base >= maxExp) {
+		throw new Error(
+			`His contract already runs through ${c.contract.exp}, the longest a coach can sign for.`,
+		);
+	}
 	c.contract = {
 		amount: Math.max(
 			c.contract.amount,
 			coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")),
 		),
-		exp:
-			Math.max(c.contract.exp, contractStartSeason() - 1) +
-			helpers.bound(Math.round(years), 1, 5),
+		exp: Math.min(base + helpers.bound(Math.round(years), 1, 5), maxExp),
 	};
 	addTransaction(c, tid, c.role, "reSigned");
 	await idb.cache.coaches.put(c);
@@ -1249,6 +1277,7 @@ export {
 	getTeamHiringContext,
 	headCoachFitBonus,
 	hotSeat,
+	philosophyLeagueMean,
 	philosophyLevelDelta,
 	playerSystemFit,
 	playerSystemFitForTeam,

@@ -60,9 +60,10 @@ type StaffActionArgs =
 const formatPct = (x: number) => `${x >= 0 ? "+" : ""}${(100 * x).toFixed(1)}%`;
 
 // Returns true when the action went through
-const action = async (args: StaffActionArgs) => {
+// tid: the page's team (multi-team mode can show any of the user's teams)
+const action = async (tid: number, args: StaffActionArgs) => {
 	try {
-		const result = await toWorker("main", "staffAction", args);
+		const result = await toWorker("main", "staffAction", { ...args, tid });
 		if (result.buyout) {
 			showNotification({
 				type: "info",
@@ -99,9 +100,11 @@ type Pending =
 const YearsSelect = ({
 	years,
 	setYears,
+	max = 5,
 }: {
 	years: number;
 	setYears: (years: number) => void;
+	max?: number;
 }) => (
 	<label className="d-flex align-items-center gap-2 mb-3">
 		Contract length
@@ -111,11 +114,13 @@ const YearsSelect = ({
 			onChange={(event) => setYears(Number(event.target.value))}
 			data-testid="staff-contract-years"
 		>
-			{[1, 2, 3, 4, 5].map((y) => (
-				<option key={y} value={y}>
-					{y} season{y > 1 ? "s" : ""}
-				</option>
-			))}
+			{[1, 2, 3, 4, 5]
+				.filter((y) => y <= max)
+				.map((y) => (
+					<option key={y} value={y}>
+						{y} season{y > 1 ? "s" : ""}
+					</option>
+				))}
 		</select>
 	</label>
 );
@@ -125,8 +130,10 @@ const CoachMarketPanel = ({
 	market,
 	hasHead,
 	candidates,
+	tid,
 }: {
 	market: NonNullable<View<"staff">["market"]>;
+	tid: number;
 	hasHead: boolean;
 	candidates: View<"staff">["candidates"];
 }) => {
@@ -150,7 +157,7 @@ const CoachMarketPanel = ({
 						<button
 							className="btn btn-sm btn-success ms-1"
 							onClick={() =>
-								action({
+								action(tid, {
 									type: "hire",
 									cid: o.cid,
 									role: o.role,
@@ -164,7 +171,7 @@ const CoachMarketPanel = ({
 						</button>
 						<button
 							className="btn btn-sm btn-light-bordered ms-1"
-							onClick={() => action({ type: "walkAway", cid: o.cid })}
+							onClick={() => action(tid, { type: "walkAway", cid: o.cid })}
 						>
 							Walk away
 						</button>
@@ -194,7 +201,7 @@ const CoachMarketPanel = ({
 								<button
 									className="btn btn-sm btn-success"
 									onClick={() =>
-										action({
+										action(tid, {
 											type: "interim",
 											cid: market.interim!.cid,
 											keep: true,
@@ -207,7 +214,7 @@ const CoachMarketPanel = ({
 								<button
 									className="btn btn-sm btn-light-bordered"
 									onClick={() =>
-										action({
+										action(tid, {
 											type: "interim",
 											cid: market.interim!.cid,
 											keep: false,
@@ -229,7 +236,7 @@ const CoachMarketPanel = ({
 						Your associate head coach is ready to take over.{" "}
 						<button
 							className="btn btn-sm btn-success"
-							onClick={() => action({ type: "promoteHeir" })}
+							onClick={() => action(tid, { type: "promoteHeir" })}
 							data-testid="staff-promote-heir"
 						>
 							Promote him (keeps your systems)
@@ -261,6 +268,7 @@ const Staff = ({
 	abbrev,
 	budget,
 	canExtend,
+	maxContractExp,
 	candidates,
 	coachSystems,
 	colors,
@@ -327,14 +335,14 @@ const Staff = ({
 		setBusy(true);
 		try {
 			if (pending.type === "fire") {
-				if (await action({ type: "fire", cid: pending.coach.cid })) {
+				if (await action(tid, { type: "fire", cid: pending.coach.cid })) {
 					setMarketRole(pending.role);
 				}
 			} else if (pending.type === "extend") {
-				await action({ type: "extend", cid: pending.coach.cid, years });
+				await action(tid, { type: "extend", cid: pending.coach.cid, years });
 			} else {
 				// The old coach is only fired once the hire went through
-				await action({
+				await action(tid, {
 					type: "hire",
 					cid: pending.candidate.cid,
 					role: pending.role,
@@ -409,13 +417,19 @@ const Staff = ({
 		}
 		if (pending.type === "extend") {
 			const c = pending.coach;
+			// No contract runs past maxContractExp (5 seasons from the next contract year)
+			const maxYears = Math.max(
+				1,
+				maxContractExp - Math.max(c.contract.exp, maxContractExp - 5),
+			);
+			const extYears = Math.min(years, maxYears);
 			return {
 				title: `Extend ${c.name}?`,
 				ok: "Extend contract",
 				okClass: "btn-primary",
 				body: (
 					<>
-						<YearsSelect years={years} setYears={setYears} />
+						<YearsSelect years={extYears} setYears={setYears} max={maxYears} />
 						<ul className="mb-0 ps-3">
 							<li>
 								A new contract at{" "}
@@ -427,8 +441,8 @@ const Staff = ({
 								{c.demand < c.contract.amount
 									? " and won't take a pay cut"
 									: ""}
-								), {years} more season
-								{years > 1 ? "s" : ""} after his current deal, which runs
+								), {extYears} more season
+								{extYears > 1 ? "s" : ""} after his current deal, which runs
 								through {c.contract.exp}.
 							</li>
 							<li>
@@ -556,7 +570,8 @@ const Staff = ({
 				>
 					Compare / Replace
 				</button>
-				{canExtend || c.contract.exp <= season ? (
+				{(canExtend || c.contract.exp <= season) &&
+				c.contract.exp < maxContractExp ? (
 					<button
 						className="btn btn-sm btn-light-bordered"
 						onClick={() => setPending({ type: "extend", coach: c, role })}
@@ -618,7 +633,7 @@ const Staff = ({
 						<span className="badge text-bg-info me-1">Associate HC</span>
 						<button
 							className="btn btn-sm btn-link p-0"
-							onClick={() => action({ type: "setHeir", cid: null })}
+							onClick={() => action(tid, { type: "setHeir", cid: null })}
 						>
 							Remove
 						</button>
@@ -626,7 +641,7 @@ const Staff = ({
 				) : (
 					<button
 						className="btn btn-sm btn-link p-0"
-						onClick={() => action({ type: "setHeir", cid: c.cid })}
+						onClick={() => action(tid, { type: "setHeir", cid: c.cid })}
 						data-testid={`staff-heir-${role}`}
 					>
 						Name associate head coach
@@ -642,6 +657,7 @@ const Staff = ({
 					market={market}
 					hasHead={!!hc}
 					candidates={candidates}
+					tid={tid}
 				/>
 			) : null}
 			{!coachSystems ? <SystemsOffNote /> : null}
@@ -1082,7 +1098,7 @@ const Staff = ({
 						onInterview={
 							market && market.interviewsLeft > 0
 								? (c) => {
-										void action({
+										void action(tid, {
 											type: "interview",
 											cid: c.cid,
 											role: marketRole,

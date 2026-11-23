@@ -444,6 +444,7 @@ const newPhasePreseason = async (
 	const coachingLevels: Record<number, number> = {};
 	// Coaching systems: the head coach's philosophy (development coaches help young players, win-now coaches veterans)
 	const headProfiles = await staff.getHeadProfiles();
+	const philosophyMean = staff.philosophyLeagueMean(headProfiles);
 	for (const t of teams) {
 		const teamSeasons = await idb.merged.teamSeasons.getAll({
 			tid: t.tid,
@@ -617,6 +618,7 @@ const newPhasePreseason = async (
 								staff.philosophyLevelDelta(
 									headProfiles.get(p.tid)!,
 									newSeason - p.born.year,
+									philosophyMean,
 								),
 							1,
 							100,

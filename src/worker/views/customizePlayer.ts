@@ -186,6 +186,8 @@ export default defineView({
 					delete p.owedByTids;
 					// A clone is a different person, so he gets his own traits when saved
 					delete p.traits;
+					// and his own 2K badges (the original's could hold a Legend)
+					delete p.badges2k;
 					contractSeasons = undefined;
 				}
 			}
