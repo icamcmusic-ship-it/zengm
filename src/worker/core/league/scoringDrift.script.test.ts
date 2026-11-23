@@ -15,10 +15,7 @@
 import "fake-indexeddb/auto";
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";
-import {
-	LEAGUE_DATABASE_VERSION,
-	PHASE,
-} from "../../../common/constants.ts";
+import { LEAGUE_DATABASE_VERSION, PHASE } from "../../../common/constants.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import { last } from "../../../common/utils.ts";
