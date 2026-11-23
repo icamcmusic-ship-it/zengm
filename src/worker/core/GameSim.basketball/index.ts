@@ -8249,6 +8249,8 @@ class GameSim extends GameSimBase {
 		// Game Sim Fixes: a blocked ball still in play is usually the defense's
 		if (afterBlock) {
 			probDrb = 1 - SIM_FIX_BLOCK.orbFactor * (1 - probDrb);
+		} else if (this.simFixes && !afterFt) {
+			probDrb = 1 - SIM_FIX_BLOCK.orbOther * (1 - probDrb);
 		}
 		// 2K Badges: the defense's best box-out and chaser against the offense's best putback and chaser (centered)
 		if (this.badgeSim) {

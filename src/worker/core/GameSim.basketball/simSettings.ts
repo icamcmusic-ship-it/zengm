@@ -163,8 +163,9 @@ export const SIM_FIX_FT_ORB = 0.5;
 
 // Blocks out of bounds: this share of blocks goes out of bounds off the blocker, so the offense keeps the ball (with what was left of
 // the shot clock, at least a second: a blocked shot didn't hit the rim, so the clock isn't reset). A blocked ball that stays in play is
-// usually the defense's: the offense's rebound chance is times orbFactor (so a block still ends about 7 in 10 possessions, not 3 in 4)
-export const SIM_FIX_BLOCK = { oob: 0.18, orbFactor: 0.65 };
+// usually the defense's: the offense's rebound chance is times orbFactor. The offensive rebounds the blocks no longer give are put back
+// on the other missed shots (their offensive rebound chance times orbOther), so the league's offensive rebounds stay where they were
+export const SIM_FIX_BLOCK = { oob: 0.18, orbFactor: 0.85, orbOther: 1.035 };
 
 // Minor in-game injuries (knocks): on top of the real injuries, a player on the court is shaken up at rate times the injury rate (the same
 // random number as the injury check, so the real injuries and their rate are unchanged). He goes to the bench and is evaluated after
