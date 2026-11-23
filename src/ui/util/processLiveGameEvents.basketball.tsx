@@ -175,6 +175,14 @@ const getText = (
 		];
 	} else if (event.type === "injury") {
 		texts = [`${getName(event.pid)} was injured!`];
+	} else if (event.type === "knock") {
+		texts = [`${getName(event.pid)} is shaken up and heads to the bench`];
+	} else if (event.type === "knockReturn") {
+		texts = [
+			event.back
+				? `${getName(event.pid)} is cleared to return`
+				: `${getName(event.pid)} will not return`,
+		];
 	} else if (event.type === "tov") {
 		if (event.outOfBounds) {
 			texts = [
@@ -718,6 +726,23 @@ const processLiveGameEvents = ({
 						type: "Injured",
 						gamesRemaining: -1,
 					};
+				}
+			}
+			// Game Sim Fixes knocks: shown as injured until cleared to return (then as he was before the game)
+			if (e.type === "knock") {
+				const p = playersByPid[e.pid] as any;
+				if (p) {
+					p.injuryBeforeKnock ??= p.injury;
+					p.injury = {
+						type: "Injured",
+						gamesRemaining: -1,
+					};
+				}
+			} else if (e.type === "knockReturn" && e.back) {
+				const p = playersByPid[e.pid] as any;
+				if (p && p.injuryBeforeKnock) {
+					p.injury = p.injuryBeforeKnock;
+					p.injuryBeforeKnock = undefined;
 				}
 			}
 

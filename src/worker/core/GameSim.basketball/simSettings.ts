@@ -166,6 +166,17 @@ export const SIM_FIX_FT_ORB = 0.5;
 // usually the defense's: the offense's rebound chance is times orbFactor (so a block still ends about 7 in 10 possessions, not 3 in 4)
 export const SIM_FIX_BLOCK = { oob: 0.18, orbFactor: 0.65 };
 
+// Minor in-game injuries (knocks): on top of the real injuries, a player on the court is shaken up at rate times the injury rate (the same
+// random number as the injury check, so the real injuries and their rate are unchanged). He goes to the bench and is evaluated after
+// minMin-maxMin minutes of game clock: cleared to return (returnProb, then the coach brings him back at a dead ball) or out for the rest of
+// the game. Either way it is not an injury after the game (no games missed)
+export const SIM_FIX_KNOCK = {
+	rate: 1.2,
+	returnProb: 0.75,
+	minMin: 2,
+	maxMin: 10,
+};
+
 // Left-handed shooters (common/shootingHand.ts, cached as p.lefty in loadTeams): defenders see fewer of them, so a lefty's at-rim and
 // post makes get a small unfamiliarity bonus (make, added to the make probability), mostly gone against a left-handed defender (sameHand
 // keeps that fraction), and he drives a little more (drive, on the at-rim weight). Both are offset over everyone in the game by the

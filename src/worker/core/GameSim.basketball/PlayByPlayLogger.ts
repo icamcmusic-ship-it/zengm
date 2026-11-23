@@ -105,6 +105,21 @@ type PlayByPlayEventInputNoScore =
 			clock: number;
 	  }
 	| {
+			// Game Sim Fixes: a minor in-game injury (a knock): the player goes to the bench to be checked out
+			type: "knock";
+			t: TeamNum;
+			pid: number;
+			clock: number;
+	  }
+	| {
+			// ...and the evaluation: cleared to return (back) or out for the rest of the game
+			type: "knockReturn";
+			t: TeamNum;
+			pid: number;
+			back: boolean;
+			clock: number;
+	  }
+	| {
 			// A player (or, with pid undefined, the coach) is ejected
 			type: "ejection";
 			t: TeamNum;

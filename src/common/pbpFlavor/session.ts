@@ -24,6 +24,8 @@ import {
 	freeThrow,
 	heaveText,
 	injuryText,
+	knockText,
+	knockReturnText,
 	nonShootingFoul,
 	outOfBounds,
 	quarterNote,
@@ -1082,6 +1084,14 @@ export class FlavorSession {
 				} else if (e.type === "injury") {
 					this.injured.add(ev.pid);
 					res = { text: injuryText(rng, this.pl(ev.pid)) };
+				} else if (e.type === "knock") {
+					this.injured.add(ev.pid);
+					res = { text: knockText(rng, this.pl(ev.pid)) };
+				} else if (e.type === "knockReturn") {
+					if (ev.back) {
+						this.injured.delete(ev.pid);
+					}
+					res = { text: knockReturnText(rng, this.pl(ev.pid), !!ev.back) };
 				} else if (e.type === "endOfPeriod") {
 					res = this.onEndOfPeriod(rng, ev);
 				} else if (e.type === "outOfBounds") {

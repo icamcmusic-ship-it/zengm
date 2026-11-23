@@ -4,11 +4,11 @@ import loadTeams from "../game/loadTeams.ts";
 import { g } from "../../util/index.ts";
 import { resetG } from "../../../test/helpers.ts";
 import { genTeams, withSeededRandom } from "./simLiveGameForTests.ts";
-import { SIM_FIX_BLOCK } from "./simSettings.ts";
+import { SIM_FIX_BLOCK, SIM_FIX_KNOCK } from "./simSettings.ts";
 import { range } from "../../../common/utils.ts";
 
 /*
- * Game Sim Fixes plays: blocks out of bounds. The league totals are in docs/native-features.md (threeGradient.script.test.ts).
+ * Game Sim Fixes plays: blocks out of bounds, knocks (minor in-game injuries). The league totals are in docs/native-features.md (threeGradient.script.test.ts).
  */
 
 afterAll(() => {
@@ -21,10 +21,14 @@ const scenario = <T>(
 	seed: number,
 	settings: Record<string, unknown>,
 	fn: (sim: Sim) => T | Promise<T>,
+	{
+		baseInjuryRate = 0,
+		doPlayByPlay = false,
+	}: { baseInjuryRate?: number; doPlayByPlay?: boolean } = {},
 ) =>
 	withSeededRandom(seed, async () => {
 		await genTeams();
-		g.setWithoutSavingToDB("storePlayByPlay", false);
+		g.setWithoutSavingToDB("storePlayByPlay", doPlayByPlay);
 		for (const [key, value] of Object.entries(settings)) {
 			g.setWithoutSavingToDB(key as any, value as any);
 		}
@@ -32,8 +36,8 @@ const scenario = <T>(
 		const sim: Sim = new GameSim({
 			gid: seed,
 			teams: [teams[0]!, teams[1]!],
-			baseInjuryRate: 0,
-			doPlayByPlay: false,
+			baseInjuryRate,
+			doPlayByPlay,
 			homeCourtFactor: 1,
 			allStarGame: false,
 			neutralSite: true,
@@ -78,4 +82,83 @@ test("blocks out of bounds: off without Game Sim Fixes (the stock rebound, same 
 	await scenario(2, { simFixes: false }, (sim) => {
 		assert.isFalse(sim.simFixes);
 	});
+});
+
+test("knocks: players shaken up leave, most come back later in the game, none of it is an injury after the game", async () => {
+	let knocks = 0;
+	let returns = 0;
+	let ruledOut = 0;
+	let injuries = 0;
+	let returnedAndPlayed = 0;
+	for (const seed of range(8)) {
+		await scenario(
+			100 + seed,
+			{ simFixes: true },
+			(sim) => {
+				const result = sim.run();
+				const events = result.playByPlay as any[];
+				const subsOn = new Map<number, number[]>();
+				events.forEach((e, i) => {
+					if (e.type === "sub") {
+						for (const pid of e.pids) {
+							subsOn.set(pid, [...(subsOn.get(pid) ?? []), i]);
+						}
+					}
+				});
+				events.forEach((e, i) => {
+					if (e.type === "knock") {
+						knocks += 1;
+					} else if (e.type === "knockReturn") {
+						if (e.back) {
+							returns += 1;
+							if ((subsOn.get(e.pid) ?? []).some((j) => j > i)) {
+								returnedAndPlayed += 1;
+							}
+						} else {
+							ruledOut += 1;
+						}
+					} else if (e.type === "injury") {
+						injuries += 1;
+					}
+				});
+				for (const t of sim.team) {
+					for (const p of t.player) {
+						// (a knock is never an injury after the game, and a player cleared to return is healthy)
+						if (p.knock && !p.newInjury) {
+							const ev = events.findLast(
+								(e) => e.type === "knockReturn" && e.pid === p.id,
+							);
+							if (ev) {
+								assert.strictEqual(p.injured, !ev.back);
+							}
+						}
+					}
+				}
+			},
+			// (a high injury rate, to see some)
+			{ baseInjuryRate: 0.002, doPlayByPlay: true },
+		);
+	}
+	assert.isAbove(knocks, 10);
+	// (about SIM_FIX_KNOCK.rate knocks per injury)
+	assert.isAbove(knocks / Math.max(1, injuries), SIM_FIX_KNOCK.rate / 2);
+	assert.isBelow(knocks / Math.max(1, injuries), SIM_FIX_KNOCK.rate * 2);
+	// (a late knock may not be evaluated before the game ends)
+	assert.isAtMost(returns + ruledOut, knocks);
+	assert.isAbove(returns, ruledOut);
+	assert.isAbove(returnedAndPlayed, 0);
+});
+
+test("knocks: none without Game Sim Fixes", async () => {
+	await scenario(
+		200,
+		{ simFixes: false },
+		(sim) => {
+			const result = sim.run();
+			const events = result.playByPlay as any[];
+			assert.isFalse(events.some((e) => e.type === "knock"));
+			assert.isTrue(events.some((e) => e.type === "injury"));
+		},
+		{ baseInjuryRate: 0.005, doPlayByPlay: true },
+	);
 });

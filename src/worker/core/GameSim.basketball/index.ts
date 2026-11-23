@@ -17,6 +17,7 @@ import {
 	SIM_FIX_OFF_FOUL,
 	SIM_FIX_FT_ORB,
 	SIM_FIX_BLOCK,
+	SIM_FIX_KNOCK,
 	SIM_FIX_LEFTY,
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
@@ -394,6 +395,8 @@ type PlayerGameSim = {
 	bt?: number[];
 	injured: boolean;
 	newInjury: boolean;
+	// Game Sim Fixes: a knock (minor in-game injury), with the game minute when he is evaluated
+	knock?: { evalAt: number };
 	injury: PlayerInjury & {
 		playingThrough: boolean;
 	};
@@ -808,6 +811,9 @@ class GameSim extends GameSimBase {
 	runTimeoutNow = false;
 	// (for the tests and the calibration script)
 	endgameCounts = { runTimeouts: 0, up3Fouls: 0, odSubs: 0, foulsToGive: 0 };
+	// Game Sim Fixes: game minutes played so far, and the knocked players waiting for their evaluation
+	elapsedMin = 0;
+	knocked: PlayerGameSim[] = [];
 	// The period in which each team (on defense) last decided on a foul to give
 	ftgPeriod: [number, number] = [0, 0];
 	// ...and when this possession's foul to give happens (seconds left)
@@ -4455,6 +4461,7 @@ class GameSim extends GameSimBase {
 	 */
 	updatePlayingTime(possessionLength: number) {
 		const min = possessionLength / 60;
+		this.elapsedMin += min;
 		// (perf4: loop invariants read once)
 		const logMin = this.playByPlay.active && this.playByPlay.live;
 		for (const t of teamNums) {
@@ -4524,6 +4531,10 @@ class GameSim extends GameSimBase {
 	injuries() {
 		if (this.baseInjuryRate === 0) {
 			return false;
+		}
+		// Game Sim Fixes: players shaken up earlier are evaluated (no random numbers unless one is due)
+		if (this.knocked.length > 0) {
+			this.evaluateKnocks();
 		}
 
 		let newInjury = false;
@@ -4607,12 +4618,36 @@ class GameSim extends GameSimBase {
 								tiredNorm
 							: 1);
 
-					if (Math.random() < injuryRate) {
+					const r = Math.random();
+					if (r < injuryRate) {
 						p.injured = true;
 						p.newInjury = true;
 						newInjury = true;
 						this.playByPlay.logEvent({
 							type: "injury",
+							t,
+							pid: p.id,
+							clock: this.t,
+						});
+					} else if (
+						this.simFixes &&
+						r < injuryRate * (1 + SIM_FIX_KNOCK.rate) &&
+						!p.knock
+					) {
+						// Game Sim Fixes: a knock (same random number, so the real injuries are unchanged)
+						p.injured = true;
+						p.knock = {
+							evalAt:
+								this.elapsedMin +
+								uniform(SIM_FIX_KNOCK.minMin, SIM_FIX_KNOCK.maxMin),
+						};
+						this.knocked.push(p);
+						newInjury = true;
+						if (FLOW_DIAG.on) {
+							flowCount("knocks");
+						}
+						this.playByPlay.logEvent({
+							type: "knock",
 							t,
 							pid: p.id,
 							clock: this.t,
@@ -4623,6 +4658,33 @@ class GameSim extends GameSimBase {
 		}
 
 		return newInjury;
+	}
+
+	// Game Sim Fixes: knocked players whose evaluation is due are cleared to return or ruled out for the game
+	evaluateKnocks() {
+		for (let i = this.knocked.length - 1; i >= 0; i--) {
+			const p = this.knocked[i]!;
+			if (this.elapsedMin < p.knock!.evalAt) {
+				continue;
+			}
+			this.knocked.splice(i, 1);
+			const back = Math.random() < SIM_FIX_KNOCK.returnProb;
+			// (a real injury while he was out can't happen, he was on the bench)
+			if (back) {
+				p.injured = false;
+			}
+			if (FLOW_DIAG.on && back) {
+				flowCount("knockReturns");
+			}
+			const t = this.team[0].player.includes(p) ? 0 : 1;
+			this.playByPlay.logEvent({
+				type: "knockReturn",
+				t,
+				pid: p.id,
+				back,
+				clock: this.t,
+			});
+		}
 	}
 
 	getNumFoulsUntilBonus() {

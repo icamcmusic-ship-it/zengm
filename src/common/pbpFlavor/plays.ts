@@ -1135,6 +1135,29 @@ export const heaveText = (rng: Rng, p: FPlayer, made: boolean) => {
 	]);
 };
 
+// Game Sim Fixes knocks: a minor in-game injury, and the evaluation a few minutes later
+export const knockText = (rng: Rng, p: FPlayer) =>
+	pickV(rng, [
+		`${p.name} is shaken up on the play and heads to the bench to get checked out.`,
+		`${p.name} is slow to get up and checks out of the game; the trainer takes a look.`,
+		`${p.name} takes a knock and goes to the bench, flexing his hand.`,
+		`${p.name} limps off after the play. He's being looked at on the bench.`,
+		`${p.name} gets banged up on the play and heads back to the locker room to be evaluated.`,
+	]);
+
+export const knockReturnText = (rng: Rng, p: FPlayer, back: boolean) =>
+	back
+		? pickV(rng, [
+				`${p.name} has been cleared and is available to return.`,
+				`Good news for his team: ${p.name} is back on the bench and available.`,
+				`${p.name} is cleared to return after being checked out.`,
+			])
+		: pickV(rng, [
+				`${p.name} will not return to the game.`,
+				`${p.name} has been ruled out for the rest of the game; it looks like a day-to-day thing.`,
+				`${p.name} is done for the night as a precaution.`,
+			]);
+
 export const injuryText = (rng: Rng, p: FPlayer) =>
 	pickV(rng, [
 		`${p.name} was injured!`,
