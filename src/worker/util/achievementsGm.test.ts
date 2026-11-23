@@ -104,6 +104,49 @@ describe("GM career achievements", () => {
 		assert.isFalse(await get("gm_outlast").check());
 	});
 
+	test("gm_outlast: only firings while the user kept his current job", async () => {
+		const fire = async (count: number, end: number) => {
+			const teams = await idb.cache.teams.getAll();
+			for (let i = 0; i < count; i++) {
+				const t = teams[i % teams.length]!;
+				t.formerGms = [
+					...(t.formerGms ?? []),
+					{
+						gmid: 2000 + end * 100 + (t.formerGms?.length ?? 0) * 40 + t.tid,
+						tenures: [{ tid: t.tid, start: end - 3, end, reason: "fired" }],
+					} as unknown as Gm,
+				];
+				await idb.cache.teams.put(t);
+			}
+		};
+		// The user ran another team in 2012 (then took this job), and spectated in 2011
+		await addSeasons([
+			{ season: 2011, userTid: -1 },
+			{ season: 2012, userTid: 3 },
+		]);
+		const ts2011 = (await idb.cache.teamSeasons.indexGet(
+			"teamSeasonsBySeasonTid",
+			[2011, g.get("userTid")],
+		))!;
+		ts2011.userControl = "auto";
+		await idb.cache.teamSeasons.put(ts2011);
+		await fire(10, 2012);
+		assert.isFalse(await get("gm_outlast").check(), "before this job");
+		await fire(10, 2013);
+		assert.isTrue(await get("gm_outlast").check());
+
+		// Fired himself: no
+		g.setWithoutSavingToDB("gameOver", true);
+		assert.isFalse(await get("gm_outlast").check());
+		g.setWithoutSavingToDB("gameOver", false);
+
+		// Spectating this season: no current run
+		await setCurrent((ts) => {
+			ts.userControl = "auto";
+		});
+		assert.isFalse(await get("gm_outlast").check());
+	});
+
 	test("gm_every_team: a title with every team the user ran, 2+ teams", async () => {
 		// Ran team 3 in 2011 (title) and 2012, then team 7 (title now)
 		await addSeasons([

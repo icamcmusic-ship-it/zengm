@@ -6,6 +6,7 @@ import { getGmProfile } from "../core/gm/profile.ts";
 import { gmHotSeatLabel, gmStyleLabels } from "../../common/gmPersonality.ts";
 import { idb } from "../db/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
+import { gmExpHidden } from "./gmShared.ts";
 
 export default defineView({
 	id: "gm",
@@ -36,8 +37,14 @@ export default defineView({
 				profile.currentTid !== undefined
 					? await idb.cache.teams.get(profile.currentTid)
 					: undefined;
+			// No Visible Ratings challenge: no expected wins (they come from roster ratings)
+			const noRatings = gmExpHidden();
 			return {
 				...profile,
+				seasons: noRatings
+					? profile.seasons.map((row) => ({ ...row, expWon: undefined }))
+					: profile.seasons,
+				noRatings,
 				styleLabels: gmStyleLabels(profile.traits),
 				hotSeatLabel:
 					t?.gm?.gmid === profile.gmid

@@ -100,8 +100,11 @@ export const CoachExecRaceTable = ({
 	title?: ReactNode;
 }) => {
 	const { userTid } = useLocal(["userTid"]);
-	const allVariables: readonly string[] =
-		race.kind === "coy" ? COY_VARIABLES : EOY_VARIABLES;
+	// No Visible Ratings: the variables the worker doesn't send aren't columns either
+	const hiddenVars = new Set(race.kind === "coy" ? race.hiddenVars : []);
+	const allVariables: readonly string[] = (
+		race.kind === "coy" ? COY_VARIABLES : EOY_VARIABLES
+	).filter((key) => !hiddenVars.has(key));
 	const choice = useStatColsChoice({
 		key: `coachExec:${race.kind}`,
 		persist: async (stats) => {
@@ -113,9 +116,9 @@ export const CoachExecRaceTable = ({
 		saved: race.statCols,
 		suggested: [...allVariables],
 	});
-	const variables: readonly string[] = preview
-		? (race.statCols ?? allVariables)
-		: choice.stats;
+	const variables: readonly string[] = (
+		preview ? (race.statCols ?? allVariables) : choice.stats
+	).filter((key) => !hiddenVars.has(key));
 	const hasOdds = race.candidates.some((c) => c.odds !== undefined);
 
 	const cols: Col[] = [
@@ -149,7 +152,7 @@ export const CoachExecRaceTable = ({
 			race.kind === "coy" ? (
 				<a href={helpers.leagueUrl(["coach", c.id])}>{c.name}</a>
 			) : "gmid" in c && c.gmid !== undefined ? (
-				<a href={helpers.leagueUrl(["front_offices"])}>{c.name}</a>
+				<a href={helpers.leagueUrl(["gm", c.gmid])}>{c.name}</a>
 			) : (
 				c.name
 			);

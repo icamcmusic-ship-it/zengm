@@ -25,7 +25,13 @@ import {
 	withRandom,
 } from "../../../common/random.ts";
 import { saltedSeed } from "../../../common/leagueSalt.ts";
-import type { Gm, GmSeason, Team } from "../../../common/types.ts";
+import type {
+	Gm,
+	GmSeason,
+	GmTenure,
+	Team,
+	TeamSeason,
+} from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { actualPhase } from "../../util/actualPhase.ts";
@@ -34,7 +40,8 @@ import { isCollege } from "../college/isCollege.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
-import { league, team } from "../index.ts";
+import { league, season as seasonCore, team } from "../index.ts";
+import { InvalidPlayoffSettingsError } from "../season/genPlayoffSeries.ts";
 import { gmAnalyticsShift } from "../frontOffice/index.ts";
 import {
 	GM_FINANCE_STYLES,
@@ -268,18 +275,33 @@ const logGmEvent = async (text: string, tids: number[], score = 0) => {
 const startSeason = () =>
 	actualPhase() >= PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
 
+// The AI runs one of the user's teams because spectator mode is on
+const spectatorRunsTeam = (tid: number) =>
+	g.get("spectator") && g.get("userTids").includes(tid);
+
 const hireGm = (
 	t: Team,
 	gm: Gm,
 	initial?: boolean,
 	start: number = startSeason(),
 ) => {
-	gm.tenures.push(
-		initial ? { tid: t.tid, start, initial: true } : { tid: t.tid, start },
-	);
+	const tenure: GmTenure = initial
+		? { tid: t.tid, start, initial: true }
+		: { tid: t.tid, start };
+	// Hired while the regular season is being played (a team the user gave up, an expansion team), not in an offseason
+	const phase = actualPhase();
+	if (
+		!initial &&
+		start === g.get("season") &&
+		(phase === PHASE.REGULAR_SEASON || phase === PHASE.AFTER_TRADE_DEADLINE)
+	) {
+		tenure.midSeason = true;
+	}
+	gm.tenures.push(tenure);
 	gm.hotSeat = undefined;
 	gm.expWon = undefined;
 	gm.retiredYear = undefined;
+	gm.spectatorFor = spectatorRunsTeam(t.tid) ? t.tid : undefined;
 	t.gm = gm;
 };
 
@@ -317,6 +339,39 @@ const pruneRetired = (gm: Gm) => {
 		}
 	}
 	gm.career = career;
+	// Each job's record too, for his profile's tenures
+	for (const tenure of gm.tenures) {
+		const rows = gm.seasons.filter(
+			(row) =>
+				row.tid === tenure.tid &&
+				row.season >= tenure.start &&
+				row.season <= (tenure.end ?? Infinity),
+		);
+		if (rows.length === 0) {
+			continue;
+		}
+		const record = tenure.record ?? {
+			won: 0,
+			lost: 0,
+			tied: 0,
+			otl: 0,
+			playoffs: 0,
+			titles: 0,
+		};
+		for (const row of rows) {
+			record.won += row.won;
+			record.lost += row.lost;
+			record.tied += row.tied;
+			record.otl += row.otl;
+			if (row.playoffRoundsWon >= 0) {
+				record.playoffs += 1;
+			}
+			if (isTitle(row)) {
+				record.titles += 1;
+			}
+		}
+		tenure.record = record;
+	}
 	gm.seasons = [];
 	return true;
 };
@@ -347,12 +402,20 @@ export const leaveTeam = (
 		tenure.reason = reason;
 	}
 	gm.expWon = undefined;
+	gm.spectatorFor = undefined;
 	if (reason === "retired") {
 		retire(gm, season);
 	}
 	t.formerGms = [...(t.formerGms ?? []), gm];
 	t.gm = undefined;
 };
+
+// The GM who ran one of the user's teams in spectator mode and stepped aside when the user took it back, if he's still there to
+// step in again (not hired elsewhere, not retired)
+const parkedSpectatorGm = (t: Team) =>
+	t.formerGms?.find(
+		(gm) => gm.spectatorFor === t.tid && gm.retiredYear === undefined,
+	);
 
 /**
  * Give every AI team without a GM one (new leagues, turning the setting on, expansion teams, a team the user gave up), and take the GM
@@ -370,11 +433,33 @@ export const ensureGms = async () => {
 	for (const t of teams) {
 		const gm = t.gm;
 		if (gm && (t.disabled || userOwnsTeam(t.tid))) {
+			// Spectator mode turned off: the GM who ran the team for it steps aside, to step in again the next time it's turned on. A
+			// stint that covered no season of his own leaves no tenure and no news, so toggling spectator mode doesn't churn GMs
+			const caretaker = !t.disabled && gm.spectatorFor === t.tid;
+			const tenure = currentTenure(gm);
+			if (
+				caretaker &&
+				tenure &&
+				tenure.end === undefined &&
+				tenure.start > startSeason() - 1
+			) {
+				gm.tenures.pop();
+				gm.expWon = undefined;
+				gm.hotSeat = undefined;
+				t.formerGms = [...(t.formerGms ?? []), gm];
+				t.gm = undefined;
+				await idb.cache.teams.put(t);
+				changed = true;
+				continue;
+			}
 			// A contracted team's GM left after its last season (older leagues kept him on the team, maybe for years)
 			const lastRow = t.disabled
 				? gm.seasons.findLast((row) => row.tid === t.tid)?.season
 				: undefined;
 			leaveTeam(t, "left", Math.min(startSeason() - 1, lastRow ?? Infinity));
+			if (caretaker) {
+				gm.spectatorFor = t.tid;
+			}
 			await idb.cache.teams.put(t);
 			changed = true;
 			if (!t.disabled) {
@@ -397,14 +482,28 @@ export const ensureGms = async () => {
 			successor?.tid === t.tid
 				? takeFromMarket(teams, successor.gmid, t.tid)
 				: undefined;
-		const gm = picked ?? (await generateGm(gmid, { seeded: !firstTime }));
-		if (!picked) {
+		// Else the GM who ran it in spectator mode before, back again
+		const parked = picked ? undefined : parkedSpectatorGm(t);
+		if (parked) {
+			t.formerGms = t.formerGms!.filter((x) => x !== parked);
+		}
+		const gm =
+			picked ?? parked ?? (await generateGm(gmid, { seeded: !firstTime }));
+		if (!picked && !parked) {
 			gmid += 1;
 		}
 		hireGm(t, gm, firstTime);
 		await idb.cache.teams.put(t);
 		changed = true;
-		if (picked) {
+		if (parked) {
+			// Spectator mode turned on again: the same GM, no news
+			if (!spectatorRunsTeam(t.tid)) {
+				await logGmEvent(
+					`${teamLink(t.tid)} named ${gmLink(gm)}${financeText(gm)} general manager.`,
+					[t.tid],
+				);
+			}
+		} else if (picked) {
 			await logGmEvent(
 				`${teamLink(t.tid)} named ${gmLink(gm)}${financeText(gm)} general manager, the successor picked by the general manager they fired.`,
 				[t.tid],
@@ -595,6 +694,39 @@ const youthValue = async (tid: number) => {
 		: values.reduce((a, b) => a + b, 0) / values.length;
 };
 
+/**
+ * First round picks a team holds beyond its own, over the seasons that have picks right now (at most 4 of them counted, scaled): this
+ * season's pick until the draft uses it, and then the seasons after it, up to the ones genPicks has made (numFuture seasons, moving on
+ * a year after the draft). A team holding exactly its own picks is at 0 whatever the phase
+ */
+export const extraFirstRoundPicks = (
+	picks: { round: number; season: number | string }[],
+	{
+		season,
+		phase,
+		numFuture,
+	}: { season: number; phase: number; numFuture: number },
+) => {
+	if (numFuture <= 0) {
+		return 0;
+	}
+	const from = phase >= PHASE.DRAFT ? season + 1 : season;
+	const to = season + numFuture - 1 + (phase > PHASE.DRAFT ? 1 : 0);
+	const numSeasons = to - from + 1;
+	if (numSeasons <= 0) {
+		return 0;
+	}
+	const firsts = picks.filter(
+		(dp) =>
+			dp.round === 1 &&
+			typeof dp.season === "number" &&
+			dp.season >= from &&
+			dp.season <= to,
+	).length;
+	const counted = Math.min(numSeasons, 4);
+	return (firsts * counted) / numSeasons - counted;
+};
+
 // Progress signals for the season just finished
 const progressSignals = async (
 	t: Team,
@@ -608,24 +740,20 @@ const progressSignals = async (
 		t.tid,
 	);
 	const season = g.get("season");
-	const numFuture = g.get("numSeasonsFutureDraftPicks");
-	const firsts = picks.filter(
-		(dp) =>
-			dp.round === 1 &&
-			typeof dp.season === "number" &&
-			dp.season > season &&
-			dp.season <= season + numFuture,
-	).length;
-	const ownFirsts = Math.min(numFuture, 4);
-	const payroll = await team.getPayroll(t.tid);
+	// Cap room once this season's expiring contracts come off: the payroll he has committed for next season
+	const payroll = await team.getPayroll(t.tid, season + 1);
 	const salaryCap = g.get("salaryCap");
 	const scale = 82 / Math.max(1, numGames);
 	const progress = gmProgressScore({
 		youthChange: prev?.youth !== undefined ? youth - prev.youth : 0,
-		extraFirsts:
-			numFuture > 0
-				? (firsts * Math.min(numFuture, 4)) / numFuture - ownFirsts
-				: 0,
+		extraFirsts: extraFirstRoundPicks(picks, {
+			season,
+			phase: actualPhase(),
+			numFuture:
+				g.get("draftType") === "freeAgents"
+					? 0
+					: g.get("numSeasonsFutureDraftPicks"),
+		}),
 		capRoom: (salaryCap - payroll) / Math.max(1, salaryCap),
 		winTrend: prev ? (won - prev.won) * scale : 0,
 	});
@@ -749,12 +877,71 @@ export const projectedFireProb = async (
 	return fireProbOf(t, gm, rows, marketFactors(teams).get(t.tid) ?? 0);
 };
 
+// Games a team must have played before its season is projected for hot seat news and rumors: 10 of 82, scaled to the season length
+export const hotSeatMinGp = () =>
+	Math.max(1, Math.min(10, Math.ceil((g.get("numGames") * 10) / 82)));
+
+// The teams in a playoff spot if the regular season ended now (the standings with their tiebreakers, which draw no random numbers)
+export const currentPlayoffTids = async () => {
+	try {
+		return new Set((await seasonCore.genPlayoffSeries()).tidPlayoffs);
+	} catch (error) {
+		if (error instanceof InvalidPlayoffSettingsError) {
+			return new Set<number>();
+		}
+		throw error;
+	}
+};
+
+/**
+ * The season so far projected to a full one, judged the way the owner will judge it (hot seat news and the rumor mill): during the
+ * playoffs his real playoff result, before them making the playoffs (0 rounds won) if his team is in a playoff spot now.
+ * playoffTids: currentPlayoffTids, looked up once by the caller
+ */
+export const projectedSeasonFireProb = async (
+	t: Team,
+	teams: Team[],
+	ts: Pick<
+		TeamSeason,
+		"season" | "won" | "lost" | "tied" | "otl" | "playoffRoundsWon"
+	>,
+	playoffTids: () => Promise<Set<number>>,
+) => {
+	const gp = helpers.getTeamSeasonGp(ts);
+	if (gp <= 0) {
+		return 0;
+	}
+	const scale = g.get("numGames") / gp;
+	const playoffRoundsWon =
+		g.get("phase") === PHASE.PLAYOFFS
+			? ts.playoffRoundsWon
+			: (await playoffTids()).has(t.tid)
+				? 0
+				: -1;
+	return projectedFireProb(t, teams, {
+		season: ts.season,
+		won: ts.won * scale,
+		lost: ts.lost * scale,
+		tied: (ts.tied ?? 0) * scale,
+		otl: (ts.otl ?? 0) * scale,
+		playoffRoundsWon,
+	});
+};
+
+// Looks the playoff spots up the first time they're needed
+export const lazyPlayoffTids = () => {
+	let promise: Promise<Set<number>> | undefined;
+	return () => {
+		promise ??= currentPlayoffTids();
+		return promise;
+	};
+};
+
 // Hot seat news: at the trade deadline (mid-season in a league without one), the AI GMs most likely to be fired if the season ended
 // now are reported to be in danger. At least HOT_SEAT_NEWS_MIN_PROB, each reported with that probability from a stream seeded by the
 // season and his id (never the main stream), at most HOT_SEAT_NEWS_MAX a season, worst first
 export const HOT_SEAT_NEWS_MIN_PROB = 0.3;
 export const HOT_SEAT_NEWS_MAX = 3;
-const HOT_SEAT_NEWS_MIN_GP = 10;
 
 export const hotSeatNews = async () => {
 	if (!gmEnabled() || isCollege()) {
@@ -766,7 +953,8 @@ export const hotSeatNews = async () => {
 	}
 	const season = g.get("season");
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
-	const numGames = g.get("numGames");
+	const minGp = hotSeatMinGp();
+	const playoffTids = lazyPlayoffTids();
 
 	const candidates: { t: Team; gm: Gm; prob: number; record: string }[] = [];
 	for (const t of teams) {
@@ -779,19 +967,10 @@ export const hotSeatNews = async () => {
 			t.tid,
 		]);
 		const gp = ts ? helpers.getTeamSeasonGp(ts) : 0;
-		if (!ts || gp < HOT_SEAT_NEWS_MIN_GP) {
+		if (!ts || gp < minGp) {
 			continue;
 		}
-		// The season so far projected to a full one, judged the way the owner will judge it (as the rumor mill does)
-		const scale = numGames / gp;
-		const prob = await projectedFireProb(t, teams, {
-			season,
-			won: ts.won * scale,
-			lost: ts.lost * scale,
-			tied: (ts.tied ?? 0) * scale,
-			otl: (ts.otl ?? 0) * scale,
-			playoffRoundsWon: -1,
-		});
+		const prob = await projectedSeasonFireProb(t, teams, ts, playoffTids);
 		if (prob < HOT_SEAT_NEWS_MIN_PROB) {
 			continue;
 		}
@@ -977,7 +1156,16 @@ export const runOffseason = async () => {
 	// Retired GMs' season rows become career totals
 	for (const t of allTeams) {
 		for (const gm of t.formerGms ?? []) {
+			// The GM waiting to run the user's team again in spectator mode stays, unless he's too old to be hired
+			if (
+				gm.retiredYear === undefined &&
+				gm.spectatorFor === t.tid &&
+				season + 1 - gm.born.year <= MAX_HIRE_AGE
+			) {
+				continue;
+			}
 			if (gm.retiredYear === undefined && !onGmMarket(gm, season)) {
+				gm.spectatorFor = undefined;
 				retire(gm, season);
 			} else {
 				pruneRetired(gm);

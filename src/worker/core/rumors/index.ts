@@ -72,7 +72,12 @@ import {
 import { isCollege } from "../college/isCollege.ts";
 import { getNeedLabels, getTeamNeeds } from "../draft/draftNeeds.ts";
 import { getFreeAgentMarket } from "../freeAgents/market.ts";
-import { gmEnabled, projectedFireProb } from "../gm/index.ts";
+import {
+	gmEnabled,
+	hotSeatMinGp,
+	lazyPlayoffTids,
+	projectedSeasonFireProb,
+} from "../gm/index.ts";
 import league from "../league/index.ts";
 import moodInfo from "../player/moodInfo.ts";
 import {
@@ -752,6 +757,8 @@ const gatherGm = async (ctx: Ctx): Promise<Draft[]> => {
 	if (!gmEnabled() || ctx.phase > PHASE.PLAYOFFS) {
 		return out;
 	}
+	const minGp = hotSeatMinGp();
+	const playoffTids = lazyPlayoffTids();
 	for (const t of ctx.teams) {
 		const gm = t.gm;
 		if (!gm || !ctx.aiSet.has(t.tid)) {
@@ -762,19 +769,16 @@ const gatherGm = async (ctx: Ctx): Promise<Draft[]> => {
 			t.tid,
 		]);
 		const gp = ts ? helpers.getTeamSeasonGp(ts) : 0;
-		if (!ts || gp < 10) {
+		if (!ts || gp < minGp) {
 			continue;
 		}
 		// The season so far, projected to a full one, judged the way the owner will judge it after the playoffs (gm/index.ts)
-		const scale = g.get("numGames") / gp;
-		const fireProb = await projectedFireProb(t, ctx.teams, {
-			season: ctx.season,
-			won: ts.won * scale,
-			lost: ts.lost * scale,
-			tied: (ts.tied ?? 0) * scale,
-			otl: (ts.otl ?? 0) * scale,
-			playoffRoundsWon: ctx.phase === PHASE.PLAYOFFS ? ts.playoffRoundsWon : -1,
-		});
+		const fireProb = await projectedSeasonFireProb(
+			t,
+			ctx.teams,
+			ts,
+			playoffTids,
+		);
 		if (fireProb < 0.15) {
 			continue;
 		}

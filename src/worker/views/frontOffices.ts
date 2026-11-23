@@ -11,10 +11,12 @@ import { idb } from "../db/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { featureOffError } from "../util/nativeFeatures.ts";
-import { formatGm, type FormattedGm } from "./gmShared.ts";
+import { formatGm, gmExpHidden, type FormattedGm } from "./gmShared.ts";
 
 type Move = {
+	// After this season (in the offseason before the next one), or during it (midSeason)
 	season: number;
+	midSeason?: boolean;
 	type: "hired" | "fired" | "retired" | "left";
 	tid: number;
 	abbrev: string;
@@ -87,8 +89,9 @@ export default defineView({
 					if (!tenure.initial) {
 						const before = gm.tenures.slice(0, i).map((x) => abbrev(x.tid));
 						moves.push({
-							// Hired in the offseason before his first season
-							season: tenure.start - 1,
+							// Hired in the offseason before his first season, or during it
+							season: tenure.midSeason ? tenure.start : tenure.start - 1,
+							midSeason: tenure.midSeason ? true : undefined,
 							type: "hired",
 							tid: tenure.tid,
 							abbrev: abbrev(tenure.tid),
@@ -121,9 +124,11 @@ export default defineView({
 
 		const carouselMoves = moves;
 		const order = { fired: 0, retired: 1, left: 2, hired: 3 };
+		// Newest first: during a season comes after the offseason before it
+		const when = (m: Move) => m.season + (m.midSeason ? 0.5 : 0);
 		carouselMoves.sort(
 			(a, b) =>
-				b.season - a.season ||
+				when(b) - when(a) ||
 				order[a.type] - order[b.type] ||
 				a.abbrev.localeCompare(b.abbrev),
 		);
@@ -145,6 +150,8 @@ export default defineView({
 					}))
 				: undefined,
 			userTid: g.get("userTid"),
+			// No Visible Ratings challenge: no expectations column (they come from roster ratings)
+			noRatings: gmExpHidden(),
 		};
 	},
 });

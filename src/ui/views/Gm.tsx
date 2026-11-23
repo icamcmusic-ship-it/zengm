@@ -32,6 +32,7 @@ const Gm = ({
 	hof,
 	hotSeatLabel,
 	name,
+	noRatings,
 	notableTrades,
 	numTrades,
 	retiredYear,
@@ -172,7 +173,11 @@ const Gm = ({
 								<th>Season</th>
 								<th>Team</th>
 								<th>W-L</th>
-								<th title="Expected wins at the start of the season">Exp. W</th>
+								{noRatings ? null : (
+									<th title="Expected wins at the start of the season">
+										Exp. W
+									</th>
+								)}
 								<th>Playoffs</th>
 								<th>Awards</th>
 							</tr>
@@ -204,7 +209,7 @@ const Gm = ({
 											<span className="text-body-secondary"> (partial)</span>
 										) : null}
 									</td>
-									<td>{row.expWon ?? ""}</td>
+									{noRatings ? null : <td>{row.expWon ?? ""}</td>}
 									<td>{playoffText(row.playoffRoundsWon, row.numRounds)}</td>
 									<td>{row.exec ? "Executive of the Year" : ""}</td>
 								</tr>

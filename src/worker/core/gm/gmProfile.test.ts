@@ -39,6 +39,88 @@ describe("GM profile and successor", () => {
 		assert.deepEqual(await getUserVsGms(), []);
 	});
 
+	const addTrade = async (season: number, phase: number, otherTid: number) => {
+		await idb.cache.events.add({
+			type: "trade",
+			season,
+			phase: phase as any,
+			tids: [g.get("userTid"), otherTid],
+			pids: [],
+			dpids: [],
+			score: 5,
+			teams: [{ assets: [] }, { assets: [] }],
+		} as any);
+	};
+
+	test("trades with the user: this offseason's are his, an AI-run preseason's aren't", async () => {
+		const season = g.get("season");
+		const otherTid = 3;
+		const gmid = (await idb.cache.teams.get(otherTid))!.gm!.gmid;
+
+		// During this offseason (they count for next season): marked "(you)" on his profile
+		g.setWithoutSavingToDB("phase", PHASE.DRAFT);
+		await addTrade(season, PHASE.DRAFT, otherTid);
+		const profile = (await getGmProfile(gmid))!;
+		assert.strictEqual(profile.notableTrades.length, 1);
+		assert.isTrue(profile.notableTrades[0]!.withUser);
+		assert.strictEqual(
+			(await getUserVsGms()).find((row) => row.gmid === gmid)!.trades.length,
+			1,
+		);
+
+		// Next preseason in spectator mode: the AI made that trade for the user's team, it's not his
+		g.setWithoutSavingToDB("season", season + 1);
+		g.setWithoutSavingToDB("phase", PHASE.PRESEASON);
+		g.setWithoutSavingToDB("spectator", true);
+		await addTrade(season + 1, PHASE.PRESEASON, otherTid);
+		const spectating = (await getUserVsGms()).find((row) => row.gmid === gmid);
+		assert.isFalse(
+			(spectating?.trades ?? []).some((x) => x.season === season + 1),
+		);
+		g.setWithoutSavingToDB("spectator", false);
+		const user = (await getUserVsGms()).find((row) => row.gmid === gmid)!;
+		assert.deepEqual(
+			user.trades.map((x) => x.season),
+			[season + 1, season],
+		);
+	});
+
+	test("No Visible Ratings: no expected wins sent", async () => {
+		const t = (await idb.cache.teams.get(3))!;
+		t.gm!.expWon = 50;
+		await idb.cache.teams.put(t);
+		const load = (await import("../../views/gm.ts")).default.load;
+		const frontOffices = (await import("../../views/frontOffices.ts")).default
+			.load;
+		const view = async () =>
+			(await load({
+				inputs: { gmid: t.gm!.gmid },
+				updateEvents: new Set(["firstRun"]),
+				prevInputs: {},
+				prevOutput: {},
+				conditions: {},
+			} as any)) as any;
+		const fo = async () =>
+			(await frontOffices({
+				inputs: {},
+				updateEvents: new Set(["firstRun"]),
+				prevInputs: {},
+				prevOutput: {},
+				conditions: {},
+			} as any)) as any;
+		assert.isFalse((await view()).noRatings);
+		assert.strictEqual(
+			(await fo()).rows.find((row: any) => row.tid === 3).gm.expWon,
+			50,
+		);
+		g.setWithoutSavingToDB("challengeNoRatings", true);
+		assert.isTrue((await view()).noRatings);
+		const rowGm = (await fo()).rows.find((row: any) => row.tid === 3).gm;
+		assert.isUndefined(rowGm.expWon);
+		assert.isUndefined(rowGm.aboveExp);
+		assert.isTrue((await fo()).noRatings);
+	});
+
 	test("fired: the user picks a GM from the market, who takes over his old team when he leaves", async () => {
 		const userTid = g.get("userTid");
 		const marketTid = 5;

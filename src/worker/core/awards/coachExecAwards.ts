@@ -838,7 +838,7 @@ export const awardExecOfTheYear = async () => {
 	const who = best.user
 		? "You"
 		: best.gmid !== undefined
-			? `General manager <a href="/l/${g.get("lid")}/front_offices">${best.name}</a> of ${teamLink(best.tid)}`
+			? `General manager <a href="/l/${g.get("lid")}/gm/${best.gmid}">${best.name}</a> of ${teamLink(best.tid)}`
 			: `The front office of ${teamLink(best.tid)}`;
 	await logEvent({
 		type: "award",
@@ -863,6 +863,8 @@ export type CoachExecRace =
 			winnerId: number | undefined;
 			// Variables chosen as columns (validated), undefined for all of them
 			statCols: string[] | undefined;
+			// Variables not sent, so never shown (No Visible Ratings)
+			hiddenVars?: string[];
 	  }
 	| {
 			kind: "eoy";
@@ -874,6 +876,19 @@ export type CoachExecRace =
 			// Variables chosen as columns (validated), undefined for all of them
 			statCols: string[] | undefined;
 	  };
+
+// No Visible Ratings challenge: the roster rating variable is neither shown nor sent (it's the current team ratings, updated daily)
+const COACH_EXEC_RATINGS_VARIABLES = ["rosterWinp"];
+const hideRatingsVars = <T extends { vars: object }>(candidate: T): T => {
+	if (!g.get("challengeNoRatings")) {
+		return candidate;
+	}
+	const vars: Record<string, number> = { ...candidate.vars };
+	for (const key of COACH_EXEC_RATINGS_VARIABLES) {
+		delete vars[key];
+	}
+	return { ...candidate, vars };
+};
 
 /**
  * The Coach of the Year and Executive of the Year races of a season (the ones available in this league), best first, with the
@@ -919,9 +934,12 @@ export const getCoachExecRaces = async (
 			formula,
 			candidates: withId
 				.slice(0, limit)
-				.map((c) => ({ ...c, odds: odds?.[c.id] })),
+				.map((c) => hideRatingsVars({ ...c, odds: odds?.[c.id] })),
 			winnerId: winner?.cid,
 			statCols: coachExecStatCols("coy", options.statCols),
+			hiddenVars: g.get("challengeNoRatings")
+				? COACH_EXEC_RATINGS_VARIABLES
+				: undefined,
 		});
 	}
 

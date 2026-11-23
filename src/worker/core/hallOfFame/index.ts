@@ -482,7 +482,7 @@ const runWing = async (season: number, conditions: Conditions) => {
 			logEvent(
 				{
 					type: "hallOfFame",
-					text: `Executive <a href="${helpers.leagueUrl(["front_offices"])}">${gm.firstName} ${gm.lastName}</a> (${hofCase.line}) was inducted into the ${hofLink()}.`,
+					text: `Executive <a href="${helpers.leagueUrl(["gm", gm.gmid])}">${gm.firstName} ${gm.lastName}</a> (${hofCase.line}) was inducted into the ${hofLink()}.`,
 					showNotification: false,
 					pids: [],
 					tids: tid >= 0 ? [tid] : [],
