@@ -150,6 +150,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Scouting reports](#scouting-reports) | player Scouting page, Scouting Department, PDF | bball | `featureScoutingReports` | always on (core) |
 | [Coaching Staff Depth](#coaching-staff-depth) | Coaching Staff, coach pages, Staff Report, development | bball | `featureCoachingDepth` | always on (core) |
 | [Coach market & succession](#coach-market-and-succession) | Coaching Staff (hiring, coach market panel) | bball | `featureCoachMarket` | off / on |
+| [Generation presets](#generation-presets) | new league screen, League Settings (new players' builds) | bball | `featureGenerationPresets` + `generationPreset` | on (Balanced) / on (Balanced) |
 | [Player–coach relationships](#playercoach-relationships) | player Contract & mood panel, coach pages, mood, development plans | bball | `featurePlayerCoachRel` | on / off |
 | [Scout specialties & assignments](#scout-specialties-and-assignments) | Scouting Department, prospect Scouting page | bball | `featureScoutSpecialties` | off / on |
 | [Extra frivolities](#extra-frivolities) | Frivolities | all | `featureFrivolities` | on / on |
@@ -1663,6 +1664,22 @@ season). Never for an edited face. Measured over 3,000 seeds:
   - League: ovr 49.9 → 50.0 (SD 9.9 → 10.1), pot 56.1 → 56.3 (SD 7.8 → 7.9), rookies' ovr 39.1 → 38.6; rostered positions within 1.5 points each (C 13.0% → 11.8%, G 11.0% → 12.3%, F 6.0% → 7.5%, SF 8.3% → 7.4%); 3PA rate 0.397 → 0.403. **Scoring is up:** points 111.1 → 113.4 a game and TS% 57.6 → 58.7 (seed SE about 0.4 points and 0.2 TS points), already in a new league's first season: specialists and shooters are used well by the sim (spacing, shot selection). No single part causes it (each switched off alone left most of it).
   - Tests: the class-shape balance test (weighted ovr 0.08 / 0.00, pot -0.17 / -0.22) and the rating inflation test pass. The game-sim mechanics tests (`simLiveGameForTests.ts`, `outcomeInvariance.test.ts`) generate with the stock draw (`withStockGeneration`, test-only), since they were calibrated on that population; `expandedRatingsOff.fixture.json` was re-recorded (intended generation change).
 - **Engine:** `common/prospectVariety.ts` (tables, draws, rates; pure), `worker/core/player/genRatings.basketball.ts` (rating draw), `worker/core/player/prospectVariety.ts` (ovr-neutral reshaping, senior polish, near-duplicates, archetype steer, pre-draft trajectory), `worker/core/draft/genPlayersWithoutSaving.ts` (declaring, fifth-years, class steps), `worker/core/player/developSeason.basketball.ts` (rates, bust tail), `common/draftClassShape.ts` / `worker/core/draft/classShape.ts` (second shape), `worker/core/player/heredity.ts`; tests in `worker/core/player/prospectVariety.test.ts`.
+
+### Generation presets
+
+- **Where:** League Extras → _Generation Presets_ (`featureGenerationPresets`, basketball, on for every league) with the option _Generation Preset_ (`generationPreset`: `balanced` (default), `guard` Guard-heavy era, `big` Big-man era, `shooting` Shooting era, `athletic` Athletic era), on the new league screen and in League Settings. Code: `common/prospectVariety.ts` (`GENERATION_PRESETS`, `presetTypeShares`), `worker/core/player/genRatings.basketball.ts` (`generationPreset`). Test: `player/generationPresets.test.ts` (`GEN_PRESET_REPORT=1` prints the table below).
+- **What:** every newly generated player (a new league's random players, every draft class, random free agents; never real players): (1) the player type drawn within his height band (point, scorer, big, wing) is reweighted (guard era: point ×1.8, scorer ×1.5, big ×0.5; big-man era: point ×0.6, scorer ×0.7, big ×1.8; shooting: scorer ×1.4, wing ×1.1, big ×0.85; athletic: wing ×1.25, point ×0.9) from the same random number; (2) guard eras are 0.8 inch shorter and big-man eras 0.8 inch taller; (3) a rating tilt (guard: handle/passing +4, speed +2, inside −3, rebounding −4, strength −2; big: inside +5, rebounding +4, strength +3, three −4, handle −3, passing −2; shooting: three +6, free throws +4, mid-range +3, inside −3, dunking −3; athletic: leaping +5, speed/dunking +4, endurance +2, IQ/free throws/three −3); then his ovr is put back (`shiftToRawOvr`, like the regional tilts) to what it was at his drawn height, with a per-era correction for the type mix (guard −0.7, big +0.6 raw ovr). Balanced is the generator exactly as before (a test compares 1,500 players rating for rating), and the switch off reads as Balanced. No new random numbers. Existing players keep their ratings.
+- **Measured** (1,500 generated players per preset, same random stream, raw ratings at generation, Improved Positions on):
+
+  | preset          | raw ovr | guards (PG/G/SG) | bigs (PF/FC/C) | point / scorer / big type | three | inside | reb  | handle | leaping | speed |
+  | --------------- | ------- | ---------------- | -------------- | ------------------------- | ----- | ------ | ---- | ------ | ------- | ----- |
+  | Balanced        | 35.7    | 40.6%            | 31.7%          | 16.5% / 22.2% / 30.9%     | 35.7  | 31.1   | 40.0 | 40.8   | 50.9    | 50.9  |
+  | Guard-heavy era | 35.7    | 50.5%            | 18.7%          | 23.6% / 26.0% / 17.8%     | 38.0  | 24.9   | 33.1 | 45.3   | 52.5    | 54.4  |
+  | Big-man era     | 35.7    | 32.8%            | 46.6%          | 12.0% / 16.8% / 44.6%     | 29.6  | 38.7   | 46.1 | 36.8   | 48.8    | 48.6  |
+  | Shooting era    | 35.7    | 42.5%            | 30.0%          | 15.4% / 24.3% / 28.9%     | 41.8  | 27.4   | 37.3 | 40.3   | 49.6    | 50.6  |
+  | Athletic era    | 35.6    | 41.0%            | 32.6%          | 15.4% / 21.5% / 29.6%     | 32.5  | 30.7   | 39.6 | 40.6   | 55.6    | 54.6  |
+
+- **Known limits:** a preset changes only new players, so an existing league moves into an era over the drafts that follow (a new league is in it at once). The game sim and the league's averages (scoring, 3PA rate) follow the players: a shooting era shoots more threes; nothing rescales them.
 
 ### Sub-ratings
 

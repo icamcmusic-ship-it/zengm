@@ -760,6 +760,32 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "generationPresets",
+		key: "featureGenerationPresets",
+		name: "Generation Presets",
+		description:
+			"An era for newly generated players (new leagues' random players and every draft class): Balanced is the normal generator; Guard-heavy, Big-man, Shooting and Athletic eras tilt which player types are drawn within each height band and shift their ratings toward that era's style, with each player's overall kept the same, so the league's talent level doesn't change, only what it looks like. Real players are never changed. Existing players keep their ratings; a new preset affects players generated from then on.",
+		default: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "generationPreset",
+				name: "Generation Preset",
+				description:
+					"The era new players are generated for. Balanced: the normal generator.",
+				type: "string",
+				default: "balanced",
+				values: [
+					{ key: "balanced", value: "Balanced" },
+					{ key: "guard", value: "Guard-heavy era" },
+					{ key: "big", value: "Big-man era" },
+					{ key: "shooting", value: "Shooting era" },
+					{ key: "athletic", value: "Athletic era" },
+				],
+			},
+		],
+	},
+	{
 		id: "forkFaces",
 		key: "featureForkFaces",
 		core: true,
