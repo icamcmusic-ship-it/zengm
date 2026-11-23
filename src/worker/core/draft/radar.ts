@@ -42,7 +42,7 @@ export const radarInputFor = (
 		),
 		ageAtDraft: p.draft.year - p.born.year,
 		heightInches: p.hgt ?? heightFromRating(r.hgt),
-		athletic: athletic ?? tapeAthletic(r.spd, r.jmp),
+		athletic: athletic ?? tapeAthletic((r as any).spd, (r as any).jmp),
 		tested: athletic !== undefined,
 	};
 };
@@ -69,8 +69,11 @@ export const classCombineAthletic = async (
 	}
 	const combine = await getClassCombine(draftYear, players);
 	for (const [pid, result] of combine.results) {
-		if (result.drills) {
-			out.set(pid, athleticScore(combine.ranks.get(pid)));
+		const score = result.drills
+			? athleticScore(combine.ranks.get(pid))
+			: undefined;
+		if (score !== undefined) {
+			out.set(pid, score);
 		}
 	}
 	return out;

@@ -302,7 +302,10 @@ export const getRadarReason = (input: RadarInput): RadarReason | undefined => {
 		);
 	}
 
-	// Physical tools
+	// Physical tools, for a prospect whose production doesn't speak for him (a lowly recruited producer needs no other reason)
+	if (!isWeakProduction(seasons)) {
+		return undefined;
+	}
 	if (input.tested && input.athletic >= TOOLS_ATHLETIC) {
 		return make(
 			"combine",
