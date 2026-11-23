@@ -31,8 +31,7 @@ import {
 import { menuItems } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
 import { local, useLocal } from "../../util/local.ts";
-import { menuItemHiddenForLeagueType } from "../../util/collegeMode.ts";
-import { isMenuLinkFeatureOn } from "../../util/nativeFeatures.ts";
+import { commandPaletteLinkAvailable } from "../../util/menuFilter.ts";
 import { relativeTime } from "../../util/relativeTime.ts";
 import { router } from "../../router/index.ts";
 
@@ -106,38 +105,15 @@ const getResultsGroupedDefault = ({
 	playMenuOptions: LocalStateUI["playMenuOptions"];
 	searchText: string;
 }) => {
-	const filterMenuItem = (menuItem: MenuItemLink | MenuItemText) => {
-		if (menuItem.type === "text") {
-			return false;
-		}
-
-		if (!menuItem.commandPalette) {
-			return false;
-		}
-
-		if (!menuItem.league && inLeague) {
-			return false;
-		}
-
-		if (!menuItem.nonLeague && !inLeague) {
-			return false;
-		}
-
-		if (menuItem.godMode && !godMode) {
-			return false;
-		}
-
-		// Same rule as the page it links to (like the Staff Report, which belongs to two features)
-		if (!isMenuLinkFeatureOn(menuItem)) {
-			return false;
-		}
-
-		if (menuItemHiddenForLeagueType(menuItem, local.getState().leagueType)) {
-			return false;
-		}
-
-		return true;
+	// Same rules as the side menu's filter box (util/menuFilter.ts)
+	const context = {
+		godMode,
+		inLeague,
+		leagueType: local.getState().leagueType,
 	};
+	const filterMenuItem = (
+		menuItem: MenuItemLink | MenuItemText,
+	): menuItem is MenuItemLink => commandPaletteLinkAvailable(menuItem, context);
 
 	const flat = menuItems.filter(
 		(menuItem) => menuItem.type === "link",

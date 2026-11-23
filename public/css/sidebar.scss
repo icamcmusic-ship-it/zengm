@@ -51,6 +51,65 @@ $sidebar-width: 150px;
 	}
 }
 
+// Group names above the filter box's results, which can't be collapsed
+.sidebar-heading-static {
+	cursor: default;
+}
+
+.sidebar-filter {
+	padding: 0 $container-padding-x;
+	margin-bottom: 0.25rem;
+}
+
+.sidebar-filter-empty {
+	padding: 4px $container-padding-x;
+}
+
+// Star to pin a link to Favorites: shown on hover and keyboard focus, and always once pinned. It sits over the end of a
+// long label, so it gets the row's background
+.sidebar-pinnable {
+	position: relative;
+}
+
+.sidebar-pin {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	padding: 0 0.375rem;
+	border: 0;
+	font-size: 0.75rem;
+	line-height: 1;
+	color: $gray-600;
+	background-color: rgba(var(--bs-light-rgb), 1);
+	opacity: 0;
+
+	&.pinned {
+		color: $yellow;
+		opacity: 1;
+	}
+
+	&:hover {
+		color: $yellow;
+	}
+
+	&:focus-visible {
+		opacity: 1;
+	}
+}
+
+.sidebar-pinnable:hover .sidebar-pin {
+	opacity: 1;
+	background-color: $gray-200;
+}
+
+// No hover on touch screens: show the empty stars faintly, so they can be tapped
+@media (hover: none) {
+	.sidebar-pin {
+		opacity: 0.5;
+	}
+}
+
 @include media-breakpoint-up(xl) {
 	.sidebar {
 		transition: width 0.3s ease-in-out;
@@ -87,6 +146,10 @@ $sidebar-width: 150px;
 		padding-left: 0.75rem;
 	}
 	.sidebar-inner .nav-link {
+		padding-left: 0.75rem;
+	}
+	.sidebar-filter,
+	.sidebar-filter-empty {
 		padding-left: 0.75rem;
 	}
 	.sidebar-open .sidebar-inner {

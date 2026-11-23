@@ -6,7 +6,7 @@ import { useViewData } from "../../util/viewManager.tsx";
 import DropdownLinks from "../DropdownLinks.tsx";
 import LogoAndText from "../LogoAndText.tsx";
 import PlayMenu from "../PlayMenu.tsx";
-import { menuItems } from "../../util/menuItems.tsx";
+import { topMenuItems } from "../../util/menuItems.tsx";
 import type { Phase } from "../../../common/types.ts";
 import type { LeagueUrlParts } from "../../router/types.ts";
 
@@ -140,7 +140,7 @@ export const NavBar = ({ updating }: { updating: boolean }) => {
 						godMode={godMode}
 						inLeague={inLeague}
 						lid={lid}
-						menuItems={menuItems.filter(
+						menuItems={topMenuItems.filter(
 							(menuItem) => !menuItem.commandPaletteOnly,
 						)}
 					/>

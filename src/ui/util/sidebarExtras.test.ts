@@ -116,3 +116,65 @@ test("broken or missing storage starts empty", async () => {
 	stubWindow(undefined);
 	assert.deepStrictEqual(readSeen(1), {});
 });
+
+test("collapsed groups from before the regrouping carry over to the groups they were split into", async () => {
+	const storage = memoryStorage();
+	stubWindow(storage);
+	storage.setItem(
+		"sidebarCollapsedGroups",
+		JSON.stringify(["League", "Tools", "Stats", "Recently visited", 3]),
+	);
+	const { isGroupCollapsed, readGroupsCollapsed, writeGroupCollapsed } =
+		await load();
+
+	assert.deepStrictEqual(readGroupsCollapsed(), {
+		League: true,
+		Newsroom: true,
+		History: true,
+		Tools: true,
+		Settings: true,
+		Commissioner: true,
+		Danger: true,
+		Stats: true,
+		"Recently visited": true,
+	});
+	// Migrated once
+	assert.strictEqual(storage.getItem("sidebarCollapsedGroups"), null);
+	assert.isTrue(isGroupCollapsed("Newsroom", false));
+	assert.isFalse(isGroupCollapsed("Players", false));
+
+	writeGroupCollapsed("League", false);
+	assert.isFalse(isGroupCollapsed("League", false));
+	assert.isTrue(isGroupCollapsed("History", false));
+});
+
+test("a group collapsed by default stays collapsed until expanded", async () => {
+	const { isGroupCollapsed, writeGroupCollapsed } = await load();
+	assert.isTrue(isGroupCollapsed("Commissioner", true));
+	writeGroupCollapsed("Commissioner", false);
+	assert.isFalse(isGroupCollapsed("Commissioner", true));
+	assert.isTrue(isGroupCollapsed("Other", true));
+});
+
+test("favorites toggle in the order they were pinned, and survive bad storage", async () => {
+	const storage = memoryStorage();
+	stubWindow(storage);
+	const { readFavorites, toggleFavorite } = await load();
+	assert.deepStrictEqual(readFavorites(), []);
+	assert.deepStrictEqual(toggleFavorite("l/standings"), ["l/standings"]);
+	assert.deepStrictEqual(toggleFavorite("/settings"), [
+		"l/standings",
+		"/settings",
+	]);
+	assert.deepStrictEqual(toggleFavorite("l/standings"), ["/settings"]);
+	assert.deepStrictEqual(readFavorites(), ["/settings"]);
+
+	storage.setItem("sidebarFavorites", "{bad");
+	assert.deepStrictEqual(readFavorites(), []);
+	storage.setItem("sidebarFavorites", JSON.stringify(["a", 1, "a", "b"]));
+	assert.deepStrictEqual(readFavorites(), ["a", "b"]);
+
+	stubWindow(undefined);
+	assert.deepStrictEqual(readFavorites(), []);
+	assert.deepStrictEqual(toggleFavorite("x"), ["x"]);
+});

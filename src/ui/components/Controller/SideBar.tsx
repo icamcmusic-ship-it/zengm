@@ -3,18 +3,18 @@ import clsx from "clsx";
 import {
 	Fragment,
 	memo,
+	type KeyboardEvent,
 	type ReactNode,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useId,
+	useRef,
 	useState,
 } from "react";
 import { helpers } from "../../util/helpers.ts";
 import { localActions, useLocal } from "../../util/local.ts";
-import {
-	isMenuLinkFeatureOn,
-	useFeatureSwitches,
-} from "../../util/nativeFeatures.ts";
+import { useFeatureSwitches } from "../../util/nativeFeatures.ts";
 import type {
 	MenuItemLink,
 	MenuItemHeader,
@@ -23,17 +23,25 @@ import type {
 import CollapseArrow from "../CollapseArrow.tsx";
 import { AnimatePresence, m } from "framer-motion";
 import { VIDEO_ADS, VIDEO_AD_PADDING } from "../../../common/constants.ts";
-import { menuItems } from "../../util/menuItems.tsx";
+import { menuItems, menuLinkKey, nowShortcuts } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
-import { menuItemHiddenForLeagueType } from "../../util/collegeMode.ts";
+import {
+	commandPaletteLinkAvailable,
+	matchesMenuFilter,
+	menuLinkAvailable,
+} from "../../util/menuFilter.ts";
 import {
 	addRecent,
 	BADGE_PATHS,
 	formatBadgeCount,
+	isGroupCollapsed,
 	MAX_RECENT,
+	readFavorites,
 	readRecent,
 	type RecentPage,
 	type SidebarBadgeKey,
+	toggleFavorite,
+	writeGroupCollapsed,
 } from "../../util/sidebarExtras.ts";
 import useSidebarBadges from "../../hooks/useSidebarBadges.ts";
 
@@ -47,40 +55,29 @@ export const getText = (
 	return text;
 };
 
-// Titles of the side menu groups the user collapsed, remembered in this browser like sidebarOpen
-const COLLAPSED_KEY = "sidebarCollapsedGroups";
-
-const readCollapsed = (): string[] => {
-	try {
-		const parsed = JSON.parse(safeLocalStorage.getItem(COLLAPSED_KEY) ?? "[]");
-		return Array.isArray(parsed)
-			? parsed.filter((title) => typeof title === "string")
-			: [];
-	} catch {
-		return [];
-	}
-};
-
-const writeCollapsed = (title: string, collapsed: boolean) => {
-	try {
-		const titles = readCollapsed().filter((other) => other !== title);
-		if (collapsed) {
-			titles.push(title);
-		}
-		safeLocalStorage.setItem(COLLAPSED_KEY, JSON.stringify(titles));
-	} catch {}
-};
-
 const MenuGroup = ({
 	children,
+	collapsedByDefault = false,
+	containsActive = false,
 	title,
 }: {
 	children: ReactNode;
+	collapsedByDefault?: boolean;
+	// Holds the page being viewed: opened, so the highlighted item is never hidden in a collapsed group
+	containsActive?: boolean;
 	title?: string;
 }) => {
 	const [open, setOpen] = useState(
-		() => title === undefined || !readCollapsed().includes(title),
+		() =>
+			title === undefined ||
+			containsActive ||
+			!isGroupCollapsed(title, collapsedByDefault),
 	);
+	useEffect(() => {
+		if (containsActive) {
+			setOpen(true);
+		}
+	}, [containsActive]);
 	const id = useId();
 
 	return (
@@ -93,7 +90,7 @@ const MenuGroup = ({
 					onClick={(event) => {
 						event.preventDefault();
 						const newOpen = !open;
-						writeCollapsed(title, !newOpen);
+						writeGroupCollapsed(title, !newOpen);
 						setOpen(newOpen);
 					}}
 				>
@@ -177,17 +174,21 @@ type VisibilityContext = {
 	leagueType: string | undefined;
 };
 
-// Whether a link is shown in the side menu. Non-reactive (League extras switches are read from the local state), so
-// SideBar re-renders on a switch change with useFeatureSwitches
+const menuContext = ({ godMode, lid, leagueType }: VisibilityContext) => ({
+	godMode,
+	inLeague: lid !== undefined,
+	leagueType,
+});
+
+// Whether a link is shown in the side menu (same rules as the command palette, util/menuFilter.ts). Non-reactive
+// (League extras switches are read from the local state), so SideBar re-renders on a switch change with
+// useFeatureSwitches
 export const sideMenuLinkVisible = (
 	menuItem: MenuItemLink,
-	{ godMode, lid, leagueType }: VisibilityContext,
+	context: VisibilityContext,
 ) =>
 	!menuItem.commandPaletteOnly &&
-	(lid === undefined ? !!menuItem.nonLeague : !!menuItem.league) &&
-	(!menuItem.godMode || godMode) &&
-	isMenuLinkFeatureOn(menuItem) &&
-	!menuItemHiddenForLeagueType(menuItem, leagueType);
+	menuLinkAvailable(menuItem, menuContext(context));
 
 const visibleSideMenuLinks = (context: VisibilityContext) => {
 	const links: MenuItemLink[] = [];
@@ -210,8 +211,8 @@ const visibleSideMenuLinks = (context: VisibilityContext) => {
 	return links;
 };
 
-// Page the side menu highlights: the page itself when it has a visible item of its own (like Rumors or the Staff
-// Report), otherwise the host page it is a tab of (util/pageTabs.ts), so exactly one place lights up
+// Page the side menu highlights: the page itself when it has a visible item of its own (like Rumors or League
+// Extras), otherwise the host page it is a tab of (util/pageTabs.ts), so exactly one place lights up
 export const sideMenuHighlightPageID = (
 	pageID: string | undefined,
 	pathname: string | undefined,
@@ -248,6 +249,230 @@ export const recentPageFor = (
 	return { path: pathname, label };
 };
 
+// Side menu links (not the command palette ones) by key, with their group, for Favorites
+const sideLinks = new Map<string, { group: string; link: MenuItemLink }>();
+const textCounts = new Map<unknown, number>();
+for (const item of menuItems) {
+	if (item.commandPaletteOnly) {
+		continue;
+	}
+	const group = item.type === "header" ? item.long : "";
+	for (const link of item.type === "header" ? item.children : [item]) {
+		if (link.type === "link" && !link.commandPaletteOnly) {
+			const key = menuLinkKey(link);
+			if (key !== undefined && !sideLinks.has(key)) {
+				sideLinks.set(key, { group, link });
+			}
+			const text = getText(link.text);
+			textCounts.set(text, (textCounts.get(text) ?? 0) + 1);
+		}
+	}
+}
+
+// Label of a link outside its group (Favorites, Now): "Finances" is in League and Team, so it says which one
+export const shortcutLabel = (link: MenuItemLink, group?: string) => {
+	const text = getText(link.text);
+	if (typeof text === "string" && (textCounts.get(text) ?? 0) > 1) {
+		const group2 =
+			group ??
+			menuItems.find(
+				(item): item is MenuItemHeader =>
+					item.type === "header" && item.children.includes(link),
+			)?.long;
+		if (group2) {
+			return `${group2} ${text}`;
+		}
+	}
+	return text;
+};
+
+// Pinned links that are shown here, in the order they were pinned
+export const visibleFavorites = (
+	favorites: readonly string[],
+	context: VisibilityContext,
+) =>
+	favorites.flatMap((key) => {
+		const entry = sideLinks.get(key);
+		return entry && sideMenuLinkVisible(entry.link, context)
+			? [{ ...entry, key }]
+			: [];
+	});
+
+// Links of the "Now" group in this phase that are available here
+export const visibleNowShortcuts = (
+	phase: Parameters<typeof nowShortcuts>[0],
+	context: VisibilityContext,
+) =>
+	context.lid === undefined
+		? []
+		: nowShortcuts(phase).filter((link) =>
+				menuLinkAvailable(link, menuContext(context)),
+			);
+
+// Links matching the filter box, by group (the command palette's links and the side menu's)
+export const filterMenuLinks = (query: string, context: VisibilityContext) => {
+	const groups: { category: string; links: MenuItemLink[] }[] = [];
+	const seen = new Set<string>();
+	for (const item of menuItems) {
+		const category = item.type === "header" ? item.long : "";
+		const links: MenuItemLink[] = [];
+		for (const link of item.type === "header" ? item.children : [item]) {
+			if (link.type !== "link") {
+				continue;
+			}
+			const available =
+				commandPaletteLinkAvailable(link, menuContext(context)) ||
+				(item.type === "link" && sideMenuLinkVisible(link, context));
+			const text = getText(link.text);
+			if (
+				!available ||
+				typeof text !== "string" ||
+				!matchesMenuFilter(query, category, text)
+			) {
+				continue;
+			}
+			// Once per page (Dashboard is both a top link and a League command)
+			const key = menuLinkKey(link) ?? text;
+			if (seen.has(key)) {
+				continue;
+			}
+			seen.add(key);
+			links.push(link);
+		}
+		const last = groups.at(-1);
+		if (links.length === 0) {
+			continue;
+		}
+		// Top links (Dashboard, ...) are one group with no name
+		if (last && last.category === category) {
+			last.links.push(...links);
+		} else {
+			groups.push({ category, links });
+		}
+	}
+	return groups;
+};
+
+const PinButton = ({
+	label,
+	onToggle,
+	pinned,
+}: {
+	label: ReactNode;
+	onToggle: () => void;
+	pinned: boolean;
+}) => {
+	const description =
+		typeof label === "string"
+			? pinned
+				? `Unpin ${label} from Favorites`
+				: `Pin ${label} to Favorites`
+			: pinned
+				? "Unpin from Favorites"
+				: "Pin to Favorites";
+	return (
+		<button
+			type="button"
+			className={clsx("sidebar-pin", { pinned })}
+			aria-label={description}
+			aria-pressed={pinned}
+			title={description}
+			data-testid="sidebar-pin"
+			onClick={(event) => {
+				event.preventDefault();
+				onToggle();
+			}}
+		>
+			<span
+				className={clsx(
+					"glyphicon",
+					pinned ? "glyphicon-star" : "glyphicon-star-empty",
+				)}
+				aria-hidden="true"
+			/>
+		</button>
+	);
+};
+
+type Pins = {
+	favorites: readonly string[];
+	onToggle: (key: string) => void;
+};
+
+const LinkItem = ({
+	active = false,
+	badge,
+	label,
+	menuItem,
+	onMenuItemClick,
+	pins,
+	onKeyDown,
+	testID,
+}: {
+	active?: boolean;
+	badge?: number;
+	label?: ReactNode;
+	menuItem: MenuItemLink;
+	onMenuItemClick: () => void;
+	pins?: Pins;
+	onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+	testID?: string;
+}) => {
+	const anchorProps = makeAnchorProps(menuItem, onMenuItemClick);
+	const className = clsx("nav-link", {
+		active,
+		"god-mode": menuItem.godMode,
+	});
+	const text = label ?? getText(menuItem.text);
+	const key = pins ? menuLinkKey(menuItem) : undefined;
+
+	return (
+		<li className={clsx("nav-item", { "sidebar-pinnable": key })}>
+			{anchorProps.href === undefined ? (
+				// An action (Auto Play, Screenshot, ...) rather than a page: a real button, so it can be reached
+				// with Tab and activated with Enter or Space
+				<button
+					type="button"
+					className={clsx(className, "w-100 text-start")}
+					data-testid={testID}
+					onClick={anchorProps.onClick}
+					onKeyDown={onKeyDown}
+				>
+					{text}
+				</button>
+			) : (
+				<a
+					className={className}
+					aria-current={active ? "page" : undefined}
+					data-testid={testID}
+					{...anchorProps}
+					href={anchorProps.href}
+					onKeyDown={onKeyDown}
+				>
+					{text}
+					{badge !== undefined ? (
+						<span
+							className="badge rounded-pill text-bg-danger ms-1"
+							data-testid="sidebar-badge"
+							title={`${badge} new since your last visit`}
+						>
+							{formatBadgeCount(badge)}
+							<span className="visually-hidden"> new</span>
+						</span>
+					) : null}
+				</a>
+			)}
+			{pins && key !== undefined ? (
+				<PinButton
+					label={text}
+					pinned={pins.favorites.includes(key)}
+					onToggle={() => pins.onToggle(key)}
+				/>
+			) : null}
+		</li>
+	);
+};
+
 const RecentlyVisited = ({
 	onMenuItemClick,
 	pages,
@@ -276,6 +501,79 @@ const RecentlyVisited = ({
 	);
 };
 
+// Filter box results: every matching link, under its group's name. Arrow keys move between them, and up from the
+// first one goes back to the box
+const FilterResults = ({
+	context,
+	id,
+	inputRef,
+	onMenuItemClick,
+	query,
+	resultsRef,
+}: {
+	context: VisibilityContext;
+	id: string;
+	inputRef: RefObject<HTMLInputElement | null>;
+	onMenuItemClick: () => void;
+	query: string;
+	resultsRef: RefObject<HTMLDivElement | null>;
+}) => {
+	const groups = filterMenuLinks(query, context);
+
+	const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+			return;
+		}
+		const links = [
+			...(resultsRef.current?.querySelectorAll<HTMLElement>(".nav-link") ?? []),
+		];
+		const index = links.indexOf(document.activeElement as HTMLElement);
+		if (index < 0) {
+			return;
+		}
+		event.preventDefault();
+		if (event.key === "ArrowDown") {
+			links[Math.min(index + 1, links.length - 1)]!.focus();
+		} else if (index === 0) {
+			inputRef.current?.focus();
+		} else {
+			links[index - 1]!.focus();
+		}
+	};
+
+	return (
+		<div id={id} ref={resultsRef} data-testid="sidebar-filter-results">
+			{groups.length === 0 ? (
+				<p
+					className="sidebar-filter-empty text-body-secondary mb-0"
+					role="status"
+				>
+					No matches
+				</p>
+			) : null}
+			{groups.map(({ category, links }, i) => (
+				<Fragment key={i}>
+					{category ? (
+						<div className="sidebar-heading sidebar-heading-static">
+							{category}
+						</div>
+					) : null}
+					<ul className="nav flex-column flex-nowrap">
+						{links.map((link, j) => (
+							<LinkItem
+								key={j}
+								menuItem={link}
+								onKeyDown={onKeyDown}
+								onMenuItemClick={onMenuItemClick}
+							/>
+						))}
+					</ul>
+				</Fragment>
+			))}
+		</div>
+	);
+};
+
 const MenuItem = ({
 	badges,
 	context,
@@ -283,6 +581,7 @@ const MenuItem = ({
 	menuItem,
 	onMenuItemClick,
 	pathname,
+	pins,
 	root,
 }: {
 	badges: Partial<Record<SidebarBadgeKey, number>>;
@@ -291,6 +590,7 @@ const MenuItem = ({
 	menuItem: MenuItemHeader | MenuItemLink | MenuItemText;
 	onMenuItemClick: () => void;
 	pathname?: string;
+	pins: Pins;
 	root: boolean;
 }) => {
 	const { lid } = context;
@@ -312,49 +612,19 @@ const MenuItem = ({
 			return null;
 		}
 
-		const anchorProps = makeAnchorProps(menuItem, onMenuItemClick);
 		const active = menuItem.active
 			? menuItem.active(highlightPageID, pathname)
 			: false;
-		const className = clsx("nav-link", {
-			active,
-			"god-mode": menuItem.godMode,
-		});
 		const badgeKey = badgeKeyOf(menuItem);
-		const badge = badgeKey ? badges[badgeKey] : undefined;
 
 		const item = (
-			<li className="nav-item">
-				{anchorProps.href === undefined ? (
-					// An action (Auto Play, Screenshot, ...) rather than a page: a real button, so it can be reached
-					// with Tab and activated with Enter or Space
-					<button
-						type="button"
-						className={clsx(className, "w-100 text-start")}
-						onClick={anchorProps.onClick}
-					>
-						{getText(menuItem.text)}
-					</button>
-				) : (
-					<a
-						className={className}
-						aria-current={active ? "page" : undefined}
-						{...anchorProps}
-					>
-						{getText(menuItem.text)}
-						{badge !== undefined ? (
-							<span
-								className="badge rounded-pill text-bg-danger ms-1"
-								data-testid="sidebar-badge"
-								title={`${badge} new since your last visit`}
-							>
-								{formatBadgeCount(badge)}
-								<span className="visually-hidden"> new</span>
-							</span>
-						) : null}
-					</a>
-				)}
-			</li>
+			<LinkItem
+				active={active}
+				badge={badgeKey ? badges[badgeKey] : undefined}
+				menuItem={menuItem}
+				onMenuItemClick={onMenuItemClick}
+				pins={pins}
+			/>
 		);
 		return root ? <MenuGroup>{item}</MenuGroup> : item;
 	}
@@ -374,16 +644,37 @@ const MenuItem = ({
 					menuItem={child}
 					onMenuItemClick={onMenuItemClick}
 					pathname={pathname}
+					pins={pins}
 					root={false}
 				/>
 			))
 			.filter((element) => element !== null);
 
-		if (children.length === 0) {
+		if (
+			children.length === 0 ||
+			!menuItem.children.some(
+				(child) => child.type === "link" && sideMenuLinkVisible(child, context),
+			)
+		) {
 			return null;
 		}
 
-		return <MenuGroup title={menuItem.long}>{children}</MenuGroup>;
+		const containsActive = menuItem.children.some(
+			(child) =>
+				child.type === "link" &&
+				sideMenuLinkVisible(child, context) &&
+				!!child.active?.(highlightPageID, pathname),
+		);
+
+		return (
+			<MenuGroup
+				collapsedByDefault={!!menuItem.collapsed}
+				containsActive={containsActive}
+				title={menuItem.long}
+			>
+				{children}
+			</MenuGroup>
+		);
 	}
 };
 
@@ -399,12 +690,48 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 	const [node, setNode] = useState<null | HTMLDivElement>(null);
 	const [nodeFade, setNodeFade] = useState<null | HTMLDivElement>(null);
 
-	const { godMode, leagueType, lid, sidebarOpen } = useLocal([
+	const { godMode, leagueType, lid, phase, sidebarOpen } = useLocal([
 		"godMode",
 		"leagueType",
 		"lid",
+		"phase",
 		"sidebarOpen",
 	]);
+
+	// Pinned links (Favorites), the same in every league of this browser
+	const [favorites, setFavorites] = useState(readFavorites);
+	const pins: Pins = {
+		favorites,
+		onToggle: (key) => {
+			setFavorites(toggleFavorite(key));
+		},
+	};
+
+	// Filter box: while something is typed, the menu is replaced by the matching links
+	const [filter, setFilter] = useState("");
+	const filterInputRef = useRef<HTMLInputElement>(null);
+	const filterResultsRef = useRef<HTMLDivElement>(null);
+	const filtering = filter.trim() !== "";
+	const onFilterKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+		if (event.key === "Escape") {
+			if (filter !== "") {
+				event.preventDefault();
+				event.stopPropagation();
+				setFilter("");
+			}
+		} else if (event.key === "ArrowDown" || event.key === "Enter") {
+			const first =
+				filterResultsRef.current?.querySelector<HTMLElement>(".nav-link");
+			if (first) {
+				event.preventDefault();
+				if (event.key === "Enter") {
+					first.click();
+				} else {
+					first.focus();
+				}
+			}
+		}
+	};
 
 	// Re-render when a League extras switch changes
 	useFeatureSwitches();
@@ -535,6 +862,15 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 		}
 	}, []);
 
+	const onFilterResultClick = useCallback(() => {
+		setFilter("");
+		onMenuItemClick();
+	}, [onMenuItemClick]);
+
+	const filterResultsID = useId();
+	const nowLinks = visibleNowShortcuts(phase, context);
+	const favoriteLinks = visibleFavorites(favorites, context);
+
 	useEffect(() => {
 		const closeHandler = () => {
 			localActions.setSidebarOpen(false);
@@ -570,25 +906,84 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 							: undefined
 					}
 				>
-					{menuItems.map((menuItem, i) => (
-						<Fragment key={i}>
-							{i === firstHeaderIndex && lid !== undefined ? (
-								<RecentlyVisited
+					<div className="sidebar-filter" role="search">
+						<input
+							ref={filterInputRef}
+							type="search"
+							className="form-control form-control-sm"
+							placeholder="Filter menu"
+							aria-label="Filter menu"
+							aria-controls={filtering ? filterResultsID : undefined}
+							data-testid="sidebar-filter"
+							value={filter}
+							onChange={(event) => {
+								setFilter(event.target.value);
+							}}
+							onKeyDown={onFilterKeyDown}
+						/>
+					</div>
+					{filtering ? (
+						<FilterResults
+							context={context}
+							id={filterResultsID}
+							inputRef={filterInputRef}
+							onMenuItemClick={onFilterResultClick}
+							query={filter}
+							resultsRef={filterResultsRef}
+						/>
+					) : (
+						menuItems.map((menuItem, i) => (
+							<Fragment key={i}>
+								{i === firstHeaderIndex ? (
+									<>
+										{nowLinks.length > 0 ? (
+											<MenuGroup title="Now">
+												{nowLinks.map((link, j) => (
+													<LinkItem
+														key={j}
+														label={shortcutLabel(link)}
+														menuItem={link}
+														onMenuItemClick={onMenuItemClick}
+														testID="sidebar-now"
+													/>
+												))}
+											</MenuGroup>
+										) : null}
+										{favoriteLinks.length > 0 ? (
+											<MenuGroup title="Favorites">
+												{favoriteLinks.map(({ group, key, link }) => (
+													<LinkItem
+														key={key}
+														label={shortcutLabel(link, group)}
+														menuItem={link}
+														onMenuItemClick={onMenuItemClick}
+														pins={pins}
+														testID="sidebar-favorite"
+													/>
+												))}
+											</MenuGroup>
+										) : null}
+										{lid !== undefined ? (
+											<RecentlyVisited
+												onMenuItemClick={onMenuItemClick}
+												pages={recent}
+											/>
+										) : null}
+									</>
+								) : null}
+								<MenuItem
+									badges={badges}
+									context={context}
+									highlightPageID={highlightPageID}
+									menuItem={menuItem}
 									onMenuItemClick={onMenuItemClick}
-									pages={recent}
+									pathname={pathname}
+									pins={pins}
+									root
 								/>
-							) : null}
-							<MenuItem
-								badges={badges}
-								context={context}
-								highlightPageID={highlightPageID}
-								menuItem={menuItem}
-								onMenuItemClick={onMenuItemClick}
-								pathname={pathname}
-								root
-							/>
-						</Fragment>
-					))}
+							</Fragment>
+						))
+					)}
 				</div>
 			</nav>
 		</>
