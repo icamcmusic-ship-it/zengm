@@ -3,7 +3,11 @@
 // No Visible Ratings challenge. Building the file draws no Math.random.
 import "fake-indexeddb/auto";
 import { assert, beforeAll, describe, test } from "vitest";
-import { LEAGUE_DATABASE_VERSION, PHASE } from "../../../common/constants.ts";
+import {
+	LEAGUE_DATABASE_VERSION,
+	PHASE,
+	PLAYER,
+} from "../../../common/constants.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { gameExportCsvFiles } from "../../../common/gameExport/csv.ts";
 import {
@@ -374,6 +378,11 @@ describe("game export", () => {
 				file = await buildGameExport(regular.gid);
 				for (const x of file.playerContext) {
 					if (!x.profile) {
+						continue;
+					}
+					// (retired players keep their ratings, as in the player export: someone in the game may have retired since)
+					const pNow = await idb.getCopy.players({ pid: x.pid });
+					if (pNow?.tid === PLAYER.RETIRED) {
 						continue;
 					}
 					assert.isFalse(x.profile.ratingsShown);
