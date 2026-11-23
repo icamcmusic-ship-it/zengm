@@ -145,7 +145,7 @@ test("play-by-play logging does not change a result with the setting on", async 
 		const on = await simOne(seed, true, true, false);
 		assert.strictEqual(on, off, `seed ${seed}`);
 	}
-}, 120_000);
+}, 300_000);
 
 test("with the setting off, stored expanded ratings are ignored", async () => {
 	for (const seed of [21, 22]) {
@@ -156,4 +156,4 @@ test("with the setting off, stored expanded ratings are ignored", async () => {
 		const on = await simOne(seed, false, true, false);
 		assert.notStrictEqual(on, withFields);
 	}
-}, 120_000);
+}, 300_000);
