@@ -26,6 +26,9 @@ export default defineView({
 					allStars?.three?.players.length ?? g.get("numPlayersThree"),
 				showDunk,
 				showThree,
+				showRisingStars: allStars?.risingStars !== undefined,
+				showSkills: allStars?.skills !== undefined,
+				showVote: allStars?.votes !== undefined,
 			};
 		}
 	},

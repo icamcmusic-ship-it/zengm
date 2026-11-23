@@ -10,7 +10,16 @@ const AllStar = ({
 	numPlayersThree,
 	showDunk,
 	showThree,
+	showRisingStars,
+	showSkills,
+	showVote,
 }: View<"allStar">) => {
+	const weekendParts = [
+		showVote ? "the fan, player and media vote" : undefined,
+		showRisingStars ? "the Rising Stars game" : undefined,
+		showSkills ? "the skills challenge" : undefined,
+		allStarType === "tournament" ? "the tournament semifinals" : undefined,
+	].filter((x) => x !== undefined);
 	useTitleBar({
 		title: `All-Star ${showDunk || showThree ? "Events" : "Game"}`,
 	});
@@ -92,9 +101,9 @@ const AllStar = ({
 						<div className="card-body">
 							<h3 className="card-title">All-Star Game</h3>
 							<p className="card-text">
-								The best players in{" "}
-								{allStarType === "byConf" ? "each conference" : "the league"}{" "}
-								face off in an exhibition game.
+								{allStarType === "tournament"
+									? "The winners of the two tournament semifinals play to a target score."
+									: `The best players in ${allStarType === "byConf" ? "each conference" : "the league"} face off in an exhibition game.`}
 							</p>
 							<a
 								href={helpers.leagueUrl(["daily_schedule"])}
@@ -106,6 +115,20 @@ const AllStar = ({
 					</div>
 				</>
 			)}
+			{weekendParts.length > 0 ? (
+				<div className="card" style={style}>
+					<div className="card-body">
+						<h3 className="card-title">All-Star Weekend</h3>
+						<p className="card-text">Results of {weekendParts.join(", ")}.</p>
+						<a
+							href={helpers.leagueUrl(["all_star", "weekend"])}
+							className="btn btn-primary stretched-link"
+						>
+							View the weekend
+						</a>
+					</div>
+				</div>
+			) : null}
 			<div className="card" style={style}>
 				<div className="card-body">
 					<h3 className="card-title">All-Star History</h3>

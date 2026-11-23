@@ -1,12 +1,12 @@
 import { updatePlayerAwards } from "../awards/awardsByPlayer.ts";
-import { g } from "../../util/index.ts";
+import { g, helpers } from "../../util/index.ts";
 import type {
 	AllStars,
 	Conditions,
 	AllStarPlayer,
+	Player,
 } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import type { PlayerRatings } from "../../../common/types.basketball.ts";
 import { last, orderBy, range, assertDefined } from "../../../common/utils.ts";
 import { getPosByGpF } from "../player/getPosByGpF.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
@@ -14,6 +14,10 @@ import { shuffle } from "../../../common/random.ts";
 import { player } from "../index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { isRedshirting } from "../college/redshirt.ts";
+import { castVotes, selectFromVotes, type VoteCandidate } from "./vote.ts";
+import { courtOf, dunkTalent, threeTalent, weekendRandom } from "./weekend.ts";
+import { pickRisingStars } from "./risingStars.ts";
+import { pickSkillsField } from "./skills.ts";
 
 // This is from the old football awards sytem. Eventually should make All-Star teams use the same formulas as the default All-League awards...
 // Football players from player.formatAll, with currentStats added in create
@@ -137,7 +141,7 @@ export const getAllStarCandidates = async () => {
 				// For position determination
 				"gpF",
 			],
-			basketball: ["ewa", "ws"],
+			basketball: ["ewa", "ws", "gp", "pts"],
 			football: [
 				"keyStats",
 				"pntYds",
@@ -232,6 +236,189 @@ export const getSeasonThrees = (
 		tp,
 		tpa,
 		tpp: tpa > 0 ? tp / tpa : 0,
+	};
+};
+
+// Dunk contest invitations: above-the-rim talent (dunk/jumping, max vertical, wingspan, badges, a showman's ego), how often he
+// actually finishes at the rim this season, and youth (it's a young man's contest)
+const dunkInvite = (p: Player, season: number) => {
+	let gp = 0;
+	let rim = 0;
+	for (const row of p.stats) {
+		if (row.season === season && !row.playoffs) {
+			gp += row.gp ?? 0;
+			rim += row.fgAtRim ?? 0;
+		}
+	}
+	const rimPerGame = gp > 0 ? rim / gp : 0;
+	const age = season - p.born.year;
+	return (
+		dunkTalent(p) +
+		1.5 * Math.min(6, rimPerGame) +
+		0.4 * helpers.bound(27 - age, -5, 5)
+	);
+};
+
+// Share of his team's games a player must have played to be on the All-Star ballot (once teams have played 10 games)
+export const MIN_GP_FRAC = 0.4;
+
+// The All-Star vote (allStarVote, basketball). With exactly two conferences each votes for its own team of allStarNum, otherwise
+// the league votes for 2 x allStarNum. Injured picks stay All-Stars (listed as injured) and the commissioner names the next
+// healthy player at the same court from the coaches' order. Returns undefined if a ballot can't fill its team with healthy
+// players (a tiny league), so the old stats pick runs instead.
+const pickByVote = async (
+	candidates: Awaited<ReturnType<typeof getAllStarCandidates>>,
+	allStarNum: number,
+	numConfs: number,
+) => {
+	const season = g.get("season");
+	const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
+		"teamSeasonsBySeasonTid",
+		[[season], [season, "Z"]],
+	);
+	const tsByTid = new Map(teamSeasons.map((ts) => [ts.tid, ts]));
+	const cidByTid = new Map(
+		(await idb.cache.teams.getAll()).map((t) => [t.tid, t.cid]),
+	);
+	const teamGpOf = (ts: (typeof teamSeasons)[number] | undefined) =>
+		ts ? ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0) : 0;
+	let maxTeamGp = 0;
+	for (const ts of teamSeasons) {
+		maxTeamGp = Math.max(maxTeamGp, teamGpOf(ts));
+	}
+
+	// Before any games, the candidates' order (BBGM's pick without stats) stands in for value and scoring
+	const noGames = maxTeamGp === 0;
+
+	const rows: (VoteCandidate & { healthy: boolean })[] = [];
+	for (const [i, c] of candidates.entries()) {
+		const ts = tsByTid.get(c.tid);
+		const teamGp = teamGpOf(ts);
+		const gp = c.stats.gp ?? 0;
+		if (maxTeamGp >= 10 && gp < MIN_GP_FRAC * teamGp) {
+			continue;
+		}
+		const raw = await idb.cache.players.get(c.pid);
+		const prevAllStars =
+			raw?.awards.filter((a) => a.type === "All-Star" && a.season < season)
+				.length ?? 0;
+		rows.push({
+			pid: c.pid,
+			tid: c.tid,
+			name: c.name,
+			cid: numConfs === 2 ? (cidByTid.get(c.tid) ?? -1) : -1,
+			court: courtOf(c.ratings.pos),
+			value: noGames ? -i : 2.5 * (c.stats.ewa ?? 0) + (c.stats.ws ?? 0),
+			ppg: noGames ? -i : gp > 0 ? (c.stats.pts ?? 0) : 0,
+			teamWinp:
+				ts && teamGp > 0 ? (ts.won + 0.5 * (ts.tied ?? 0)) / teamGp : 0.5,
+			teamHype: ts?.hype ?? 0.5,
+			teamPop: ts?.pop ?? 1,
+			prevAllStars,
+			healthy: c.injury.gamesRemaining === 0,
+		});
+	}
+
+	const numStarters = g.get("numPlayersOnCourt");
+	const ballots =
+		numConfs === 2
+			? orderBy(
+					[...Map.groupBy(rows, (r) => r.cid)].filter(([cid]) => cid >= 0),
+					(x) => x[0],
+					"asc",
+				).map((x) => ({ rows: x[1], num: allStarNum, starters: numStarters }))
+			: [{ rows, num: 2 * allStarNum, starters: 2 * numStarters }];
+	if (numConfs === 2 && ballots.length !== 2) {
+		return;
+	}
+
+	const rand = weekendRandom(season, "vote");
+	const remaining: AllStarPlayer[] = [];
+	const votes: NonNullable<AllStars["votes"]> = [];
+	const healthyPids = new Set<number>();
+	// Overall order of the picks (by value, best first), for the draft and mixed teams
+	const orderIndex = new Map(candidates.map((c, i) => [c.pid, i]));
+	for (const ballot of ballots) {
+		const healthyByPid = new Map(ballot.rows.map((r) => [r.pid, r.healthy]));
+		const voteRows = castVotes(ballot.rows, rand);
+		const picked = selectFromVotes(voteRows, ballot.num, ballot.starters);
+		const used = new Set(picked.map((r) => r.pid));
+		const coachOrder = orderBy(
+			voteRows,
+			[(r) => r.playerRank + r.mediaRank, "fanRank", "pid"],
+			["asc", "asc", "asc"],
+		);
+		const out: AllStarPlayer[] = [];
+		let numHealthy = 0;
+		for (const row of picked) {
+			const obj: AllStarPlayer = {
+				pid: row.pid,
+				tid: row.tid,
+				name: row.name,
+			};
+			if (row.selected === "starter") {
+				obj.starter = true;
+			}
+			if (healthyByPid.get(row.pid)) {
+				out.push(obj);
+				healthyPids.add(row.pid);
+				numHealthy += 1;
+				continue;
+			}
+			obj.injured = true;
+			out.push(obj);
+			// The commissioner's replacement: same court if possible
+			const replacement =
+				coachOrder.find(
+					(r) =>
+						!used.has(r.pid) &&
+						healthyByPid.get(r.pid) &&
+						r.court === row.court,
+				) ??
+				coachOrder.find((r) => !used.has(r.pid) && healthyByPid.get(r.pid));
+			if (replacement) {
+				used.add(replacement.pid);
+				replacement.selected = "replacement";
+				out.push({
+					pid: replacement.pid,
+					tid: replacement.tid,
+					name: replacement.name,
+					replacement: true,
+				});
+				healthyPids.add(replacement.pid);
+				numHealthy += 1;
+			}
+		}
+		if (numHealthy < ballot.num) {
+			return;
+		}
+		remaining.push(
+			...orderBy(out, [(p) => orderIndex.get(p.pid) ?? Infinity], ["asc"]),
+		);
+		// The top of the ballot for the vote page: everyone picked and the next few at each court
+		const shown = new Set<number>();
+		for (const court of ["backcourt", "frontcourt"] as const) {
+			const byScore = orderBy(
+				voteRows.filter((r) => r.court === court),
+				["score", "pid"],
+				["asc", "asc"],
+			);
+			for (const r of byScore.slice(0, 10)) {
+				shown.add(r.pid);
+			}
+		}
+		for (const r of voteRows) {
+			if (r.selected || shown.has(r.pid)) {
+				votes.push(r);
+			}
+		}
+	}
+
+	return {
+		remaining,
+		votes: orderBy(votes, ["cid", "score", "pid"], ["asc", "asc", "asc"]),
+		healthyPids,
+		byConf: numConfs === 2,
 	};
 };
 
@@ -434,7 +621,39 @@ const create = async (conditions: Conditions) => {
 		})();
 	};
 
-	if (allStarType === "byConf") {
+	if (
+		__SPORT === "basketball" &&
+		allStarType === "tournament" &&
+		Math.floor(allStarNum / 2) < g.get("numPlayersOnCourt")
+	) {
+		// Four teams need at least a lineup each
+		allStarType = "top";
+	}
+
+	// Basketball, the All-Star vote: fans, players and media, with position slots and a minimum of games
+	if (__SPORT === "basketball" && g.get("allStarVote")) {
+		const voted = await pickByVote(sortedPlayers, allStarNum, confs.length);
+		if (voted) {
+			allStars.remaining = voted.remaining;
+			allStars.votes = voted.votes;
+			healthyPids = voted.healthyPids;
+			pickedAllStars = true;
+			if (allStarType === "byConf" && !voted.byConf) {
+				allStarType = "top";
+			}
+			if (allStarType !== "byConf") {
+				// One list, best first, for the draft and mixed teams
+				const orderIndex = new Map(sortedPlayers.map((p, i) => [p.pid, i]));
+				allStars.remaining = orderBy(
+					allStars.remaining,
+					[(p) => orderIndex.get(p.pid) ?? Infinity],
+					["asc"],
+				);
+			}
+		}
+	}
+
+	if (allStarType === "byConf" && !pickedAllStars) {
 		// Try byConf, but if it fails, fall back on top
 		const cidsByTid: Record<number, number> = {};
 		const teams = await idb.cache.teams.getAll();
@@ -509,6 +728,13 @@ const create = async (conditions: Conditions) => {
 		return true;
 	};
 
+	if (
+		allStarType === "tournament" &&
+		healthyPids.size < 4 * g.get("numPlayersOnCourt")
+	) {
+		allStarType = "top";
+	}
+
 	if (allStarType === "draft" && healthyPids.size < 2) {
 		// Not enough healthy players for two captains (a tiny league), so no draft
 		allStarType = "top";
@@ -534,6 +760,43 @@ const create = async (conditions: Conditions) => {
 		if (allStars.teamNames[0] === allStars.teamNames[1]) {
 			allStars.teamNames[1] += " 2";
 		}
+	} else if (allStarType === "tournament") {
+		// Four teams, picked in snake order from the best down; each named for its best player. The semifinal winners become
+		// teams 0 and 1 before the All-Star Game (prepareGame.ts)
+		const teams: AllStarPlayer[][] = [[], [], [], []];
+		const snake = [0, 1, 2, 3, 3, 2, 1, 0];
+		let i = 0;
+		while (true) {
+			const ind = allStars.remaining.findIndex(({ pid }) =>
+				healthyPids.has(pid),
+			);
+			if (ind < 0) {
+				break;
+			}
+			teams[snake[i % snake.length]!]!.push(allStars.remaining[ind]!);
+			allStars.remaining.splice(ind, 1);
+			i += 1;
+		}
+		const names = teams.map((t) => {
+			const p = players.find((p2) => p2.pid === t[0]?.pid);
+			return p ? `Team ${p.firstName}` : "Team";
+		});
+		for (let j = 1; j < names.length; j++) {
+			let k = 2;
+			const base = names[j]!;
+			while (names.slice(0, j).includes(names[j]!)) {
+				names[j] = `${base} ${k}`;
+				k += 1;
+			}
+		}
+		allStars.tournament = {
+			teamNames: names,
+			teams,
+			semis: [{ teams: [0, 3] }, { teams: [1, 2] }],
+			targetSemis: 40,
+			targetFinal: 25,
+		};
+		allStars.teamNames = ["Semifinal 1 winner", "Semifinal 2 winner"];
 	} else if (allStarType === "byConf") {
 		// First half of allStars.remaining is 1st conference, second half is 2nd conference
 		for (const i of [0, 1] as const) {
@@ -572,7 +835,8 @@ const create = async (conditions: Conditions) => {
 	allStars.type = allStarType;
 
 	if (__SPORT === "basketball") {
-		const lastYear = await idb.merged.allStars.get(g.get("season") - 1);
+		const season = g.get("season");
+		const lastYear = await idb.merged.allStars.get(season - 1);
 		let prevWinnerDunk: number | undefined;
 		if (lastYear?.dunk?.winner !== undefined) {
 			prevWinnerDunk = lastYear.dunk.players[lastYear.dunk.winner]!.pid;
@@ -592,12 +856,10 @@ const create = async (conditions: Conditions) => {
 				activePlayers.filter((p) => p.injury.gamesRemaining === 0),
 				[
 					(p) => (p.pid === prevWinnerDunk ? 1 : 0),
-					(p) => {
-						const ratings = p.ratings.at(-1) as PlayerRatings;
-						return ratings.dnk + 2 * ratings.jmp;
-					},
+					(p) => dunkInvite(p, season),
+					(p) => p.pid,
 				],
-				["desc", "desc"],
+				["desc", "desc", "asc"],
 			)
 				.slice(0, g.get("numPlayersDunk"))
 				.map((p) => ({
@@ -661,7 +923,6 @@ const create = async (conditions: Conditions) => {
 
 			// This regular season's threes. To qualify on stats he needs at least one attempt per team game so far (about the
 			// most games anyone has played), then it's makes, with 3P% as the tiebreaker
-			const season = g.get("season");
 			const threesByPid = new Map(
 				activePlayers.map((p) => [p.pid, getSeasonThrees(p.stats, season)]),
 			);
@@ -679,10 +940,7 @@ const create = async (conditions: Conditions) => {
 				[
 					(p) => threesByPid.get(p.pid)!.tp,
 					(p) => threesByPid.get(p.pid)!.tpp,
-					(p) => {
-						const ratings = p.ratings.at(-1) as PlayerRatings;
-						return ratings.tp;
-					},
+					(p) => threeTalent(p),
 					(p) => p.pid,
 				],
 				["desc", "desc", "desc", "asc"],
@@ -695,12 +953,17 @@ const create = async (conditions: Conditions) => {
 				[
 					// Include last year's winner here too
 					(p) => (p.pid === prevWinnerThree ? 1 : 0),
+					// Catch-and-shoot shooting, and how he's actually shot it this season (by how many he's taken)
 					(p) => {
-						const ratings = p.ratings.at(-1) as PlayerRatings;
-						return ratings.tp;
+						const threes = threesByPid.get(p.pid)!;
+						return (
+							threeTalent(p) +
+							100 * (threes.tpp - 0.35) * Math.min(1, threes.tpa / minAttempts)
+						);
 					},
+					(p) => p.pid,
 				],
-				["desc", "desc"],
+				["desc", "desc", "asc"],
 			).slice(0, g.get("numPlayersThree") - shootersStats.length);
 
 			const shooters = [...shootersStats, ...shootersRatings].map((p) => ({
@@ -728,6 +991,14 @@ const create = async (conditions: Conditions) => {
 					],
 				};
 			}
+		}
+
+		if (g.get("allStarSkills")) {
+			allStars.skills = pickSkillsField(activePlayers, season);
+		}
+
+		if (g.get("allStarRisingStars") && !isCollege()) {
+			allStars.risingStars = pickRisingStars(activePlayers, season);
 		}
 	}
 

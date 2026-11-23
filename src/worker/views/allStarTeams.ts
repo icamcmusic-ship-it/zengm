@@ -97,12 +97,32 @@ const augment = async (allStars: AllStars) => {
 		remaining.sort((a, b) => sortByPos(b) - sortByPos(a));
 	}
 
+	// Tournament format before its semifinals: the four teams
+	let tournamentTeams: { name: string; players: any[] }[] | undefined;
+	if (
+		allStars.tournament &&
+		allStars.tournament.semis.some((semi) => semi.winner === undefined)
+	) {
+		tournamentTeams = [];
+		for (const [i, players] of allStars.tournament.teams.entries()) {
+			tournamentTeams.push({
+				name: allStars.tournament.teamNames[i] ?? "Team",
+				players: (
+					await Promise.all(
+						players.map((info) => getPlayerInfo(info, allStars.season)),
+					)
+				).filter((p) => p !== undefined),
+			});
+		}
+	}
+
 	return {
 		finalized: allStars.finalized,
 		gid: allStars.gid,
 		remaining,
 		teams,
 		teamNames: allStars.teamNames,
+		tournamentTeams,
 	};
 };
 
@@ -132,7 +152,7 @@ export default defineView({
 				return returnValue;
 			}
 
-			const { finalized, gid, teams, teamNames, remaining } =
+			const { finalized, gid, teams, teamNames, remaining, tournamentTeams } =
 				await augment(allStars);
 
 			const nextGameIsAllStar =
@@ -172,6 +192,7 @@ export default defineView({
 				stats,
 				teams,
 				teamNames,
+				tournamentTeams,
 				type: allStars.type,
 			};
 		}

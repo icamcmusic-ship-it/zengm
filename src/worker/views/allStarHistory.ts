@@ -23,8 +23,13 @@ const augment = (allAllStars: AllStars[]) => {
 			sPts: row.sPts,
 			season: row.season,
 			teamNames: row.teamNames,
-			captain1: addAbbrevAndCount(row.teams[0][0]!),
-			captain2: addAbbrevAndCount(row.teams[1][0]!),
+			// (a tournament's teams are empty until its semifinals are played)
+			captain1: row.teams[0][0]
+				? addAbbrevAndCount(row.teams[0][0])
+				: undefined,
+			captain2: row.teams[1][0]
+				? addAbbrevAndCount(row.teams[1][0])
+				: undefined,
 			dunk:
 				row.dunk?.winner !== undefined
 					? addAbbrevAndCount(row.dunk.players[row.dunk.winner]!)

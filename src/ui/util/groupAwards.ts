@@ -14,6 +14,8 @@ const awardsEnd = [
 	"All-Star",
 	"Slam Dunk Contest Winner",
 	"Three-Point Contest Winner",
+	"Skills Challenge Winner",
+	"Rising Stars MVP",
 	...leaderAwardCategories.map((x) => x.name),
 ];
 
@@ -77,6 +79,8 @@ const getName = (
 		type = "Slam Dunk Contest";
 	} else if (type === "Three-Point Contest Winner") {
 		type = "Three-Point Contest";
+	} else if (type === "Skills Challenge Winner") {
+		type = "Skills Challenge";
 	} else if (type.includes("All-League")) {
 		type = "All-League";
 	} else if (type.includes("All-Offensive")) {

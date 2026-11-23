@@ -267,6 +267,8 @@ export const routeInfos = {
 	"/l/:lid/all_star/three": "allStarThree",
 	"/l/:lid/all_star/three/:season": "allStarThree",
 	"/l/:lid/all_star/history": "allStarHistory",
+	"/l/:lid/all_star/weekend": "allStarWeekend",
+	"/l/:lid/all_star/weekend/:season": "allStarWeekend",
 	"/l/:lid/award_races": "awardRaces",
 	"/l/:lid/award_races/:season": "awardRaces",
 	"/l/:lid/award_history": "awardHistory",

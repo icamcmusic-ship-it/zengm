@@ -21,6 +21,7 @@ const INTERNAL_PAGES = new Set([
 	"allStarDunk",
 	"allStarTeams",
 	"allStarThree",
+	"allStarWeekend",
 	"autoExpand",
 	"autoRelocate",
 	"coach",
