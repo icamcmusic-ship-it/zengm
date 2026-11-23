@@ -70,7 +70,10 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // archcov: 27 (the user's 2064 audit: skills read against the league and his position group, athletic nouns as
 // modifiers, names chosen by how much of his strengths they cover, end words that fit the front words, stickiness
 // re-checked every season, promises from each name's skill list, the defensive tag at the 85th percentile)
-export const ARCHETYPE_READING_VERSION = 27;
+// archfam: 28 (the user's 2070 audit: skill families that count once (shooting, creation, perimeter D), no defensive
+// tag but a 2-Way prefix, 3-Level, offensive IQ a flavor, special names unlocked and given a bigger edge, last season's
+// label kept only while it covers his top two, honest names that say his skill, "Five" only on a center)
+export const ARCHETYPE_READING_VERSION = 28;
 
 export const toStored = (
 	season: number,
