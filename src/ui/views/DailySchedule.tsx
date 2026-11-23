@@ -10,6 +10,7 @@ import { ForceWin } from "../components/ForceWin.tsx";
 import { ScoreBox } from "../components/ScoreBox/index.tsx";
 import { MarqueeBadges } from "../components/MarqueeBadges.tsx";
 import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
+import { SeasonDataPackButton } from "../components/SeasonDataPack.tsx";
 
 const DailySchedule = ({
 	backToBack,
@@ -98,6 +99,10 @@ const DailySchedule = ({
 				noGamesMessage
 			) : (
 				<>
+					<div className="mb-3">
+						<SeasonDataPackButton season={season} />
+					</div>
+
 					{simToDay}
 
 					{tradeDeadline ? (

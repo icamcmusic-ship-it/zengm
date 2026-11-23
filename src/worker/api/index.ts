@@ -63,7 +63,7 @@ import {
 	setGmSuccessor as setGmSuccessorCore,
 } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
-import { decodePlayByPlay } from "../../common/pbpFlavor/store.ts";
+import { buildGameExport } from "../util/gameExport/index.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import {
 	achievement,
@@ -204,6 +204,14 @@ import {
 	getPlayerProfileExport,
 	getPlayerProfileExportSections,
 } from "../util/playerProfileExport.ts";
+import {
+	getSeasonPackGames,
+	getSeasonPackInfo,
+} from "../util/seasonExport/index.ts";
+import {
+	getTeamSeasonExport,
+	getTeamSeasonExportSections,
+} from "../util/teamExport/index.ts";
 import type { NoteInfo } from "../../ui/views/Player/Note.tsx";
 import { beforeLeague, beforeNonLeague } from "../util/beforeView.ts";
 import loadData from "../core/realRosters/loadData.basketball.ts";
@@ -1894,41 +1902,14 @@ const getExportFilename = async (type: "league" | "players") => {
 	throw new Error("Not implemented");
 };
 
-// One game as a file (Game Log, "Download game data"): everything stored with the game (the box score: both teams, every
-// player's line, the scoring summary, the clutch plays...) and, where its play-by-play was stored (basketball, the Store
-// Play-By-Play setting), the events the sim logged, decoded (common/pbpFlavor/store.ts). The UI adds the team names and
-// the play-by-play as text, which it already has from the page.
+// One game as a file (Game Log, "Download game data"): the box score and play-by-play as stored, plus the game's context and
+// analytics (worker/util/gameExport, layout and data dictionary in common/gameExport). The UI adds the team names and the
+// play-by-play as text, which it already has from the page, and makes the CSV zip.
 const exportGame = async ({ gid }: { gid: number }) => {
-	const raw = await idb.merged.games.get(gid);
-	if (!raw) {
-		throw new Error("Game not found");
-	}
-	const { pbp, ...game } = helpers.deepCopy(raw) as any;
-	let playByPlay:
-		| {
-				players: unknown[];
-				events: unknown[];
-				rivalry: number;
-				context?: number[];
-		  }
-		| undefined;
-	if (typeof pbp === "string") {
-		try {
-			const d = decodePlayByPlay(pbp);
-			playByPlay = {
-				players: d.players,
-				events: d.events,
-				rivalry: d.rivalry,
-				...(d.game ? { context: d.game } : {}),
-			};
-		} catch (error) {
-			console.error(error);
-		}
-	}
+	const file = await buildGameExport(gid);
 	return {
+		...file,
 		leagueName: (await league.getName()).replace(/[^\da-z]/gi, "_"),
-		game,
-		playByPlay,
 	};
 };
 
@@ -6809,6 +6790,10 @@ const api = {
 		getPlayersForExport,
 		getPlayerProfileExport,
 		getPlayerProfileExportSections,
+		getSeasonPackGames,
+		getSeasonPackInfo,
+		getTeamSeasonExport,
+		getTeamSeasonExportSections,
 		getPlayerWatch,
 		getProjectedAttendance,
 		getRandomCollege,

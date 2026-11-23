@@ -10,6 +10,12 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { stretchProvisionEnabled } from "../contract/capExceptions.ts";
 import getPayroll from "./getPayroll.ts";
+import {
+	pickCuts,
+	rosterBalanceOn,
+	sortByNeed,
+} from "../freeAgents/rosterBalance.ts";
+import { hardshipMoves, isHardshipPlayer } from "../freeAgents/hardship.ts";
 
 const dropPlayers = async (players: Player[], numToDrop: number) => {
 	// Automatically drop lowest value players until we reach g.get("maxRosterSize")
@@ -68,6 +74,15 @@ const dropPlayers = async (players: Player[], numToDrop: number) => {
 	}
 
 	players.sort((a, b) => a.value - b.value); // Lowest first
+	if (rosterBalanceOn()) {
+		// AI Roster Balance: keep at least 2 bigs and 3 guards, cut from a group of 7+ first
+		players = pickCuts(
+			players,
+			numToDrop,
+			(p) => last(p.ratings).pos,
+			(p) => p.value,
+		);
+	}
 
 	// Stretch provision (setting): AI teams paying the luxury tax spread what they owe the players they cut
 	const stretch =
@@ -141,7 +156,11 @@ const checkRosterSizes = async (
 	const releasedPIDs: number[] = [];
 
 	const checkRosterSize = async (tid: number, userTeamAndActive: boolean) => {
-		const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+		// AI Roster Balance: an AI team's hardship signings don't count against the roster limits (hardship.ts)
+		const hardshipOn = !userTeamAndActive && rosterBalanceOn();
+		const players = (
+			await idb.cache.players.indexGetAll("playersByTid", tid)
+		).filter((p) => !hardshipOn || !isHardshipPlayer(p, tid));
 		let numPlayersOnRoster = players.length;
 
 		if (numPlayersOnRoster > g.get("maxRosterSize")) {
@@ -193,7 +212,20 @@ const checkRosterSizes = async (
 				// Auto-add players
 				while (numPlayersOnRoster < g.get("minRosterSize")) {
 					// See also core.phase
-					let p = minFreeAgents.shift();
+					let p: Player | undefined;
+					if (rosterBalanceOn() && minFreeAgents.length > 0) {
+						// AI Roster Balance: the best one by value and positional need
+						p = sortByNeed(
+							players.map((p2) => last(p2.ratings).pos),
+							minFreeAgents,
+							(p2) => last(p2.ratings).pos,
+							(p2) => p2.value,
+						)[0]!;
+						minFreeAgents.splice(minFreeAgents.indexOf(p), 1);
+						players.push(p);
+					} else {
+						p = minFreeAgents.shift();
+					}
 
 					if (!p) {
 						p = await player.genRandomFreeAgent();
@@ -204,6 +236,16 @@ const checkRosterSizes = async (
 					numPlayersOnRoster += 1;
 				}
 			}
+		}
+
+		// AI Roster Balance: hardship signings for a short-handed AI team (and releasing them when it's healthy again)
+		if (hardshipOn) {
+			await hardshipMoves(
+				tid,
+				await idb.cache.players.indexGetAll("playersByTid", tid),
+				minFreeAgents,
+				releasedPIDs,
+			);
 		}
 
 		// Auto sort rosters (except player's team)

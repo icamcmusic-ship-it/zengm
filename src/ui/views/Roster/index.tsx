@@ -38,6 +38,7 @@ import { ArchetypeRosterPanel } from "../../components/Archetype/ArchetypeRoster
 import { RosterStashSection } from "../../components/DraftStash.tsx";
 import { useIsCollege } from "../../util/collegeMode.ts";
 import { classYearAbbrev } from "../../../common/college/constants.ts";
+import { TeamSeasonExportButton } from "../../components/TeamSeasonExport.tsx";
 
 const handleRelease = async (
 	p: View<"roster">["players"][number],
@@ -549,6 +550,14 @@ const Roster = ({
 					The AI will handle roster management in spectator mode.
 				</p>
 			) : null}
+
+			<div className="mb-2">
+				<TeamSeasonExportButton
+					abbrev={t.seasonAttrs.abbrev}
+					season={season}
+					tid={tid}
+				/>
+			</div>
 
 			<DataTable
 				cols={cols}

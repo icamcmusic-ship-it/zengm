@@ -35,6 +35,8 @@ export type RotationPlayer = {
 	injuryRestriction?: number;
 	// Coaching systems: the coach's trust in young players or veterans (1 = none)
 	coachMinutesMult?: number;
+	// The user's team (options.userControlled): one of the starters he picked (the first numPlayersOnCourt in his roster order)
+	userStarter?: boolean;
 };
 
 export type RotationPlanOptions = {
@@ -52,7 +54,20 @@ export type RotationPlanOptions = {
 	// Playoffs only: the series state (common/seriesState.ts). 1 a deciding game, 0.8 facing elimination: the top 5 play more (up to
 	// 46), the end of the rotation less. Negative (up 3-0): the stars rest a little. Undefined = 0
 	seriesUrgency?: number;
+	// The user's own team (not AI, spectator or auto play): his roster order and playing time buttons count. The plan ranks by value x
+	// playing time, his starters get a minutes floor and the playing time choice moves real minutes. Undefined = an AI team, unchanged
+	userControlled?: boolean;
 };
+
+// User's team: "+" and "++" (1.25, 1.75) move a player up the plan's order (value x choice^RANK) and a little more at that rank
+// (x choice^MINUTES), so "++" on the end of the bench makes him a rotation player. "-" (0.75) keeps his rank and takes about 30% of
+// his minutes (x choice^CUT), and the rescale doesn't give them back (an AI team's "-" star got ~32 of ~40 back)
+const USER_PT_RANK_EXP = 0.3;
+const USER_PT_MINUTES_EXP = 0.2;
+const USER_PT_CUT_EXP = 1.25;
+// ... and the starters he picked play at least this much (x the playing time choice when it's below normal), unless injured, on a
+// minutes restriction or (in the sim) in foul trouble
+export const USER_STARTER_FLOOR = 24;
 
 // Playoff series urgency: share of minutes added to the top 5 (and taken from the 7th man on) per unit of urgency
 const URGENCY_STARS = 0.07;
@@ -80,16 +95,30 @@ export const planMinutes = (
 	}
 	const style = Math.max(-1, Math.min(1, options.rotationStyle ?? 0));
 
+	const user = options.userControlled === true && !options.allStarGame;
+	// The user's playing time choice, without an Injury Depth restriction (which is also in ptModifier)
+	const restrictionOf = (p: RotationPlayer) =>
+		p.injuryRestriction !== undefined &&
+		p.injuryRestriction > 0 &&
+		p.injuryRestriction < 1
+			? p.injuryRestriction
+			: 1;
+	const choiceOf = (p: RotationPlayer) => p.ptModifier / restrictionOf(p);
+	// What the plan ranks by: value, and on the user's team value x his playing time choice
+	const keyOf = user
+		? (p: RotationPlayer) =>
+				p.valueNoPot * Math.max(1, choiceOf(p)) ** USER_PT_RANK_EXP
+		: (p: RotationPlayer) => p.valueNoPot;
 	const order = players
-		.map((p, i) => ({ p, i }))
+		.map((p, i) => ({ p, i, key: keyOf(p) }))
 		.filter(({ p }) => !p.injured && p.ptModifier > 0)
-		.sort((a, b) => b.p.valueNoPot - a.p.valueNoPot);
+		.sort((a, b) => b.key - a.key);
 
 	const targets = players.map(() => 0);
 	// The table's starters and the next five: with another number on court the whole table is scaled, so they stay its top 5 and next 5
 	const numStarters = 5;
 	const fifthValue =
-		order[Math.min(numStarters - 1, order.length - 1)]?.p.valueNoPot ?? 0;
+		order[Math.min(numStarters - 1, order.length - 1)]?.key ?? 0;
 	const urgency =
 		options.playoffs && !options.allStarGame
 			? Math.max(-1, Math.min(1, options.seriesUrgency ?? 0))
@@ -108,11 +137,13 @@ export const planMinutes = (
 	const caps = players.map(() => max);
 	const backToBackCut =
 		(options.backToBackCut ?? BACK_TO_BACK_STARTER_CUT) * scale;
-	for (const [rank, { p, i }] of order.entries()) {
+	// User's team: the least each one is planned for (his starters' floor)
+	const floors = players.map(() => 0);
+	for (const [rank, { p, i, key }] of order.entries()) {
 		let target = (table[rank] ?? 0) * scale;
 		if (rank < numStarters && !options.allStarGame) {
 			// Stars play a bit more
-			const gap = p.valueNoPot - fifthValue;
+			const gap = key - fifthValue;
 			target += STAR_BONUS * Math.max(0, Math.min(1, gap / STAR_VALUE_GAP));
 			if (options.backToBack) {
 				target -= backToBackCut;
@@ -149,14 +180,37 @@ export const planMinutes = (
 			// (a cap: not rescaled up past it either)
 			caps[i] = Math.min(max, 36 * p.minutesRestriction);
 		}
-		const injuryRestriction =
-			p.injuryRestriction !== undefined &&
-			p.injuryRestriction > 0 &&
-			p.injuryRestriction < 1
-				? p.injuryRestriction
-				: 1;
+		const injuryRestriction = restrictionOf(p);
 		if (injuryRestriction < 1) {
 			frozen.add(i);
+		}
+		if (user) {
+			const choice = choiceOf(p);
+			if (choice < 1) {
+				// "-": not rescaled up
+				frozen.add(i);
+			}
+			const restricted =
+				injuryRestriction < 1 ||
+				(p.minutesRestriction !== undefined && p.minutesRestriction < 1);
+			if (p.userStarter && !restricted) {
+				floors[i] = Math.min(
+					caps[i]!,
+					USER_STARTER_FLOOR * scale * Math.min(1, choice),
+				);
+			}
+			targets[i] = Math.min(
+				caps[i]!,
+				Math.max(
+					floors[i]!,
+					target *
+						(choice < 1
+							? choice ** USER_PT_CUT_EXP
+							: Math.min(choice ** USER_PT_MINUTES_EXP, 1.5)) *
+						injuryRestriction,
+				),
+			);
+			continue;
 		}
 		targets[i] = Math.max(
 			0,
@@ -169,7 +223,10 @@ export const planMinutes = (
 	// Rescale to the minutes there are, never above the max (more than once, since capped players can't take more). Short-handed, when
 	// everybody is at the max, the plan sums to less than the minutes there are: the sim plays whoever is healthy anyway. Before, the
 	// rescale went up to 1.25 times the max while the best player stayed at the max, so the 2nd-5th best were planned for more than him
-	for (let iter = 0; iter <= order.length; iter++) {
+	if (user) {
+		rescaleUser(targets, order, totalMinutes, caps, floors, frozen);
+	}
+	for (let iter = 0; iter <= order.length && !user; iter++) {
 		let sum = 0;
 		let sumScalable = 0;
 		for (const { i } of order) {
@@ -213,6 +270,44 @@ export const planMinutes = (
 	}
 
 	return targets;
+};
+
+// The user's team: rescale to the minutes there are, each between his floor and his cap (the restricted ones are only scaled down)
+const rescaleUser = (
+	targets: number[],
+	order: { i: number }[],
+	totalMinutes: number,
+	caps: number[],
+	floors: number[],
+	frozen: Set<number>,
+) => {
+	for (let iter = 0; iter <= 2 * order.length; iter++) {
+		let sum = 0;
+		for (const { i } of order) {
+			sum += targets[i]!;
+		}
+		const up = sum < totalMinutes;
+		let sumScalable = 0;
+		for (const { i } of order) {
+			const t = targets[i]!;
+			if (up ? !frozen.has(i) && t < caps[i]! - 1e-9 : t > floors[i]! + 1e-9) {
+				sumScalable += t;
+			}
+		}
+		const missing = totalMinutes - sum;
+		if (Math.abs(missing) < 0.01 || sumScalable <= 0) {
+			break;
+		}
+		const factor = 1 + missing / sumScalable;
+		for (const { i } of order) {
+			const t = targets[i]!;
+			if (missing > 0 && !frozen.has(i) && t < caps[i]! - 1e-9) {
+				targets[i] = Math.min(caps[i]!, t * factor);
+			} else if (missing < 0 && t > floors[i]! + 1e-9) {
+				targets[i] = Math.max(floors[i]!, t * factor);
+			}
+		}
+	}
 };
 
 // How much more (> 1) or less (< 1) a player is wanted on the court given his minutes so far and his plan. expected is his target

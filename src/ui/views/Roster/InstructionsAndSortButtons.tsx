@@ -23,8 +23,12 @@ const InstructionsAndSortButtons = ({
 					<div className="d-flex flex-wrap gap-2">
 						{editable ? (
 							<>
-								<button className="btn btn-secondary" onClick={handleAutoSort}>
-									Auto sort roster
+								<button
+									className="btn btn-secondary"
+									onClick={handleAutoSort}
+									title="Your head coach sets the starters and the rotation order"
+								>
+									Let coach decide
 								</button>
 								<button className="btn btn-secondary" onClick={handleResetPT}>
 									Reset playing time
@@ -50,7 +54,7 @@ const InstructionsAndSortButtons = ({
 								}}
 							/>
 							<label className="form-check-label" htmlFor="ai-sort-user-roster">
-								Keep auto sorted
+								Always let coach decide
 							</label>
 						</div>
 					) : null}

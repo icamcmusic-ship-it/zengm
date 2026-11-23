@@ -24,6 +24,8 @@ const addToFreeAgents = (
 	delete p.shotProfile;
 	// Injury Depth: the old team's load management flag doesn't follow him
 	delete p.loadManagement;
+	// AI Roster Balance: a hardship deal is over
+	delete p.hardship;
 
 	// Extra check is for console scripts from before numPlayersTradedAwayNormalized was a required parameter
 	// Spread is because addToFreeAgents is often called in a loop, with numPlayersTradedAwayNormalized calculated once up front

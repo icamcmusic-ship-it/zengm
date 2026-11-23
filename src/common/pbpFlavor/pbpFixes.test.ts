@@ -310,14 +310,15 @@ test("a stored playoff game (and a custom shot clock) reads as it did live", asy
 		playoffs,
 		shotClockLength: 30,
 	});
+	// (one line per entry: the live harness joins an entry's extra lines with spaces, e.g. the starting lineups at the tip)
 	const text = (lines: Line[]) =>
-		lines.map((l) => (l.note ? `${l.text}\n${l.note}` : l.text));
+		lines.map((l) => (l.note ? `${l.text} ${l.note}` : l.text));
 	const live = text(playLive(structuredClone(events), liveBox(true)));
 	const regular = text(playLive(structuredClone(events), liveBox(false)));
 	assert.notDeepEqual(live, regular);
 	const entries = buildPlayByPlayEntries({ ...liveBox(true), pbp: stored });
 	assert.deepStrictEqual(
-		entries.map((e) => nodeToText(e.text)),
+		entries.map((e) => nodeToText(e.text).replaceAll("\n", " ")),
 		live,
 	);
 }, 60_000);

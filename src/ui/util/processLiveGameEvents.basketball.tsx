@@ -121,6 +121,37 @@ const makeFlavorHost = (boxScore: any): FlavorHost => ({
 			.map((p: any) => p.pid),
 });
 
+// The starting lineups, shown with the opening tip (once per game, with or without the flavor layer): each team's five on the floor
+let startersListed = false;
+const startersLine = (boxScore: any): ReactNode => {
+	const rows = [0, 1].map((t) => {
+		const team = boxScore.teams[t];
+		const label =
+			team.abbrev ||
+			`${team.region ?? ""} ${team.name ?? ""}`.trim() ||
+			`Team ${t + 1}`;
+		const starters = (team.players as any[]).filter((p) => p.inGame);
+		return { label, starters };
+	});
+	if (rows.every((r) => r.starters.length === 0)) {
+		return null;
+	}
+	return (
+		<span className="text-body-secondary">
+			Starting lineups
+			{rows.map((r) => (
+				<span key={r.label}>
+					<br />
+					<b>{r.label}:</b>{" "}
+					{r.starters
+						.map((p) => `${p.name}${p.pos ? ` (${p.pos})` : ""}`)
+						.join(", ")}
+				</span>
+			))}
+		</span>
+	);
+};
+
 const withNote = (text: ReactNode, fr: FlavorResult) => {
 	if (!fr.note && !fr.danger) {
 		return text;
@@ -567,6 +598,7 @@ const processLiveGameEvents = ({
 	) {
 		playersByPidGid = boxScore.gid;
 		flavor = undefined;
+		startersListed = false;
 		playersByPid = {};
 		for (const t of boxScore.teams) {
 			for (const p of t.players) {
@@ -696,6 +728,19 @@ const processLiveGameEvents = ({
 			const silent = fr === "silent";
 			if (!silent) {
 				text = getText(e, boxScore, fr === undefined ? undefined : fr);
+				if (e.type === "jumpBall" && !startersListed) {
+					startersListed = true;
+					const line = startersLine(boxScore);
+					if (line) {
+						text = (
+							<>
+								{line}
+								<br />
+								{text}
+							</>
+						);
+					}
+				}
 				textEvent = e;
 				// The logo goes with the line's subject: the flavor text can start from the other side ("Smith is fouled by
 				// Jones" on Jones's foul), and then it's that player's team

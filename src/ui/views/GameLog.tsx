@@ -57,21 +57,25 @@ const plainText = (node: ReactNode): string => {
 };
 const BLOCK_TAGS = new Set(["div", "p", "br", "li", "span"]);
 
-// "Download game data": one JSON file with everything stored for the game (worker api exportGame: the box score with
-// every player's line, the scoring summary...) and its play-by-play, as the events the sim logged and as the text the
-// Play-By-Play tab shows (period, clock, team, score after the play), when the game's play-by-play was stored
+// "Download game data": one JSON file with everything stored for the game and its context (worker api exportGame, which builds it
+// in the worker: pregame stakes, team and player context, analytics; layout and data dictionary in common/gameExport), plus the
+// play-by-play as the text the Play-By-Play tab shows (period, clock, team, score after the play) when it was stored. Or a zip of
+// CSV files (box score, play-by-play, shot chart, lineups)
+const nextFrame = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 const DownloadGame = ({ boxScore }: { boxScore: any }) => {
 	const [status, setStatus] = useState<
 		"idle" | "working" | "done" | "noPbp" | "error"
 	>("idle");
+	const [format, setFormat] = useState<"json" | "csv">("json");
 	const download = async () => {
 		setStatus("working");
 		try {
-			const { leagueName, game, playByPlay } = await toWorker(
-				"main",
-				"exportGame",
-				{ gid: boxScore.gid },
-			);
+			// (let "Preparing..." show before the work)
+			await nextFrame();
+			const { leagueName, ...rest } = await toWorker("main", "exportGame", {
+				gid: boxScore.gid,
+			});
 			const teams = boxScore.teams.map((t: any) => ({
 				tid: t.tid,
 				region: t.region,
@@ -104,15 +108,23 @@ const DownloadGame = ({ boxScore }: { boxScore: any }) => {
 				} catch (error) {
 					console.error(error);
 				}
+				await nextFrame();
 			}
+			const {
+				format: fileFormat,
+				schemaVersion,
+				playByPlay,
+				...sections
+			} = rest;
 			const file = {
+				format: fileFormat,
+				schemaVersion,
 				kind: "game",
-				version: 1,
 				sport: __SPORT,
 				exported: new Date().toISOString(),
 				// (teams[0] is the home team, as in the game)
 				teams,
-				game,
+				...sections,
 				playByPlay: playByPlay
 					? {
 							lines,
@@ -123,14 +135,26 @@ const DownloadGame = ({ boxScore }: { boxScore: any }) => {
 						}
 					: null,
 			};
-			downloadFile(
-				`${GAME_ACRONYM}_${leagueName}_game_${game.season}_${teams[1].abbrev}_at_${teams[0].abbrev}_${game.gid}.json`.replace(
+			const game = sections.game;
+			const base =
+				`${GAME_ACRONYM}_${leagueName}_game_${game.season}_${teams[1].abbrev}_at_${teams[0].abbrev}_${game.gid}`.replace(
 					/[^\w.-]/g,
 					"_",
-				),
-				jsonFileBytes(file, 1),
-				"application/json",
-			);
+				);
+			if (format === "csv") {
+				const [{ gameExportCsvFiles }, { makeZip }] = await Promise.all([
+					import("../../common/gameExport/csv.ts"),
+					import("../util/zip.ts"),
+				]);
+				const encoder = new TextEncoder();
+				const files = gameExportCsvFiles(file).map((f) => ({
+					name: `${base}/${f.name}`,
+					bytes: encoder.encode(f.text),
+				}));
+				downloadFile(`${base}.zip`, [makeZip(files)], "application/zip");
+			} else {
+				downloadFile(`${base}.json`, jsonFileBytes(file), "application/json");
+			}
 			setStatus(playByPlay ? "done" : "noPbp");
 		} catch (error) {
 			console.error(error);
@@ -145,18 +169,29 @@ const DownloadGame = ({ boxScore }: { boxScore: any }) => {
 				disabled={status === "working"}
 				onClick={download}
 			>
-				Download game data (JSON)
+				Download game data
 			</button>
+			<select
+				className="form-select form-select-sm w-auto"
+				aria-label="File format"
+				value={format}
+				onChange={(event) => setFormat(event.target.value as "json" | "csv")}
+			>
+				<option value="json">JSON (everything)</option>
+				<option value="csv">CSV (zip)</option>
+			</select>
 			<span className="small text-body-secondary" role="status">
 				{status === "working"
 					? "Preparing..."
 					: status === "done"
-						? "Downloaded: box score and play-by-play."
+						? "Downloaded: box score, play-by-play, context and analytics."
 						: status === "noPbp"
-							? "Downloaded the box score. No play-by-play was stored for this game."
+							? "Downloaded. No play-by-play was stored for this game, so the sections that need it are empty (the file says why)."
 							: status === "error"
 								? "Could not make the file."
-								: "Box score, every player's line and the play-by-play."}
+								: format === "csv"
+									? "Box score, play-by-play, shot chart and lineups as CSV files."
+									: "Box score, play-by-play, stakes, team and player context, analytics and a data dictionary."}
 			</span>
 		</div>
 	);

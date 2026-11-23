@@ -209,7 +209,8 @@ test("lines of every kind show up, and the text varies", async () => {
 		freeThrow: /free throw|at the line/,
 		timeout: /^Timeout/,
 		substitution: /checks in|subs in|replaces|substitution/,
-		tip: /^Tip-off/,
+		// (the opening tip follows the starting lineups in its entry)
+		tip: /(^|\s)Tip-off/,
 		period: /^Start of/,
 		final: /^End of game/,
 		milestone:
