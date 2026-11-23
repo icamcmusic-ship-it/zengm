@@ -204,6 +204,14 @@ import {
 	getPlayerProfileExport,
 	getPlayerProfileExportSections,
 } from "../util/playerProfileExport.ts";
+import {
+	getSeasonPackGames,
+	getSeasonPackInfo,
+} from "../util/seasonExport/index.ts";
+import {
+	getTeamSeasonExport,
+	getTeamSeasonExportSections,
+} from "../util/teamExport/index.ts";
 import type { NoteInfo } from "../../ui/views/Player/Note.tsx";
 import { beforeLeague, beforeNonLeague } from "../util/beforeView.ts";
 import loadData from "../core/realRosters/loadData.basketball.ts";
@@ -6809,6 +6817,10 @@ const api = {
 		getPlayersForExport,
 		getPlayerProfileExport,
 		getPlayerProfileExportSections,
+		getSeasonPackGames,
+		getSeasonPackInfo,
+		getTeamSeasonExport,
+		getTeamSeasonExportSections,
 		getPlayerWatch,
 		getProjectedAttendance,
 		getRandomCollege,
