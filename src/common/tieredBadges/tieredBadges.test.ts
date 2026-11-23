@@ -14,6 +14,8 @@ import {
 	parseBadgeToken,
 	progressToNext,
 	quantileSorted,
+	recenterHeldTiers,
+	simRelevant,
 	sortedBadges,
 	tbValue,
 	tierOfScore,
@@ -185,6 +187,99 @@ describe("2K Badges tiers", () => {
 		);
 	});
 
+	test("the one-tier floor stays within the badge-point cap", () => {
+		// Last season a Hall of Fame shooter and defender; now nothing is left (every rating 20) and his ovr allows 3 points
+		const r: Record<string, any> = { ...rows[0]!, ovr: 51 };
+		for (const k of BASE) {
+			r[k] = 20;
+		}
+		r.sub = r.sub.map(() => 20);
+		const prev = { freeThrowAce: 4, clamps: 4, glove: 3 } as const;
+		const cap = badgePointCap(51);
+		assert.strictEqual(cap, 3);
+		const { t } = assignTiers(r, 51, cutoffs, prev);
+		assert.isAtMost(badgePoints(t), cap);
+		// The points go to the highest tiers last season (sim effects first, then by key): Clamps Gold
+		assert.deepEqual(t, { clamps: 3 });
+		// With room, every badge drops only one tier
+		assert.deepEqual(assignTiers(r, 80, cutoffs, prev).t, {
+			clamps: 3,
+			freeThrowAce: 3,
+			glove: 2,
+		});
+	});
+
+	test("tier counts stay stationary over seasons of moving ratings (hysteresis, floor, cap, re-centering)", () => {
+		// 390 rotation players whose ratings take a random walk (about 3 points a season), 12 seasons: each season new cutoffs, tiers
+		// with last season's, the re-centering and one Legend per badge, as updateTieredBadges does
+		const rand = makeSeededRandom(11);
+		const normal = () => {
+			const u = Math.max(rand(), 1e-9);
+			return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
+		};
+		const bound = (x: number) => Math.max(0, Math.min(100, x));
+		const league = genRows(390, 3, true);
+		let prev: Record<string, Tier>[] = league.map(() => ({}));
+		const bySeason: number[][] = [];
+		let overCap = 0;
+		for (let season = 0; season < 12; season++) {
+			if (season > 0) {
+				for (const r of league) {
+					for (const k of BASE) {
+						r[k] = bound(r[k] + 3 * normal());
+					}
+					r.sub = r.sub.map((x: number) => bound(x + 3 * normal()));
+					r.ovr = bound(r.ovr + 2 * normal());
+				}
+			}
+			const cuts = computeCutoffs(league, 2025 + season);
+			const players = league.map((r, pid) => {
+				const p = season > 0 ? prev[pid] : undefined;
+				const { t } = assignTiers(r, r.ovr, cuts, p);
+				return {
+					pid,
+					t,
+					fresh: p ? assignTiers(r, r.ovr, cuts).t : t,
+					scoreOf: (key: string) =>
+						tieredBadgeScore(
+							r,
+							TIERED_BADGES.find((d) => d.key === key)!,
+						),
+					scores: {} as Record<string, number>,
+				};
+			});
+			recenterHeldTiers(players);
+			for (const p of players) {
+				for (const key of Object.keys(p.t)) {
+					p.scores[key] = p.scoreOf(key);
+				}
+			}
+			enforceLegendLimit(players);
+			const counts = [0, 0, 0, 0, 0, 0];
+			for (const [pid, p] of players.entries()) {
+				for (const tier of Object.values(p.t)) {
+					counts[tier]!++;
+				}
+				if (badgePoints(p.t) > badgePointCap(league[pid]!.ovr)) {
+					overCap++;
+				}
+				assert.isAtMost(Object.keys(p.t).length, MAX_BADGES);
+			}
+			bySeason.push(counts);
+			prev = players.map((p) => p.t);
+		}
+		assert.strictEqual(overCap, 0);
+		// Seasons 4-11 against the first (no history): each tier within 15% (Legend: one per badge at most, always)
+		for (const tier of [1, 2, 3, 4]) {
+			const first = bySeason[0]![tier]!;
+			const later =
+				bySeason.slice(4).reduce((a, c) => a + c[tier]!, 0) /
+				bySeason.slice(4).length;
+			assert.isAtMost(later, 1.15 * first, `tier ${tier}`);
+			assert.isAtLeast(later, 0.85 * first, `tier ${tier}`);
+		}
+	});
+
 	test("at most one Legend per badge in the league", () => {
 		const players = [1, 2, 3].map((pid) => ({
 			pid,
@@ -237,7 +332,7 @@ describe("2K Badges display helpers", () => {
 		);
 	});
 
-	test("a player keeps his best MAX_BADGES: highest tier, then furthest into it", () => {
+	test("a player keeps his best MAX_BADGES: highest tier, then badges with a sim effect, then furthest into it", () => {
 		const t: Record<string, Tier> = {
 			glove: 1,
 			clamps: 3,
@@ -246,24 +341,29 @@ describe("2K Badges display helpers", () => {
 			acrobat: 4,
 			riseUp: 1,
 			pogoStick: 2,
+			postLockdown: 2,
 			brickWall: 5,
 		};
 		const progress = new Map([
 			["clamps", 0.2],
 			["dimer", 0.7],
 			["handles", 0.1],
+			["postLockdown", 0.05],
 			["pogoStick", 0.9],
 		]);
 		const kept = keepBest(t, progress);
 		assert.strictEqual(MAX_BADGES, 6);
+		// Pogo Stick (no sim effect) is the furthest into Silver, but Handles and Post Lockdown (sim effects) take the last two slots
 		assert.deepEqual(Object.keys(kept), [
 			"brickWall",
 			"acrobat",
 			"dimer",
 			"clamps",
-			"pogoStick",
 			"handles",
+			"postLockdown",
 		]);
+		assert.strictEqual(simRelevant("pogoStick"), 0);
+		assert.strictEqual(simRelevant("handles"), 1);
 		assert.deepEqual(
 			sortedBadges(kept).map((b) => b.key),
 			Object.keys(kept),

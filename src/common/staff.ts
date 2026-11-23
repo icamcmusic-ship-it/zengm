@@ -151,6 +151,60 @@ export const coachSalaryDemand = (
 	return Math.round((BASE_SALARY[role] * factor * salaryCap) / 90000 / 10) * 10;
 };
 
+// ---- coach rating progression (worker/core/staff progress, heirOffseason, generateCoach) ----
+// Before: +1.2 a year to 45, +0.2 to 58, -1.2 after, on top of whatever a coach was generated with (any age at the same ratings), plus
+// the associate head coach's 0-2 a year up to 78. The league's coaches drifted up for two decades (head coach ovr 53 -> 64, head
+// coach salaries x2.4, coachDrift.script.test.ts). Now: a gentler age curve, generated coaches start where that curve puts a coach
+// of their age, and each year's change is pulled a little toward the rating a coach of his age and job is made with, so the league's
+// distribution is stationary.
+
+/** Mean yearly change of a coach's rating at an age. */
+export const coachAgeTrend = (age: number) =>
+	age < 40 ? 0.8 : age < 48 ? 0.4 : age < 57 ? 0 : age < 64 ? -0.8 : -1.4;
+
+// The cumulative age trend is shifted by this, so the coaches the generator makes (ages 31-66) average out where they did before
+const AGE_OFFSET_SHIFT = 12.7;
+
+/** Rating points his age adds to (or takes from) a coach's ratings, relative to the generator's average coach. */
+export const coachAgeOffset = (age: number) => {
+	let sum = 0;
+	for (let a = 25; a < age; a++) {
+		sum += coachAgeTrend(a);
+	}
+	return Math.round((sum - AGE_OFFSET_SHIFT) * 10) / 10;
+};
+
+// What the generator makes a rating for a job (generateCoach): 42, +9 for a head coach's offense, defense and motivation, +15 for an
+// assistant's specialty
+export const COACH_BASE_RATING = 42;
+export const coachRatingRef = (key: keyof CoachRatings, role: CoachRole) => {
+	if (role === "head") {
+		return key === "dev" ? COACH_BASE_RATING : COACH_BASE_RATING + 9;
+	}
+	const own =
+		role === "shoot"
+			? "sht"
+			: role === "sc"
+				? "cnd"
+				: role === "video"
+					? "vid"
+					: role;
+	return key === own ? COACH_BASE_RATING + 15 : COACH_BASE_RATING;
+};
+
+// Share of the gap to that reference closed each year (on top of the age trend): half the gap in about 17 years
+export const COACH_REVERSION = 0.03;
+
+/** Mean yearly change of one of a coach's ratings: the age trend, pulled toward what a coach of his age and job is made with. */
+export const coachRatingDrift = (
+	value: number,
+	key: keyof CoachRatings,
+	role: CoachRole,
+	age: number,
+) =>
+	coachAgeTrend(age) -
+	COACH_REVERSION * (value - coachRatingRef(key, role) - coachAgeOffset(age));
+
 // Value used when a staff slot is vacant
 export const VACANT_RATING = 30;
 
