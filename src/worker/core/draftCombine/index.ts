@@ -1,7 +1,8 @@
 // Draft Lottery Night & Combine setting (basketball), worker side: the draft combine of a class (held at the start of the draft
 // lottery phase), its news, the AI draft nudge and the lottery night news. The combine itself is a pure function of each prospect
 // (common/draftCombine.ts, its own seeded RNG), so nothing here draws from the game's random numbers. When the combine is held, each
-// invited prospect's results are stored on him (p.combine), so regenerating his ratings or the class later doesn't rewrite them.
+// invited prospect's results are stored on him (p.combine), so later development doesn't rewrite them. Regenerate Ratings redoes
+// the stored combine of the prospects it rebuilds (redoStoredCombine).
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import {
 	buildCombineHistory,
@@ -250,6 +251,41 @@ export const getClassCombine = async (
 		results,
 		ranks: combineRanks([...results.values()]),
 	};
+};
+
+/**
+ * Regenerate Ratings: redo the stored combine of prospects whose ratings were rebuilt after their class's combine was held, so his
+ * measurements and drills follow his new ratings (the combine is a pure function of his ratings, see common/draftCombine.ts). His
+ * invite, his place in the invite order and his medical stay as they were. Before the combine is held nothing is stored, and the
+ * live combine already reads the new ratings.
+ */
+export const redoStoredCombine = async (draftYear: number, pids: number[]) => {
+	if (pids.length === 0) {
+		return 0;
+	}
+	const which = new Set(pids);
+	const players = (await classPlayersOf(draftYear))
+		.map((p) => ({ p, r: combineRatingsRow(p)! }))
+		.filter((x) => x.r)
+		.sort((a, b) => stock(b.p, b.r) - stock(a.p, a.r) || a.p.pid - b.p.pid);
+	let redone = 0;
+	for (const [i, { p, r }] of players.entries()) {
+		if (!which.has(p.pid) || p.combine?.season !== draftYear) {
+			continue;
+		}
+		const { pid, ...rest } = generateDraftCombine(toInput(p, r, i + 1));
+		const medical = p.combine.medical;
+		p.combine = {
+			...rest,
+			performance: Math.round(rest.performance * 1000) / 1000,
+		};
+		if (medical) {
+			p.combine.medical = medical;
+		}
+		await idb.cache.players.put(p);
+		redone += 1;
+	}
+	return redone;
 };
 
 // One prospect's combine, with his ranks in the class. undefined when off, not held yet or not invited

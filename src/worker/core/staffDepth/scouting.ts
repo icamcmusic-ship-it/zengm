@@ -767,6 +767,30 @@ export const pickOurGuys = async () => {
 
 const scoutName = (id: number) => scoutFromId(leagueSeed(), id, 0.5, 0, 0).name;
 
+/**
+ * The verdict on a scout's "our guy": a star any time; after four seasons solid, or a bust. Only a first-round pick can bust: a
+ * second-rounder or an undrafted player who doesn't pan out is a miss, with no penalty. undefined while it's too early to say.
+ */
+export const ourGuyVerdict = ({
+	allStar,
+	peak,
+	seasonsSince,
+	firstRounder,
+}: {
+	allStar: boolean;
+	peak: number;
+	seasonsSince: number;
+	firstRounder: boolean;
+}): "star" | "bust" | "solid" | "miss" | undefined => {
+	if (allStar || peak >= 64) {
+		return "star";
+	}
+	if (seasonsSince >= 4) {
+		return peak >= 47 ? "solid" : firstRounder ? "bust" : "miss";
+	}
+	return undefined;
+};
+
 // After the draft: judge "our guy" calls (a star any time; bust or solid after four seasons), then retirements, poaching and promotions
 export const runScoutCareers = async () => {
 	const season = g.get("season");
@@ -798,12 +822,12 @@ export const runScoutCareers = async () => {
 					typeof a.type === "string" &&
 					(a.type === "All-Star" || a.type.startsWith("All-League")),
 			);
-			let verdict: "star" | "bust" | "solid" | undefined;
-			if (allStar || peak >= 64) {
-				verdict = "star";
-			} else if (season - call.s >= 4) {
-				verdict = peak < 47 ? "bust" : "solid";
-			}
+			const verdict = ourGuyVerdict({
+				allStar,
+				peak,
+				seasonsSince: season - call.s,
+				firstRounder: p.draft.year === call.s && p.draft.round === 1,
+			});
 			if (!verdict) {
 				continue;
 			}

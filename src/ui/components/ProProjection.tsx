@@ -31,16 +31,17 @@ export const ProjectionCells = ({
 	projection: ProProjectionData | undefined;
 	// A second-round pick: no bust odds (little is expected of him)
 	noBust?: boolean;
-	// No visible ratings challenge: the peak is an ovr
+	// No visible ratings challenge: the peak is an ovr, and the odds are as telling as one, so neither is shown (only the outlook tier)
 	hidePeak?: boolean;
 }) => {
+	if (hidePeak) {
+		return null;
+	}
 	if (!projection) {
 		return (
 			<>
-				{hidePeak ? null : <td className="text-body-secondary">…</td>}
-				<td className={hidePeak ? "text-body-secondary" : undefined}>
-					{hidePeak ? "…" : null}
-				</td>
+				<td className="text-body-secondary">…</td>
+				<td />
 				<td />
 				<td />
 			</>
@@ -48,16 +49,14 @@ export const ProjectionCells = ({
 	}
 	return (
 		<>
-			{hidePeak ? null : (
-				<td
-					title={`10th-90th percentile: ${projection.peakLow}-${projection.peakHigh}`}
-				>
-					{projection.peak}{" "}
-					<span className="text-body-secondary small">
-						({projection.peakLow}-{projection.peakHigh})
-					</span>
-				</td>
-			)}
+			<td
+				title={`10th-90th percentile: ${projection.peakLow}-${projection.peakHigh}`}
+			>
+				{projection.peak}{" "}
+				<span className="text-body-secondary small">
+					({projection.peakLow}-{projection.peakHigh})
+				</span>
+			</td>
 			<td>{pct(projection.starPct)}</td>
 			<td>{pct(projection.starterPct)}</td>
 			<td
@@ -124,24 +123,32 @@ export const ProProjectionSection = ({ pid }: { pid: number }) => {
 						around age {projection.peakAge}, about {projection.years} seasons in
 						the league.
 					</p>
-					<div className="d-flex gap-3 flex-wrap mb-1">
-						<div>
-							<div className="text-body-secondary small">Star (65+)</div>
-							<div className="fs-5">{pct(projection.starPct)}</div>
+					{challengeNoRatings ? null : (
+						<div className="d-flex gap-3 flex-wrap mb-1">
+							<div>
+								<div className="text-body-secondary small">Star (65+)</div>
+								<div className="fs-5">{pct(projection.starPct)}</div>
+							</div>
+							<div>
+								<div className="text-body-secondary small">Starter (58+)</div>
+								<div className="fs-5">{pct(projection.starterPct)}</div>
+							</div>
+							{projection.projectedFirstRound ? (
+								<div>
+									<div className="text-body-secondary small">Bust</div>
+									<div className="fs-5">{pct(projection.bustPct)}</div>
+								</div>
+							) : null}
 						</div>
-						<div>
-							<div className="text-body-secondary small">Starter (58+)</div>
-							<div className="fs-5">{pct(projection.starterPct)}</div>
-						</div>
-						<div>
-							<div className="text-body-secondary small">Bust</div>
-							<div className="fs-5">{pct(projection.bustPct)}</div>
-						</div>
-					</div>
+					)}
 					<p className="text-body-secondary small mb-0">
 						Simulated careers with the game's own player development, from his
-						ratings as your scouts see them. Bust: under 50 ovr at his peak or
-						out of the league within 4 seasons.
+						ratings as your scouts see them.
+						{challengeNoRatings
+							? ""
+							: projection.projectedFirstRound
+								? " Bust: under 50 ovr at his peak or out of the league within 4 seasons."
+								: " He projects as a second-round pick, and second-rounders are never graded as busts."}
 					</p>
 				</>
 			)}

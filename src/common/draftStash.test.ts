@@ -113,7 +113,11 @@ describe("draft-and-stash rules", () => {
 	});
 
 	test("who can be stashed, and when", () => {
-		const p = { tid: 4, draft: { year: 2025, round: 2 } };
+		const p = {
+			tid: 4,
+			draft: { year: 2025, round: 2 },
+			born: { year: 2004 },
+		};
 		const base = {
 			p,
 			season: 2025,
@@ -135,6 +139,17 @@ describe("draft-and-stash rules", () => {
 		assert.isString(stashBlockedReason({ ...base, hasProStats: true }));
 		assert.isString(
 			stashBlockedReason({ ...base, p: { ...p, tid: PLAYER.FREE_AGENT } }),
+		);
+		// 27 or older: his rights would lapse at the start of free agency that same summer
+		assert.isString(
+			stashBlockedReason({ ...base, p: { ...p, born: { year: 1998 } } }),
+		);
+		assert.isUndefined(
+			stashBlockedReason({ ...base, p: { ...p, born: { year: 1999 } } }),
+		);
+		assert.include(
+			stashBlockedReason({ ...base, phase: PHASE.PRESEASON })!,
+			"end of free agency",
 		);
 
 		assert.isUndefined(

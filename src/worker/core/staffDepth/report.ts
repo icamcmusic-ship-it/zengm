@@ -856,7 +856,7 @@ export const getScoutingDepth = async (tid: number) => {
 		// Scout Specialties & Assignments: who covers which region, and the prospects there (in his focus first)
 		assignments: focusOn ? assignmentMap(ctx) : undefined,
 		formerOurGuys: ourGuys
-			.filter((x) => x.judged && x.judged !== "solid")
+			.filter((x) => x.judged === "star" || x.judged === "bust")
 			.slice(-8),
 	};
 };

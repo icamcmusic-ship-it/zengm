@@ -47,6 +47,15 @@ export const getDraftBoardPick = <T extends { draftBoard?: { rank?: number } }>(
 	return best;
 };
 
+// Picks per round of the draft under way, for the AI's pick scale (draftDecision.ts pickScale/adjustmentCap): an expansion draft numbers
+// each round 1..(expansion teams), as in selectPlayer.ts, so its round 2 starts right after the expansion teams' first picks
+export const picksPerRound = () => {
+	const expansionDraft = g.get("expansionDraft");
+	return expansionDraft.phase === "draft"
+		? Math.max(1, expansionDraft.expansionTids.length)
+		: g.get("numActiveTeams");
+};
+
 export const getTeamOvrDiffs = (
 	teamPlayers: PlayerWithoutKey[],
 	players: PlayerWithoutKey[],
@@ -251,7 +260,7 @@ const runPicks = async (
 					getTraitFactor,
 				});
 				teamCtx.move = getDraftNightMove(dp.dpid);
-				const numTeams = g.get("numActiveTeams");
+				const numTeams = picksPerRound();
 				decisions = decideDraft({
 					pool: playersAll.map((p) => classFacts!.get(p.pid)!),
 					team: teamCtx,

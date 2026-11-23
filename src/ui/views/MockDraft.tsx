@@ -87,8 +87,9 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 		<>
 			{shape ? <DraftClassShape shape={shape} /> : null}
 			<p>
-				Every team picks the way the AI drafts: by value plus its own needs and
-				strategy
+				Every team picks the way the AI drafts, by value plus its own needs and
+				strategy, but from the prospects as your scouts see them (real teams
+				have their own reads, so the real draft will differ)
 				{result && !result.useNeeds
 					? " (need-based drafting is off in League Extras, so value only)"
 					: ""}
@@ -154,13 +155,15 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 								</th>
 								<th>Why</th>
 								{challengeNoRatings ? null : (
-									<th title="Projected peak ovr (10th-90th percentile)">
-										Peak
-									</th>
+									<>
+										<th title="Projected peak ovr (10th-90th percentile)">
+											Peak
+										</th>
+										<th>Star</th>
+										<th>Starter</th>
+										<th>Bust</th>
+									</>
 								)}
-								<th>Star</th>
-								<th>Starter</th>
-								<th>Bust</th>
 								<th>Outlook</th>
 							</tr>
 						</thead>

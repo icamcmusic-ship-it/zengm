@@ -12,10 +12,10 @@ const STASH_EXPLANATION =
 	"Stash overseas: he leaves your roster and keeps playing for his club abroad while you hold his rights. He takes no roster spot and no salary, develops each season, and his seasons abroad show with his college/overseas stats.";
 
 const bringOverExplanation = (lapseSeason: number) =>
-	`Bring over: he joins your roster and signs a contract (the rookie scale of his pick within a year of the draft, otherwise a contract at his market value), and you pay a buyout to his club if he has played there since the draft. Possible between the draft and the start of the regular season. If he is still abroad at the start of free agency in ${lapseSeason}, your rights lapse and he becomes a free agent.`;
+	`Bring over: he joins your roster and signs a contract (the rookie scale of his pick within a year of the draft, otherwise a contract at his market value), and you pay a buyout to his club if he has played there since the draft. Possible between the draft and the end of free agency (not in the preseason). If he is still abroad at the start of free agency in ${lapseSeason}, your rights lapse and he becomes a free agent.`;
 
 const ROSTER_BRING_OVER_TEXT =
-	"Bring over: he joins the roster and signs a contract (the rookie scale of his pick within a year of the draft, otherwise a contract at his market value), plus a buyout to his club if he has played there since the draft. Possible between the draft and the start of the regular season; rights lapse at the start of free agency in the season shown, and he becomes a free agent.";
+	"Bring over: he joins the roster and signs a contract (the rookie scale of his pick within a year of the draft, otherwise a contract at his market value), plus a buyout to his club if he has played there since the draft. Possible between the draft and the end of free agency (not in the preseason); rights lapse at the start of free agency in the season shown, and he becomes a free agent.";
 
 const seasonsText = (n: number) => `${n} ${n === 1 ? "season" : "seasons"}`;
 

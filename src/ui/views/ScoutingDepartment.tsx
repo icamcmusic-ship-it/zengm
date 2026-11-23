@@ -17,6 +17,7 @@ const OUR_GUY_WORDS = {
 	star: "became a star",
 	bust: "busted",
 	solid: "solid pro",
+	miss: "didn't pan out",
 };
 
 // Scouting Director & Regions: the Director, the priority, the region plan and scout careers

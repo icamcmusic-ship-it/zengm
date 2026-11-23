@@ -174,6 +174,14 @@ const drifting = (key: string, edition: number) => {
 // the truth; and each outlet's own error
 const PUBLIC_SD = 0.32;
 const OUTLET_SD = 0.3;
+// Public perception: a read of each prospect the media shares for the whole class (seeded per class and prospect, the same in every
+// edition, so it doesn't shrink as the season goes on). With it the final consensus misses by about 0.3 class standard deviations,
+// about as much as a team's own scouts at the default scouting budget (fuzz sd about 2 ovr), so the free public board isn't better
+// information than paid scouting
+export const PERCEPTION_SD = 0.27;
+
+const perceptionError = (seed: string, draftYear: number, pid: number) =>
+	new Rng(`outletPerception|${seed}|${draftYear}|${pid}`).normal(0, 1);
 
 /**
  * Every outlet's board of a class: pid -> rank (1 = top), by outlet id. Only the top `size` prospects by the consensus are ranked
@@ -195,6 +203,9 @@ export const outletBoards = ({
 	const zProd = standardize(prospects.map((p) => p.production));
 	const zAth = standardize(prospects.map((p) => p.athletic));
 	const scale = noiseScale(edition);
+	const perception = prospects.map(
+		(p) => PERCEPTION_SD * perceptionError(seed, draftYear, p.pid),
+	);
 	const boards = new Map<number, Map<number, number>>();
 	for (const outlet of OUTLETS) {
 		const list = prospects.map((p, i) => {
@@ -218,6 +229,7 @@ export const outletBoards = ({
 			const score =
 				zValue[i]! +
 				outlet.leanWeight * lean +
+				perception[i]! +
 				scale * (PUBLIC_SD * pub + OUTLET_SD * outlet.noise * own);
 			return { pid: p.pid, score };
 		});

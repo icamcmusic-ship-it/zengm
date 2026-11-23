@@ -5,6 +5,7 @@ import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { player, trade } from "../index.ts";
 import { canBeDrafted } from "./canBeDrafted.ts";
+import { perceivedProspect } from "./mockDraftData.ts";
 import {
 	getDraftAdjustment,
 	getNeedLabels,
@@ -30,7 +31,8 @@ const getAvailableProspects = async () => {
 			])
 		).filter(canBeDrafted);
 	}
-	return players.sort((a, b) => b.value - a.value);
+	// (by value as the user's scouts see it, see getAITeamBoards)
+	return players.sort((a, b) => b.valueFuzz - a.valueFuzz);
 };
 
 const BOARD_SIZE = 5;
@@ -48,17 +50,21 @@ export const getAITeamBoards = async () => {
 			t.tid,
 		);
 		const needs = getTeamNeeds(teamPlayers);
-		// Same scoring as runPicks for AI teams. Names and order only, no values, so it doesn't reveal true ratings
+		// The AI's scoring, from the prospects as the user's scouts see them (value as scouted, fuzzed ratings): the order itself would
+		// reveal true ratings otherwise. Names and order only
 		const board = prospects
 			.slice(0, 40)
-			.map((p) => ({
-				p,
-				score:
-					p.value +
-					(__SPORT === "basketball"
-						? getDraftAdjustment(p, needs, t.strategy)
-						: 0),
-			}))
+			.map((p) => {
+				const seen = perceivedProspect(p);
+				return {
+					p,
+					score:
+						seen.value +
+						(__SPORT === "basketball"
+							? getDraftAdjustment(seen, needs, t.strategy)
+							: 0),
+				};
+			})
 			.sort((a, b) => b.score - a.score)
 			.slice(0, BOARD_SIZE)
 			.map(({ p }) => ({

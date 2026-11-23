@@ -43,6 +43,8 @@ import {
 	expandedRatingsApply,
 } from "../player/expandedRatings.ts";
 import { ballSecurityBase } from "../../../common/expandedRatings.ts";
+import { remakeCollegeStatsFor } from "./generateCollegeStats.ts";
+import { redoStoredCombine } from "../draftCombine/index.ts";
 
 // "Regenerate ratings": rebuilds draft prospects (and, through Customize Player, any player) into varied, specialized
 // builds without changing anyone's overall. The engine is pure (src/common/ratingsBuilds); this is the plumbing that reads
@@ -450,7 +452,28 @@ type UndoEntry = {
 	valueNoPot: number;
 	valueFuzz: number;
 	valueNoPotFuzz: number;
+	// His pre-draft story (stats, honors, path, college season, stored combine), which an apply remakes from the new ratings
+	story: Pick<
+		Player,
+		| "stats"
+		| "awards"
+		| "college"
+		| "preDraftCareer"
+		| "collegeStatsV"
+		| "collegeSeason"
+		| "combine"
+	>;
 };
+
+const STORY_KEYS = [
+	"stats",
+	"awards",
+	"college",
+	"preDraftCareer",
+	"collegeStatsV",
+	"collegeSeason",
+	"combine",
+] as const;
 
 let undoStack:
 	| { lid: number | undefined; draftYear: number; entries: UndoEntry[] }
@@ -467,6 +490,15 @@ const snapshot = (p: Player): UndoEntry => ({
 	valueNoPot: p.valueNoPot,
 	valueFuzz: p.valueFuzz,
 	valueNoPotFuzz: p.valueNoPotFuzz,
+	story: helpers.deepCopy({
+		stats: p.stats,
+		awards: p.awards,
+		college: p.college,
+		preDraftCareer: p.preDraftCareer,
+		collegeStatsV: p.collegeStatsV,
+		collegeSeason: p.collegeSeason,
+		combine: p.combine,
+	}),
 });
 
 // Write a result into a player the way the game's own code would keep it consistent: the ratings row, ovr/pot/skills/pos,
@@ -536,9 +568,34 @@ export const writeResult = async (
 	await idb.cache.players.put(p);
 };
 
+/**
+ * The pre-draft story of rebuilt prospects follows their new ratings: their generated college/overseas stats are remade and a combine
+ * already held is redone (see remakeCollegeStatsFor and redoStoredCombine). pids by draft year.
+ */
+const rebuildPreDraftStory = async (pidsByYear: Map<number, number[]>) => {
+	if (__SPORT !== "basketball") {
+		return;
+	}
+	for (const [draftYear, pids] of pidsByYear) {
+		await remakeCollegeStatsFor(draftYear, pids);
+		await redoStoredCombine(draftYear, pids);
+	}
+};
+
+const groupByYear = (players: Player[]) => {
+	const out = new Map<number, number[]>();
+	for (const p of players) {
+		const list = out.get(p.draft.year) ?? [];
+		list.push(p.pid);
+		out.set(p.draft.year, list);
+	}
+	return out;
+};
+
 export const applyRegenerate = async (params: RegenerateParams) => {
 	const { players, inputs, result, inScope } = await compute(params);
 	const entries: UndoEntry[] = [];
+	const changed: Player[] = [];
 	let applied = 0;
 	for (const [i, p] of players.entries()) {
 		const r = result.results[i]!;
@@ -547,8 +604,10 @@ export const applyRegenerate = async (params: RegenerateParams) => {
 		}
 		entries.push(snapshot(p));
 		await writeResult(p, r, inputs[i]!.resolved, params.settings.seed ?? "");
+		changed.push(p);
 		applied++;
 	}
+	await rebuildPreDraftStory(groupByYear(changed));
 	undoStack = { lid: g.get("lid"), draftYear: params.draftYear, entries };
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	return { applied };
@@ -585,6 +644,13 @@ export const undoRegenerate = async () => {
 		p.valueNoPot = e.valueNoPot;
 		p.valueFuzz = e.valueFuzz;
 		p.valueNoPotFuzz = e.valueNoPotFuzz;
+		for (const key of STORY_KEYS) {
+			if (e.story[key] === undefined) {
+				delete (p as any)[key];
+			} else {
+				(p as any)[key] = e.story[key];
+			}
+		}
 		await idb.cache.players.put(p);
 		restored++;
 	}
@@ -604,6 +670,7 @@ export const restoreOriginalRatings = async ({
 	const players = await getProspects(draftYear);
 	const which = pids === null ? undefined : new Set(pids);
 	let restored = 0;
+	const changed: number[] = [];
 	for (const p of players) {
 		if ((which && !which.has(p.pid)) || !p.ratingsBuild) {
 			continue;
@@ -635,8 +702,10 @@ export const restoreOriginalRatings = async ({
 		subsAfterRewrite(p);
 		await updateValues(p);
 		await idb.cache.players.put(p);
+		changed.push(p.pid);
 		restored++;
 	}
+	await rebuildPreDraftStory(new Map([[draftYear, changed]]));
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	return { restored };
 };
@@ -860,6 +929,7 @@ const applyToClass = async (
 		pids,
 	});
 	let applied = 0;
+	const changed: number[] = [];
 	for (const [i, p] of all.entries()) {
 		const r = result.results[i]!;
 		if (!inScope.has(p.pid) || r.skipped) {
@@ -867,8 +937,11 @@ const applyToClass = async (
 		}
 		entries?.push(snapshot(p));
 		await writeResult(p, r, inputs[i]!.resolved, seed);
+		changed.push(p.pid);
 		applied++;
 	}
+	// (a class being created has no stats or combine yet, so this only touches classes that already had them)
+	await rebuildPreDraftStory(new Map([[draftYear, changed]]));
 	return applied;
 };
 
