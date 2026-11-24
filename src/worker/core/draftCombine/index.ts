@@ -4,6 +4,8 @@
 // invited prospect's results are stored on him (p.combine), so later development doesn't rewrite them. Regenerate Ratings redoes
 // the stored combine of the prospects it rebuilds (redoStoredCombine).
 import { PHASE, PLAYER } from "../../../common/constants.ts";
+// (a cycle, the scouting reports read the combine: fine, both are only used inside functions)
+import { getProspectRooms, scoutRoomOn } from "../scoutingReports/room.ts";
 import {
 	buildCombineHistory,
 	combineNudges,
@@ -101,9 +103,6 @@ const byStock = (a: Row, b: Row) =>
  * room is seeded and draws nothing from the game's random numbers.
  */
 const inConsensusOrder = async (rows: Row[]): Promise<Row[]> => {
-	// (dynamic: the scouting reports read the combine)
-	const { getProspectRooms, scoutRoomOn } =
-		await import("../scoutingReports/room.ts");
 	if (!scoutRoomOn()) {
 		return rows;
 	}

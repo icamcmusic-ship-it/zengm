@@ -1,4 +1,5 @@
 import { idb } from "../../db/index.ts";
+import { catchUpHofAfterBallotOff } from "../hallOfFame/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
 import { wrapNewValueIfCurrentlyWrapped } from "../../util/g.ts";
 import type { GameAttributesLeague } from "../../../common/types.ts";
@@ -270,7 +271,6 @@ const setGameAttributes = async (
 
 	// Hall of Fame Ballot turned off: the candidates it never got to are inducted now if worthy (they'd never be otherwise)
 	if (hofBallotWasOn && !featureOn("hofBallot")) {
-		const { catchUpHofAfterBallotOff } = await import("../hallOfFame/index.ts");
 		await catchUpHofAfterBallotOff();
 	}
 
