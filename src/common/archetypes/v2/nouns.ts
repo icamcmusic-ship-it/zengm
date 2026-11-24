@@ -854,13 +854,12 @@ export type NounInput = {
 	// league's, nounGroups.data.ts)
 	ng?: NounGroupQuantiles;
 	// last season's pick, to keep its order when it is still about as good (archstick: and his whole label, `id` his
-	// main name's id and `defense` his defensive label, kept while every rule still holds and it is about as good)
+	// main name's id, kept while every rule still holds and it is about as good)
 	prev?: {
 		special?: string;
 		nouns?: NounKey[];
 		trait?: string;
 		id?: string;
-		defense?: string;
 	};
 	// archstick: false for the plain order of his nouns (no near tie given to last season's)
 	tie?: false;
@@ -897,8 +896,6 @@ export type NounPick = (
 	// no name of his own from his nouns: an honest name, about this noun (or about nothing)
 	| { kind: "honest"; noun?: NounKey; conf: number }
 ) & {
-	// the defensive label
-	defense?: string;
 	// archcov: the skills (and modifiers) the main name names, and why the name was chosen
 	main?: NounKey[];
 	explain?: CoverExplain;
@@ -2853,12 +2850,9 @@ const favoredNouns = (x: NounInput): ReadonlySet<NounKey> | undefined => {
 			out.add(k);
 		}
 	}
-	for (const n of defLabelNouns(x.prev.defense)) {
-		out.add(n);
-	}
 	return out.size > 0 ? out : undefined;
 };
-// (the nouns a defensive label says)
+// (the nouns a defensive label says: labels stored before reading 28, read by the audit scripts only)
 export const defLabelNouns = (label: string | undefined): NounKey[] => {
 	if (!label) {
 		return [];

@@ -17,7 +17,12 @@ export default defineView({
 		if (
 			updateEvents.has("firstRun") ||
 			updateEvents.has("newPhase") ||
-			updateEvents.has("playerMovement")
+			updateEvents.has("playerMovement") ||
+			// (God Mode on or off changes the scouting fuzz of every ovr shown; settings like Archetype Label Source,
+			// player traits or the No Visible Ratings challenge change the labels and what is shown; team names and
+			// abbrevs are edited there too)
+			updateEvents.has("gameAttributes") ||
+			updateEvents.has("team")
 		) {
 			return await archetypes.landscape();
 		}

@@ -66,19 +66,10 @@ const nudged = (r: ArchetypeRatings, i: number, d: number) => {
 	}
 	return out;
 };
-const read = (
-	r: ArchetypeRatings,
-	opts: object,
-	prev?: { id: string; def?: string },
-) =>
+const read = (r: ArchetypeRatings, opts: object, prev?: { id: string }) =>
 	classifyV2(r, {
 		...opts,
-		...(prev
-			? {
-					previousId: prev.id,
-					...(prev.def ? { previousDefense: prev.def } : {}),
-				}
-			: {}),
+		...(prev ? { previousId: prev.id } : {}),
 	});
 
 describe("archstick: sticky labels", () => {
@@ -86,7 +77,7 @@ describe("archstick: sticky labels", () => {
 		for (let i = 0; i < 160; i++) {
 			const { r, opts } = player(i);
 			const a = read(r, opts);
-			const b = read(r, opts, { id: a.id, def: a.defense });
+			const b = read(r, opts, { id: a.id });
 			assert.strictEqual(b.label, a.label, `player ${i}`);
 		}
 	}, 60_000);
@@ -100,7 +91,7 @@ describe("archstick: sticky labels", () => {
 			const a = read(r, opts);
 			const r2 = nudged(r, i, 3);
 			const b0 = read(r2, opts);
-			const b = read(r2, opts, { id: a.id, def: a.defense });
+			const b = read(r2, opts, { id: a.id });
 			fresh += b0.label !== a.label ? 1 : 0;
 			sticky += b.label !== a.label ? 1 : 0;
 			// (a main name kept over this season's pick: every word of it still keeps its promise)
@@ -118,7 +109,6 @@ describe("archstick: sticky labels", () => {
 					age: opts.age,
 					prev: {
 						id: isComposedId(a.id) ? a.id : mergedId(a.id),
-						...(a.defense ? { defense: a.defense } : {}),
 					},
 				};
 				const p = pickNouns(x);
@@ -148,16 +138,6 @@ describe("archstick: sticky labels", () => {
 		const c = read(r, { pos: "SG", age: 26, ovr: 52, pot: 52 }, { id });
 		assert.notStrictEqual(c.id, id);
 		assert.notMatch(c.name, /Raw|Developing|Project|Late Bloomer|Lottery/);
-	});
-
-	test("a defensive label is not kept once his defense is no longer among what names him", () => {
-		const { r, opts } = player(5);
-		const weakD = { ...r, diq: 25, hgt: 30, jmp: 30, spd: 40 };
-		const c = read(weakD, opts, {
-			id: read(weakD, opts).id,
-			def: "Rim Protector",
-		});
-		assert.notInclude(c.label, "Rim Protector");
 	});
 
 	test("ties are broken the same way every time, and a near tie goes to last season's noun", () => {

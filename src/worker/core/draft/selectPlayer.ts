@@ -8,6 +8,7 @@ import { addContract, createContract } from "../contract/index.ts";
 import getRookieContractLength from "./getRookieContractLength.ts";
 import { last } from "../../../common/utils.ts";
 import { canBeDrafted } from "./canBeDrafted.ts";
+import { storeScoutedArchetype } from "../player/archetype.ts";
 
 /**
  * Select a player for the current drafting team.
@@ -34,6 +35,8 @@ const selectPlayer = async (dp: DraftPick, pid: number, why?: string[]) => {
 		return false;
 	}
 	const prevTid = p.tid;
+	// (his label as scouted stays until his first preseason)
+	await storeScoutedArchetype(p);
 	p.tid = dp.tid;
 
 	const expansionDraft = g.get("expansionDraft");

@@ -25,7 +25,10 @@ import updateSubRatingsForLeague, {
 } from "../core/player/updateSubRatingsForLeague.ts";
 import { env } from "./env.ts";
 import { initUILocalGames } from "./initUILocalGames.ts";
-import { warmProspectArchetypes } from "../core/player/archetype.ts";
+import {
+	restoreStaleArchetypes,
+	warmProspectArchetypes,
+} from "../core/player/archetype.ts";
 import { refitArchetypeTuning } from "../core/player/archetypeFeedback.ts";
 
 // ReturnType rather than number because bbgm-rosters type checks this with Node types
@@ -204,6 +207,8 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 		await refitArchetypeTuning().catch((error) => console.error(error));
 	}
 	warmProspectArchetypes();
+	// (labels stored by an older reading, or missing, stored again once in the background)
+	restoreStaleArchetypes();
 	// Pages that read whole seasons of box scores, and League Achievements
 	schedulePageWarm();
 
