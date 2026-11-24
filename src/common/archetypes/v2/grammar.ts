@@ -3020,7 +3020,21 @@ const joinPhrases = (xs: string[]) =>
 
 // A one-line description from the words: "A playmaker who defends his position and scores from mid-range and in the paint."
 export const describe = (role: RoleDef, descs: readonly DescDef[]): string => {
+	const extraPhrases = () => [
+		...new Set(
+			orderDescs(descs)
+				.map((d) => CUSTOM_PHRASE[d.concept] ?? CONCEPT_PHRASE.get(d.concept))
+				.filter((x): x is string => !!x),
+		),
+	];
 	if (role.desc) {
+		// A role whose own description is just what he is ("A center.", "A power forward."): the name's other words say
+		// what he does, so they go after it ("A center who finishes through contact and draws fouls."), instead of a name
+		// full of skills described as a bare position
+		const extra = extraPhrases();
+		if (extra.length > 0 && /^An? [^.,:;]+\.$/.test(role.desc)) {
+			return `${role.desc.slice(0, -1)} who ${joinPhrases(extra)}.`;
+		}
 		return role.desc;
 	}
 	const own = role.concepts
@@ -3034,6 +3048,10 @@ export const describe = (role: RoleDef, descs: readonly DescDef[]): string => {
 	const head = ROLE_NOUN[role.key] ?? "A player";
 	const lead = own[0];
 	const body = [lead, ...phrases].filter(Boolean) as string[];
+	if (body.length === 0) {
+		// The position alone (no skill worth naming yet, cover.ts SKILL_NAME_MIN)
+		return `${head} without a standout skill yet.`;
+	}
 	return `${head} who ${joinPhrases(body)}.`;
 };
 
