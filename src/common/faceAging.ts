@@ -692,6 +692,9 @@ export const agedFields = (
 export const faceAgingLocked = (aging: FaceAging | undefined) =>
 	aging?.e === 1 && aging.a !== 1;
 
+// Sparse histories: the fatness change since the last snapshot that is worth a snapshot of its own
+export const SPARSE_FATNESS = 0.05;
+
 /**
  * Age a face to a season. Returns the new face and aging state, or undefined when nothing applies (locked, already done).
  */
@@ -702,6 +705,11 @@ export const ageFaceForSeason = (
 		season: number;
 		// false: age the face but keep no snapshot (draft prospects: no face from before he was drafted is ever shown)
 		record?: boolean;
+		// Sparse history (retired players, who age a little every year): a snapshot only for a visible change since the last
+		// one (any style, line, accessory or glasses change, or fatness by SPARSE_FATNESS) or when forced (every few seasons,
+		// for the slow greying and filling out). A snapshot is then the difference from the face the snapshots so far add up
+		// to, not from his current face
+		sparse?: { force: boolean };
 	},
 	options: FaceAgingOptions,
 ): { face: FaceConfig; aging: FaceAging } | undefined => {
@@ -722,8 +730,27 @@ export const ageFaceForSeason = (
 		options,
 	);
 	const first = Object.keys(state.h).length === 0;
-	const diff = first ? { ...fields } : diffAgingFields(current, fields);
-	if (ctx.record !== false && (first || Object.keys(diff).length > 0)) {
+	let before = current;
+	if (ctx.sparse && !first) {
+		const seasons = historySeasons(state);
+		before = extractAgingFields(
+			applyAgingFields(face, snapshotFields(state, seasons, Infinity)),
+		);
+	}
+	const diff = first ? { ...fields } : diffAgingFields(before, fields);
+	const visible =
+		first ||
+		!ctx.sparse ||
+		ctx.sparse.force ||
+		Object.keys(diff).some(
+			(key) => key !== "hc" && key !== "bc" && key !== "ft",
+		) ||
+		Math.abs(fields.ft - before.ft) >= SPARSE_FATNESS;
+	if (
+		ctx.record !== false &&
+		visible &&
+		(first || Object.keys(diff).length > 0)
+	) {
 		state.h[ctx.season] = diff;
 	}
 	state.s = ctx.season;
@@ -779,6 +806,15 @@ export const faceForSeason = (
 	if (seasons.length === 0 || season >= seasons.at(-1)!) {
 		return face;
 	}
+	return applyAgingFields(face, snapshotFields(aging, seasons, season));
+};
+
+// The aging fields the snapshots up to a season add up to
+const snapshotFields = (
+	aging: FaceAging,
+	seasons: number[],
+	season: number,
+) => {
 	// Accessories weren't in the first snapshot of faces aged before they were tracked: start from the generated ones
 	let fields: Partial<FaceAgingFields> = {};
 	if (aging.b.ac !== undefined) {
@@ -799,7 +835,7 @@ export const faceForSeason = (
 		found = true;
 		fields = { ...fields, ...aging.h[s] };
 	}
-	return applyAgingFields(face, fields);
+	return fields;
 };
 
 // Seasons whose snapshot changed something, with the face then (for the player page)

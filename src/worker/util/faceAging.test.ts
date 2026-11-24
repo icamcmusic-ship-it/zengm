@@ -4,6 +4,13 @@ import { PLAYER } from "../../common/constants.ts";
 import { makeSeededRandom } from "../../common/random.ts";
 import { resetG } from "../../test/helpers.ts";
 import {
+	ageFaceForSeason,
+	extractAgingFields,
+	faceForSeason,
+	SPARSE_FATNESS,
+} from "../../common/faceAging.ts";
+import { textureOf } from "../../common/faceEvents.ts";
+import {
 	agePlayerFace,
 	faceAgingOnCustomize,
 	freshFaceAging,
@@ -90,5 +97,96 @@ describe("agePlayerFace", () => {
 		expect(agePlayerFace(p as any, season)).toBe(false);
 		expect(JSON.stringify(p.face)).toBe(face);
 		expect(JSON.stringify({ ...p.faceAging })).toBe(aging);
+	});
+});
+
+describe("retired players' sparse history", () => {
+	test("fewer snapshots, same faces at the snapshot seasons, close in between", () => {
+		const options = {
+			speed: "strong" as const,
+			hairLoss: true,
+			graying: true,
+			styleEvents: true,
+		};
+		for (const seed of [11, 12, 13, 14]) {
+			const start = g.get("season");
+			const retiredYear = start + 4;
+			const end = retiredYear + 30;
+			const make = () => ({
+				...makePlayer(makeFace(seed), 30),
+				pid: seed,
+				tid: PLAYER.FREE_AGENT as number,
+				retiredYear: undefined as number | undefined,
+			});
+			const sparse = make();
+			const full = make();
+			for (let season = start; season <= end; season++) {
+				if (season > retiredYear) {
+					sparse.tid = PLAYER.RETIRED;
+					sparse.retiredYear = retiredYear;
+				}
+				agePlayerFace(sparse as any, season, options);
+
+				// The full history: every season recorded (as before)
+				const res = ageFaceForSeason(
+					full.face,
+					full.faceAging,
+					{
+						seed: full.pid,
+						born: full.born.year,
+						minutes: 0,
+						weight: full.weight,
+						texture: textureOf(
+							full.face.body?.color,
+							full.faceAging?.b.hi ?? full.face.hair.id,
+							full.faceAging?.b.hb ?? full.face.hairBg?.id,
+						),
+						retiredYear: sparse.retiredYear,
+						eyeInjurySeasons: [],
+						season,
+					},
+					options,
+				)!;
+				full.face = res.face;
+				full.faceAging = res.aging;
+			}
+
+			// Same face today
+			expect(extractAgingFields(sparse.face)).toEqual(
+				extractAgingFields(full.face),
+			);
+			const sparseSeasons = Object.keys(sparse.faceAging.h).map(Number);
+			const fullSeasons = Object.keys(full.faceAging.h).map(Number);
+			expect(sparseSeasons.length).toBeLessThan(fullSeasons.length);
+			const after = (seasons: number[]) =>
+				seasons.filter((s) => s > retiredYear).length;
+			expect(after(sparseSeasons)).toBeLessThanOrEqual(
+				after(fullSeasons) * 0.6,
+			);
+
+			for (let season = start; season <= end; season++) {
+				const a = extractAgingFields(
+					faceForSeason(sparse.face, sparse.faceAging, season),
+				);
+				// Rebuilt from the last snapshot season at or before it: the full history's face then
+				const last = Math.max(...sparseSeasons.filter((s) => s <= season));
+				const b = extractAgingFields(
+					faceForSeason(full.face, full.faceAging, last),
+				);
+				expect(a).toEqual(b);
+				// And close to the full history's face that season
+				const c = extractAgingFields(
+					faceForSeason(full.face, full.faceAging, season),
+				);
+				expect(Math.abs(a.ft - c.ft)).toBeLessThan(SPARSE_FATNESS + 0.001);
+				// Everything but the hair/beard colour and fatness exactly
+				const { hc: _h1, bc: _b1, ft: _f1, ...restA } = a;
+				const { hc: _h2, bc: _b2, ft: _f2, ...restC } = c;
+				expect(restA).toEqual(restC);
+				if (season <= retiredYear + 1) {
+					expect(a).toEqual(c);
+				}
+			}
+		}
 	});
 });

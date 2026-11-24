@@ -78,6 +78,15 @@ const agingContext = (p: AgingPlayer) => {
 	};
 };
 
+// Retired players' snapshots: a visible change (style, lines, glasses, fatness by SPARSE_FATNESS) any season; the slow
+// greying and filling out only the first season after he retired and every RETIRED_SNAPSHOT_EVERY seasons. Seasons in
+// between show the last snapshot's face (a few years of greying behind, at most)
+export const RETIRED_SNAPSHOT_EVERY = 5;
+export const retiredSnapshotSeason = (season: number, retiredYear: number) => {
+	const years = season - retiredYear;
+	return years <= 1 || years % RETIRED_SNAPSHOT_EVERY === 0;
+};
+
 // Ages one player's face to a season, in place. Returns true if his face or its stored aging state (generated fields,
 // snapshots) changed, so the caller saves the player. Only the season marker moving isn't worth a write: without it the same
 // (pure, cheap) aging is just worked out again next time.
@@ -90,14 +99,19 @@ export const agePlayerFace = (
 	if (p.imgURL || !p.face?.hair || p.pid === undefined) {
 		return false;
 	}
+	const retired = p.tid === PLAYER.RETIRED && p.retiredYear !== undefined;
 	const result = ageFaceForSeason(
 		p.face,
 		p.faceAging,
 		{
 			...agingContext(p),
 			season,
-			// No snapshot of a draft prospect's face: face history starts at his first pro season
+			// No snapshot of a draft prospect's face: face history starts at his first pro season. Retired players (who age
+			// a little every year) keep a sparse one, so it doesn't grow every season for the rest of the league
 			record: p.tid !== PLAYER.UNDRAFTED,
+			sparse: retired
+				? { force: retiredSnapshotSeason(season, p.retiredYear!) }
+				: undefined,
 		},
 		options,
 	);

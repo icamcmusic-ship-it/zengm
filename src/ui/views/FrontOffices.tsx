@@ -183,6 +183,7 @@ const FrontOffices = ({
 														<div style={{ width: 80, height: 120 }}>
 															<StaffFace
 																face={gm.face}
+																lazy
 																colors={row.colors}
 																age={gm.age}
 																seed={gm.gmid}

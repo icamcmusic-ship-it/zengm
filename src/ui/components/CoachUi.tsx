@@ -40,12 +40,15 @@ export const CoachPortrait = ({
 	age,
 	colors,
 	face,
+	lazy,
 	seed,
 	width,
 }: {
 	age?: number;
 	colors?: [string, string, string];
 	face?: FaceConfig;
+	// Draw the face only once it scrolls into view (long lists)
+	lazy?: boolean;
 	seed?: number | string;
 	width: number;
 }) => (
@@ -54,7 +57,13 @@ export const CoachPortrait = ({
 		style={{ width, height: width * 1.5 }}
 	>
 		{face ? (
-			<StaffFace face={face} colors={colors} age={age} seed={seed} />
+			<StaffFace
+				face={face}
+				colors={colors}
+				age={age}
+				lazy={lazy}
+				seed={seed}
+			/>
 		) : null}
 	</div>
 );
