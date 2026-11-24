@@ -10,6 +10,7 @@
 // - h: per-season snapshots of the fields that changed that preseason, first entry complete, so a past season's face can be
 //   rebuilt (faceForSeason) without storing whole faces
 // - s: last season aged; e: face edited by the user (locked from aging unless a: "allow aging" ticked)
+// - g: the generated fields once an edit has replaced b (Customize Player's "Reset to generated face")
 import type { FaceConfig } from "facesjs";
 import {
 	facialHairTier,
@@ -51,6 +52,10 @@ export type FaceAging = {
 	s?: number;
 	e?: 1;
 	a?: 1;
+	// The generated fields, kept when a user edit replaces b (for "Reset to generated face")
+	g?: FaceAgingFields;
+	// Sent by Customize Player's "Reset to generated face" (never stored)
+	r?: 1;
 };
 
 export type FaceAgingOptions = {
@@ -731,7 +736,9 @@ export const ageFaceForSeason = (
 	);
 	const first = Object.keys(state.h).length === 0;
 	let before = current;
-	if (ctx.sparse && !first) {
+	// Diff from the snapshots so far, not his current face, when they may not add up to it: a sparse history, or a face not aged
+	// since its state was reset (Customize Player's "Reset to generated face" keeps his history)
+	if (!first && (ctx.sparse || state.s === undefined)) {
 		const seasons = historySeasons(state);
 		before = extractAgingFields(
 			applyAgingFields(face, snapshotFields(state, seasons, Infinity)),
@@ -784,6 +791,41 @@ export const faceAgingAfterEdit = (
 	}
 	if (allow) {
 		out.a = 1;
+	}
+	const generated = generatedBase(aging);
+	if (generated) {
+		out.g = generated;
+	}
+	return out;
+};
+
+// His face's aging fields as generated: b until a user edit replaces it, then g (undefined for a face edited before g was
+// kept, or never generated)
+export const generatedBase = (aging: FaceAging | undefined) =>
+	aging?.g ?? (aging && aging.ba === undefined ? aging.b : undefined);
+
+// A face back from the external facesjs editor, which knows nothing of the fork: it can drop the fork's extras (beard and
+// dyed hair colours) and the fork's part ids, so they're put back from the face that was sent
+export const mergeEditorFace = (
+	before: FaceConfig | undefined,
+	after: FaceConfig,
+): FaceConfig => {
+	if (!before) {
+		return after;
+	}
+	const out: any = { ...after };
+	const extra = (before as FaceWithExtra).fork;
+	if (extra && out.fork === undefined) {
+		out.fork = extra;
+	}
+	for (const [feature, part] of Object.entries(before)) {
+		const id = (part as any)?.id;
+		if (typeof id === "string" && id.startsWith("fork-")) {
+			const back = out[feature];
+			if (back === undefined || back === null || !back.id) {
+				out[feature] = part;
+			}
+		}
 	}
 	return out;
 };

@@ -9,6 +9,7 @@ import {
 	extractAgingFields,
 	faceAgingAfterEdit,
 	faceForSeason,
+	generatedBase,
 	type FaceAging,
 	type FaceAgingOptions,
 } from "../../common/faceAging.ts";
@@ -228,12 +229,39 @@ export const faceAgingOnCustomize = (
 		p.faceAging = freshFaceAging(p.face);
 		return true;
 	}
+	// "Reset to generated face": his generated fields back, unlocked, his history kept, and aged back to now on save (unless
+	// the face was edited again after the reset)
+	const reset = p.faceAging?.r === 1;
+	if (reset) {
+		delete p.faceAging!.r;
+		const generated = generatedBase(prev?.faceAging);
+		if (
+			!p.imgURL &&
+			p.face?.hair &&
+			generated &&
+			JSON.stringify(extractAgingFields(p.face)) ===
+				JSON.stringify(extractAgingFields(applyAgingFields(p.face, generated)))
+		) {
+			// This season's snapshot is recorded again when he's aged
+			const h = { ...prev?.faceAging?.h };
+			for (const key of Object.keys(h)) {
+				if (Number(key) >= season) {
+					delete h[Number(key)];
+				}
+			}
+			p.faceAging = { b: generated, h };
+			return true;
+		}
+	}
 	const allow = p.faceAging?.a === 1;
 	const age = season - p.born.year;
+	// Only what aging works on counts as an edit: the external facesjs editor's round trip can reorder or drop things aging
+	// never touches (team colours, jersey, the fork's other extras)
 	const changed =
 		!prev ||
-		JSON.stringify(stripExtra(prev.face)) !==
-			JSON.stringify(stripExtra(p.face));
+		reset ||
+		JSON.stringify(extractAgingFields(prev.face)) !==
+			JSON.stringify(extractAgingFields(p.face));
 	if (changed) {
 		p.faceAging = faceAgingAfterEdit(
 			prev?.faceAging,
@@ -253,15 +281,6 @@ export const faceAgingOnCustomize = (
 		delete p.faceAging;
 	}
 	return false;
-};
-
-// Team colours and jersey are set for drawing, not chosen by the user
-const stripExtra = (face: AgingPlayer["face"] | undefined) => {
-	if (!face) {
-		return face;
-	}
-	const { teamColors: _t, jersey: _j, ...rest } = face;
-	return rest;
 };
 
 // His face in any season: rebuilt from the snapshots, or worked out from his generated face for a season before them (a

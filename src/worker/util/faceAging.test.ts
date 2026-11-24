@@ -5,7 +5,9 @@ import { makeSeededRandom } from "../../common/random.ts";
 import { resetG } from "../../test/helpers.ts";
 import {
 	ageFaceForSeason,
+	applyAgingFields,
 	extractAgingFields,
+	mergeEditorFace,
 	faceForSeason,
 	SPARSE_FATNESS,
 } from "../../common/faceAging.ts";
@@ -188,5 +190,70 @@ describe("retired players' sparse history", () => {
 				}
 			}
 		}
+	});
+});
+
+describe("Customize Player round trips", () => {
+	test("an editor round trip that only touches what aging doesn't isn't an edit", () => {
+		const prev = makePlayer(makeFace(21));
+		agePlayerFace(prev as any, g.get("season"));
+		const back = JSON.parse(JSON.stringify(prev.face));
+		delete back.teamColors;
+		back.eye = { ...back.eye, angle: back.eye.angle + 1 };
+		const p = { ...prev, face: back, faceAging: { ...prev.faceAging } };
+		faceAgingOnCustomize(p as any, prev as any, g.get("season"));
+		expect(p.faceAging.e).toBeUndefined();
+		expect(p.faceAging.b).toEqual(prev.faceAging.b);
+	});
+
+	test("the editor's dropped fork extras and part ids come back", () => {
+		const before = {
+			...makeFace(22),
+			fork: { beard: "#999999" },
+		} as any;
+		before.hair = { ...before.hair, id: "fork-high-tight" };
+		const after = JSON.parse(JSON.stringify(before));
+		delete after.fork;
+		delete after.hair.id;
+		after.eye.id = "eye2";
+		const merged = mergeEditorFace(before, after) as any;
+		expect(merged.fork).toEqual({ beard: "#999999" });
+		expect(merged.hair.id).toBe("fork-high-tight");
+		expect(merged.eye.id).toBe("eye2");
+	});
+
+	test("reset to generated face: unlocked, aged back to now like an unedited face", () => {
+		const season = g.get("season");
+		const untouched = makePlayer(makeFace(23), 38);
+		agePlayerFace(untouched as any, season);
+
+		const prev = makePlayer(makeFace(23), 38);
+		agePlayerFace(prev as any, season);
+		// Edited: locked, generated fields kept
+		const edited = {
+			...prev,
+			face: { ...prev.face, hair: { ...prev.face.hair, color: "#123456" } },
+			faceAging: { ...prev.faceAging },
+		};
+		faceAgingOnCustomize(edited as any, prev as any, season);
+		expect(edited.faceAging.e).toBe(1);
+		expect(edited.faceAging.g).toEqual(prev.faceAging.b);
+
+		// Reset
+		const p = {
+			...edited,
+			face: applyAgingFields(edited.face, edited.faceAging.g),
+			faceAging: { ...edited.faceAging, r: 1 },
+		};
+		expect(faceAgingOnCustomize(p as any, edited as any, season)).toBe(true);
+		expect(p.faceAging.e).toBeUndefined();
+		expect(p.faceAging.r).toBeUndefined();
+		agePlayerFace(p as any, season);
+		expect(extractAgingFields(p.face)).toEqual(
+			extractAgingFields(untouched.face),
+		);
+		expect(
+			extractAgingFields(faceForSeason(p.face, p.faceAging, season - 1)),
+		).toEqual(extractAgingFields(p.face));
 	});
 });
