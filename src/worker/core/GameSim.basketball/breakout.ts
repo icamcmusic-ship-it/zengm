@@ -28,11 +28,12 @@ export const BREAKOUT = {
 	roleByRank: [0, 0.35, 0.7, 1],
 	formRho: 0.6,
 	formSdStar: 0.06,
-	// (the extreme tail trimmed to the NBA's bench 30-point games: was 0.22, 2.5, 1 / 150, 1.55 and hotPossRole 6, see the doc)
-	formSdRole: 0.17,
+	// (toned down twice: was 0.22, 2.5, 1 / 150, 1.55, hotRole 0.35, hotPossRole 6, then 0.17, 1 / 300, 1.4, hotPossRole 4, benchHotMin 4,
+	// benchMaxShift 8, makeCal 0.0045; see the doc)
+	formSdRole: 0.13,
 	formZMax: 2,
-	careerProb: 1 / 300,
-	careerUsage: 1.4,
+	careerProb: 1 / 600,
+	careerUsage: 1.3,
 	careerMake: 0.035,
 	openInjury: 0.07,
 	openInjuryMax: 2,
@@ -48,24 +49,20 @@ export const BREAKOUT = {
 	threatSpan: 0.2,
 	rimLo: 0.5,
 	rimSpan: 0.2,
-	hotRole: 0.35,
-	hotPossRole: 4,
+	hotRole: 0.22,
+	hotPossRole: 2,
 	coldMisses: 2,
 	heatPts: 12,
 	heatEff: 1.3,
-	benchHotMin: 4,
-	benchMaxShift: 8,
+	benchHotMin: 2.5,
+	benchMaxShift: 6,
 	benchBlowout: 15,
 	closerHot: 0.15,
 	closerPts: 16,
 	closerEff: 1.2,
-	// The defense keys on a hot bench player (gs 0): past benchCoolPts points tonight his shooter-draw weight × 1 / (1 + benchCoolK ×
-	// (points − benchCoolPts) / 5), so big bench nights stay rare
-	benchCoolPts: 14,
-	benchCoolK: 0, // (0: off until tuned)
 	// Calibration: taken off the make probability of every shot from the shooter draw (more of the shots now go to whoever is shooting
 	// well tonight, so league FG% and 3P% would go up)
-	makeCal: 0.0045,
+	makeCal: 0.0035,
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -182,11 +179,16 @@ export const matchupOpening = (
 	return 1 + B.matchK * rf * clamp(edge, -0.5, 1);
 };
 
-// A bench player's shooter-draw multiplier once he's scoring a lot tonight (1 for a starter, or below benchCoolPts)
+// Core sim (every game with the Shot Share Model, not a setting): the defense keys on a hot bench player (gs 0). Past pts points tonight
+// his shooter-draw weight × 1 / (1 + k × (points − pts) / 5): 0.83 at 19, 0.71 at 24, 0.63 at 29, so big bench nights stay rare
+export const BENCH_COOL = {
+	pts: 14,
+	k: 0.25,
+};
 export const benchCool = (gs: number, pts: number) =>
-	gs !== 0 || pts <= BREAKOUT.benchCoolPts
+	gs !== 0 || pts <= BENCH_COOL.pts
 		? 1
-		: 1 / (1 + (BREAKOUT.benchCoolK * (pts - BREAKOUT.benchCoolPts)) / 5);
+		: 1 / (1 + (BENCH_COOL.k * (pts - BENCH_COOL.pts)) / 5);
 
 // Points per shot so far (FGA + 0.44 FTA)
 export const ptsPerShot = (stat: { pts: number; fga: number; fta: number }) =>

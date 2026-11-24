@@ -3442,7 +3442,8 @@ class GameSim extends GameSimBase {
 					: S.tier[rank]!) *
 				(rank >= 3 ? s.roleForce : 1) *
 				(this.bigGame && p.stat.gs === 0 ? S.playoffBench : 1) *
-				(this.breakout ? benchCool(p.stat.gs, p.stat.pts) : 1);
+				// The defense keys on a hot bench player (core sim, breakout.ts)
+				benchCool(p.stat.gs, p.stat.pts);
 			this.ssRole[i] = role;
 			this.ssPlan[i] = s.plan;
 			const huntMult = hunt[i]!;

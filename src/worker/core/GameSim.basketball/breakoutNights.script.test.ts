@@ -25,7 +25,7 @@ import { g, helpers, lock } from "../../util/index.ts";
 import gameSimPresets from "../../../ui/views/Settings/gameSimPresets.ts";
 import { FLOW_DIAG } from "./gameFlow.ts";
 import { hardshipDiag } from "../freeAgents/hardship.ts";
-import { BREAKOUT } from "./breakout.ts";
+import { BENCH_COOL, BREAKOUT } from "./breakout.ts";
 
 const env = (globalThis as any).process.env;
 
@@ -262,6 +262,7 @@ test.skipIf(!env.BREAKOUT)(
 		const numSeasons = Number(env.BREAKOUT_SEASONS ?? 2);
 		const extra = JSON.parse(env.BREAKOUT_SETTINGS ?? "{}");
 		Object.assign(BREAKOUT, JSON.parse(env.BREAKOUT_CONST ?? "{}"));
+		Object.assign(BENCH_COOL, JSON.parse(env.BENCH_COOL_CONST ?? "{}"));
 		const out = env.BREAKOUT_OUT;
 		Math.random = makeSeededRandom(seed);
 		FLOW_DIAG.on = true;
