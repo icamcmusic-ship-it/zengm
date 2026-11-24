@@ -163,12 +163,14 @@ const doInjury = async (
 		type: p2.injury.type,
 	});
 	let stopPlay = false;
+	// Games he'll miss: the countdown also runs at the end of today, so one less than gamesRemaining (the injured list and the event
+	// log both say this)
+	const gamesOut = p2.injury.gamesRemaining - 1;
+	const gamesOutText = `${gamesOut} ${gamesOut === 1 ? gameOrWeek : `${gameOrWeek}s`}`;
 	const injuryText = `${p.pos} <a href="${helpers.leagueUrl([
 		"player",
 		p2.pid,
-	])}">${p2.firstName} ${p2.lastName}</a> - ${p2.injury.type}, ${
-		p2.injury.gamesRemaining - 1
-	} ${p2.injury.gamesRemaining - 1 === 1 ? gameOrWeek : `${gameOrWeek}s`}`;
+	])}">${p2.firstName} ${p2.lastName}</a> - ${p2.injury.type}, ${gamesOutText}`;
 
 	if (g.get("userTid") === p2.tid) {
 		if (p2.injury.gamesRemaining > 1) {
@@ -246,8 +248,8 @@ const doInjury = async (
 				reaggravateExtraDays === undefined
 					? "was injured"
 					: `reaggravated ${helpers.pronoun(g.get("gender"), "his")} injury`
-			}! (${p2.injury.type}, out for ${p2.injury.gamesRemaining} ${
-				p2.injury.gamesRemaining === 1 ? gameOrWeek : `${gameOrWeek}s`
+			}! (${p2.injury.type}, ${
+				gamesOut > 0 ? `out for ${gamesOutText}` : `back next ${gameOrWeek}`
 			})`,
 			showNotification: false,
 			pids: [p2.pid],
