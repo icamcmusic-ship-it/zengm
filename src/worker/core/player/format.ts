@@ -825,7 +825,8 @@ const processRatings = (
 				attr !== "hgt" &&
 				attr !== "wng" &&
 				attr !== "pos" &&
-				attr !== "injuryIndex"
+				attr !== "injuryIndex" &&
+				attr !== "devParts"
 			) {
 				row[attr] = player.fuzzRating(pr[attr], pr.fuzz);
 			} else {

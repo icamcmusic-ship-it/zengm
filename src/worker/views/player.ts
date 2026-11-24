@@ -142,6 +142,8 @@ export const getPlayer = async <
 			"injuryIndex",
 			// Sub-ratings (basketball, the subRatings setting; undefined otherwise)
 			"sub",
+			// Development breakdown (basketball; undefined on old rows)
+			"devParts",
 		],
 		stats: ["season", "tid", "abbrev", "age", "jerseyNumber", ...stats],
 		seasonType: ["regularSeason", "playoffs", "combined"],

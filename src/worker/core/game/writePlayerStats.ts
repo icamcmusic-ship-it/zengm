@@ -1,4 +1,5 @@
 import { careerAgingOn, injuryAthleticLoss } from "../player/careerAging.ts";
+import { addInjuryToDevParts } from "../player/devParts.ts";
 import { syncLatestSubs, tiltRowSubKeys } from "../player/subRatings.ts";
 import { isNitGame } from "../college/postseason.ts";
 import { PHASE } from "../../../common/constants.ts";
@@ -336,6 +337,10 @@ const doInjury = async (
 		setPotAfterInjury(prevRatings, newRatings);
 
 		p2.injuries.at(-1)!.ovrDrop = prevRatings.ovr - newRatings.ovr;
+		// Development breakdown: the season's injury losses
+		if (__SPORT === "basketball") {
+			addInjuryToDevParts(newRatings as any, newRatings.ovr - prevRatings.ovr);
+		}
 		p2.injuries.at(-1)!.potDrop = prevRatings.pot - newRatings.pot;
 	}
 

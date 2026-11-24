@@ -6,6 +6,7 @@ import {
 	careerRetireFactors,
 	getCareerAgingDevelopment,
 	injuryAthleticLoss,
+	lastSeasonMinutes,
 	mergeCareerAging,
 	mileageExcess,
 	oldAgeAthleticDelta,
@@ -13,6 +14,7 @@ import {
 	reinventionStrength,
 	specialtyOf,
 	usefulVeteran,
+	YOUNG_MINUTES,
 } from "./careerAging.ts";
 
 const row = (season: number, x: Record<string, number> = {}) => ({
@@ -129,6 +131,63 @@ describe("careerAging", () => {
 		)!;
 		assert.strictEqual(merged.ratingDelta!.tp, 1.5);
 		assert.strictEqual(merged.baseChangeDelta, 1);
+	});
+
+	test("young players' minutes: more minutes develop faster, centered, bounded, only 23 and under who played", () => {
+		const young = (pid: number, min: number | undefined, bornYear = 2009) => ({
+			pid,
+			born: { year: bornYear },
+			ratings: [row(2030)],
+			stats:
+				min === undefined
+					? []
+					: [
+							{ season: 2030, tid: 0, min },
+							{ season: 2029, tid: 0, min: 3000 },
+						],
+		});
+		const players = [
+			young(1, 2600),
+			young(2, 1200),
+			young(3, 100),
+			young(4, undefined),
+			young(5, 3000, 2000),
+		];
+		const dev = getCareerAgingDevelopment(players, 2031);
+		const m1 = dev.get(1)!.minutesDelta!;
+		const m2 = dev.get(2)!.minutesDelta!;
+		const m3 = dev.get(3)!.minutesDelta!;
+		assert.isAbove(m1.oiq!, m2.oiq!);
+		assert.isAbove(m2.oiq!, m3.oiq!);
+		// Centered over the eligible players
+		assert.closeTo(m1.tp! + m2.tp! + m3.tp!, 0, 1e-9);
+		// Bounded: at most 2 units apart
+		assert.isAtMost(m1.tp! - m3.tp!, 2 * YOUNG_MINUTES.amount + 1e-9);
+		// Skill more than legs
+		assert.isAbove(m1.oiq!, m1.spd!);
+		// Not in the league last season, or too old: nothing
+		assert.isUndefined(dev.get(4)?.minutesDelta);
+		assert.isUndefined(dev.get(5)?.minutesDelta);
+		// Merged into the rating deltas, and kept apart for the breakdown
+		const merged = mergeCareerAging(undefined, dev.get(1))!;
+		assert.strictEqual(merged.ratingDelta!.oiq, m1.oiq);
+		assert.strictEqual(merged.minutesDelta, m1);
+		// Playoff minutes count 1.5x
+		assert.strictEqual(
+			lastSeasonMinutes(
+				{
+					pid: 1,
+					born: { year: 2009 },
+					ratings: [],
+					stats: [
+						{ season: 2030, tid: 0, min: 1000 },
+						{ season: 2030, tid: 0, min: 100, playoffs: true },
+					],
+				},
+				2031,
+			),
+			1150,
+		);
 	});
 
 	test("off: nothing", () => {
