@@ -28,12 +28,11 @@ export const BREAKOUT = {
 	roleByRank: [0, 0.35, 0.7, 1],
 	formRho: 0.6,
 	formSdStar: 0.06,
-	// (toned down twice: was 0.22, 2.5, 1 / 150, 1.55, hotRole 0.35, hotPossRole 6, then 0.17, 1 / 300, 1.4, hotPossRole 4, benchHotMin 4,
-	// benchMaxShift 8, makeCal 0.0045; see the doc)
-	formSdRole: 0.13,
+	// (fit with BENCH_COOL to the NBA's bench 20/25/30-point games, see the doc; was 0.17 within ±2, benchHotMin 4, benchMaxShift 8)
+	formSdRole: 0.22,
 	formZMax: 2,
-	careerProb: 1 / 600,
-	careerUsage: 1.3,
+	careerProb: 1 / 300,
+	careerUsage: 1.4,
 	careerMake: 0.035,
 	openInjury: 0.07,
 	openInjuryMax: 2,
@@ -49,20 +48,20 @@ export const BREAKOUT = {
 	threatSpan: 0.2,
 	rimLo: 0.5,
 	rimSpan: 0.2,
-	hotRole: 0.22,
-	hotPossRole: 2,
+	hotRole: 0.35,
+	hotPossRole: 4,
 	coldMisses: 2,
 	heatPts: 12,
 	heatEff: 1.3,
-	benchHotMin: 2.5,
-	benchMaxShift: 6,
+	benchHotMin: 6,
+	benchMaxShift: 10,
 	benchBlowout: 15,
 	closerHot: 0.15,
 	closerPts: 16,
 	closerEff: 1.2,
 	// Calibration: taken off the make probability of every shot from the shooter draw (more of the shots now go to whoever is shooting
 	// well tonight, so league FG% and 3P% would go up)
-	makeCal: 0.0035,
+	makeCal: 0.0045,
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -180,10 +179,11 @@ export const matchupOpening = (
 };
 
 // Core sim (every game with the Shot Share Model, not a setting): the defense keys on a hot bench player (gs 0). Past pts points tonight
-// his shooter-draw weight × 1 / (1 + k × (points − pts) / 5): 0.83 at 19, 0.71 at 24, 0.63 at 29, so big bench nights stay rare
+// his shooter-draw weight × 1 / (1 + k × (points − pts) / 5): 0.85 at 23, 0.71 at 26, 0.53 at 31. With BREAKOUT this puts the bench's
+// 20/25/30-point games at the NBA's (see the doc)
 export const BENCH_COOL = {
-	pts: 14,
-	k: 0.25,
+	pts: 21,
+	k: 0.45,
 };
 export const benchCool = (gs: number, pts: number) =>
 	gs !== 0 || pts <= BENCH_COOL.pts
