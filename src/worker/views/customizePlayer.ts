@@ -22,6 +22,7 @@ import { freshFaceAging } from "../util/faceAging.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
 import { ensureSubs } from "../core/player/subRatings.ts";
+import { getPersonalityTraitSeed } from "../core/player/traits.ts";
 
 const processInputs = (params: RouteParams<"customizePlayer">) => {
 	let pid: number | null = null;
@@ -254,7 +255,7 @@ export default defineView({
 				traitsInfo:
 					__SPORT === "basketball" && g.get("playerTraits") && g.get("godMode")
 						? {
-								leagueSeed: g.get("playerTraitsSeed"),
+								leagueSeed: getPersonalityTraitSeed(),
 								season: g.get("season"),
 							}
 						: undefined,

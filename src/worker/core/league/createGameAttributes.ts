@@ -142,6 +142,10 @@ const createGameAttributes = async (
 		gameAttributesInput?.playerTraitsSeed === undefined
 	) {
 		gameAttributes.playerTraitsSeed = Math.floor(Math.random() * 2 ** 31) + 1;
+		// and its own personality salt (a file with a playerTraitsSeed keeps its own, or none, so it plays as before)
+		if (gameAttributesInput?.personalityTraitsSalt === undefined) {
+			gameAttributes.personalityTraitsSalt = newLeagueSalt();
+		}
 	}
 
 	// Can't get fired for the first two seasons

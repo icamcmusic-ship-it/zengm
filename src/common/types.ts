@@ -936,6 +936,10 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	playerTraits: boolean;
 	// Seed for the stored trait components, set once when a league is created (0 in older leagues)
 	playerTraitsSeed: number;
+	// Salt for the personality trait seeds only (not trajectories, aging or scouting, which read playerTraitsSeed alone): drawn for new
+	// leagues and when Player Traits is first turned on in a league whose playerTraitsSeed is 0, so those leagues don't all share the same
+	// personalities by pid. 0 = none (players keep the seeds they would have had before it existed)
+	personalityTraitsSalt: number;
 	// League salt (common/leagueSalt.ts): mixed into every seeded derivation, drawn once at league creation (0 = none, older leagues)
 	leagueSalt: number;
 	// History of God Mode re-rolls of leagueSalt

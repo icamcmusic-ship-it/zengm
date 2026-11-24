@@ -67,6 +67,18 @@ export const traitsEnabled = () =>
 export const getLeagueTraitSeed = () =>
 	(__SPORT === "basketball" ? g.get("playerTraitsSeed") : 0) ?? 0;
 
+// The league seed for personality trait seeds only (generated and drifted p.traits): playerTraitsSeed with the league's personality salt,
+// when it has one (see GameAttributesLeague.personalityTraitsSalt). Exactly playerTraitsSeed without a salt, so nothing moves in leagues
+// without one. Trajectories, aging, scouting noise and mentoring keep reading getLeagueTraitSeed.
+export const getPersonalityTraitSeed = (): number | string => {
+	const seed = getLeagueTraitSeed();
+	const salt =
+		__SPORT === "basketball" && Object.hasOwn(g, "personalityTraitsSalt")
+			? (g.get("personalityTraitsSalt") ?? 0)
+			: 0;
+	return typeof salt === "number" && salt !== 0 ? `${seed}|ps${salt}` : seed;
+};
+
 // Years since the draft. Works for random-player leagues too, where players have no stats rows before the league starts. Draft prospects have 0.
 export const getTraitExperience = (p: TraitPlayer, season = g.get("season")) =>
 	p.tid === PLAYER.UNDRAFTED
@@ -93,7 +105,7 @@ const getContext = (p: TraitPlayer, season: number) => ({
 
 // Seeds for a player, without writing anything. Missing seeds are derived from the league seed and pid, so the answer is the same every time.
 export const getTraitSeeds = (p: TraitPlayer) =>
-	completeTraitSeeds(p.traits, getLeagueTraitSeed(), p.pid ?? 0);
+	completeTraitSeeds(p.traits, getPersonalityTraitSeed(), p.pid ?? 0);
 
 // Create p.traits if it is missing or partial. Safe to call as often as you like. Returns true if p changed.
 export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
@@ -102,7 +114,7 @@ export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
 		return false;
 	}
 	// Also repairs junk from a hand-edited league file (non-numbers, out of range)
-	const next = completeTraitSeeds(p.traits, getLeagueTraitSeed(), p.pid);
+	const next = completeTraitSeeds(p.traits, getPersonalityTraitSeed(), p.pid);
 	const same = TRAIT_KEYS.every(
 		(key) => p.traits?.[seedKey(key)] === next[seedKey(key)],
 	);
@@ -119,7 +131,7 @@ export const initTraits = (p: TraitPlayer & { pid: number }) => {
 	if (__SPORT !== "basketball" || !traitsEnabled()) {
 		return;
 	}
-	p.traits = generateTraitSeeds(getLeagueTraitSeed(), p.pid);
+	p.traits = generateTraitSeeds(getPersonalityTraitSeed(), p.pid);
 };
 
 export const getPlayerTraitScores = (
@@ -196,7 +208,7 @@ export const developTraits = (
 	}
 	p.traits = driftTraitSeeds(
 		p.traits ?? {},
-		getLeagueTraitSeed(),
+		getPersonalityTraitSeed(),
 		p.pid,
 		season,
 	);
