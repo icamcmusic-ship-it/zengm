@@ -202,6 +202,7 @@ import type { LookingForState } from "../../ui/views/TradingBlock/useLookingForS
 import { getPlayer } from "../views/player.ts";
 import { foldRetiredAdvCareers } from "../core/player/advStatsStorage.ts";
 import { getPlayersForExport } from "../util/playerExport.ts";
+import { getDraftSlotHof } from "../util/draftSlotHof.ts";
 import {
 	getPlayerProfileExport,
 	getPlayerProfileExportSections,
@@ -7015,6 +7016,7 @@ const api = {
 		runMockDraft,
 		getProProjections,
 		getDraftDayInfo,
+		getDraftSlotHof,
 		getDraftPickValueChart,
 		getDraftNightOffers,
 		declineDraftNightOffer,

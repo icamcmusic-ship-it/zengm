@@ -18,6 +18,7 @@ import { wrappedSkillsBlock } from "../components/SkillsBlock.tsx";
 import { getCol } from "../../common/getCol.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { wrappedPreDraftVsPick } from "../util/preDraftCell.tsx";
+import { HofBySlot } from "./DraftHistoryHofBySlot.tsx";
 
 const Summary = ({
 	players,
@@ -410,6 +411,8 @@ const DraftHistory = ({
 				rows={rows}
 				superCols={superCols}
 			/>
+
+			<HofBySlot />
 		</>
 	);
 };
