@@ -82,6 +82,12 @@ const doInjury = async (
 
 	// Front Office Budget: Medical's faster recovery for older players, and the duration at an average budget for the season review
 	let neutralGames: number | undefined;
+	// The injury type depends on his size and position (player/injuryBodyType.ts)
+	const bodyType = {
+		hgt: p2.hgt,
+		weight: p2.weight,
+		pos: p2.ratings.at(-1)?.pos,
+	};
 	if (frontOfficeEnabled() && p2.tid >= 0) {
 		p2.injury = player.injury(healthLevel, {
 			extraFactor: getInjuryDurationFactor(
@@ -91,9 +97,10 @@ const doInjury = async (
 			onNeutral: (games) => {
 				neutralGames = games;
 			},
+			player: bodyType,
 		});
 	} else {
-		p2.injury = player.injury(healthLevel);
+		p2.injury = player.injury(healthLevel, { player: bodyType });
 	}
 	if (isInjuryDepthEnabled()) {
 		const before = p2.injury.gamesRemaining;
