@@ -70,3 +70,34 @@ export const personalityTradeRequestProbMult = (
 ) =>
 	(1 - A.loyaltyTradeRequest * traitZ(loyalty)) *
 	(playingTimeUnhappy ? 1 - A.roleTradeRequest * traitZ(roleAcceptance) : 1);
+
+// Mood traits (F/L/$/W, the "Priorities" in the mood panel) with Player Traits on: his personality, not a random draw. Loyalty >= 70: L;
+// money vs winning >= 70: W, <= 30: $; role acceptance <= 30 or a diva ego (<= 30): F. Sorted like genMoodTraits. Can be empty
+export const MOOD_TRAIT_THRESHOLDS = { high: 70, low: 30 } as const;
+
+export const moodTraitsFromPersonality = ({
+	loyalty,
+	roleAcceptance,
+	moneyVsWinning,
+	ego,
+}: {
+	loyalty: number;
+	roleAcceptance: number;
+	moneyVsWinning: number;
+	ego: number;
+}) => {
+	const { high, low } = MOOD_TRAIT_THRESHOLDS;
+	const output: ("F" | "L" | "$" | "W")[] = [];
+	if (roleAcceptance <= low || ego <= low) {
+		output.push("F");
+	}
+	if (loyalty >= high) {
+		output.push("L");
+	}
+	if (moneyVsWinning >= high) {
+		output.push("W");
+	} else if (moneyVsWinning <= low) {
+		output.push("$");
+	}
+	return output.sort();
+};

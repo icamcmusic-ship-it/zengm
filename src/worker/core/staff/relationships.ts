@@ -21,7 +21,7 @@ import { makeSeededRandom } from "../../../common/random.ts";
 import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
-import { getEgoScore, traitsEnabled } from "../player/traits.ts";
+import { getEgoScore, getMoodTraits, traitsEnabled } from "../player/traits.ts";
 import { getCoachProfile } from "./systems.ts";
 
 export const coachRelEnabled = () =>
@@ -182,7 +182,7 @@ export const updateRelationships = async () => {
 				dev,
 				personality: head.personality,
 				ego: useTraits ? getEgoScore(p as any) : undefined,
-				traits: moodTraits ? p.moodTraits : [],
+				traits: moodTraits ? getMoodTraits(p as any) : [],
 				winp,
 				noise: 2 * random() - 1,
 			});

@@ -29,6 +29,7 @@ import {
 	egoTradeRequestMoodShift,
 	egoTradeRequestProbMult,
 	lockerRoomMoodFromSums,
+	moodTraitsFromPersonality,
 	lockerRoomWeight,
 	personalityTradeRequestProbMult,
 	workEthicZ,
@@ -43,7 +44,7 @@ import {
 	type TraitScores,
 } from "../../../common/playerTraits/index.ts";
 import { PLAYER } from "../../../common/constants.ts";
-import type { NonEmptyArray } from "../../../common/types.ts";
+import type { MoodTrait, NonEmptyArray } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
 import { agingCurveOf, ensureTrajectorySeed } from "./trajectory.ts";
 
@@ -507,6 +508,20 @@ export const getPersonalityScores = (
 			context,
 		),
 	};
+};
+
+// His mood traits (F/L/$/W): from his personality with Player Traits on (moodTraitsFromPersonality), else the stored random ones, exactly
+// as before
+export const getMoodTraits = (
+	p: TraitPlayer & { moodTraits: MoodTrait[] },
+): MoodTrait[] => {
+	if (!traitsEnabled()) {
+		return p.moodTraits;
+	}
+	return moodTraitsFromPersonality({
+		...getPersonalityScores(p),
+		ego: getEgoScore(p),
+	});
 };
 
 // Trade requests: his ego moves the mood at which he asks and the chance he asks; loyalty and (when unhappy with his minutes) role
