@@ -17,6 +17,7 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import {
 	HOF_AWARD,
+	announceHofLocks,
 	ballotLine,
 	catchUpHofAfterBallotOff,
 	clearHofBallotOnUnretire,
@@ -267,6 +268,24 @@ describe("ballot", () => {
 		// Not while the ballot is on
 		g.setWithoutSavingToDB("featureHofBallot", true);
 		assert.deepEqual(await catchUpHofAfterBallotOff(), []);
+	});
+
+	test("first-ballot locks are announced at the end of the regular season, and go in", async () => {
+		const great = makePlayer(70, 15, 12);
+		const borderline = makePlayer(71, 9, 12);
+		// Not eligible until 2020
+		const recent = makePlayer(72, 15, 12, 2017);
+		await resetCache({ players: [great, borderline, recent] });
+		await idb.cache.awards.put(awardsRow(2019));
+		assert.deepEqual(await announceHofLocks({}), [70]);
+		await runHallOfFame({});
+		const p = (await idb.cache.players.get(70))!;
+		assert.strictEqual(p.hofBallot?.status, "inducted");
+		assert.strictEqual(p.hofBallot?.votes.length, 1);
+		// Nothing to announce once they are on the ballot, or with the ballot off
+		assert.deepEqual(await announceHofLocks({}), []);
+		g.setWithoutSavingToDB("featureHofBallot", false);
+		assert.deepEqual(await announceHofLocks({}), []);
 	});
 
 	test("retirement: inducted at once with the ballot off, not with it on", async () => {

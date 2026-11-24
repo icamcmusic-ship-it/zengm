@@ -578,6 +578,80 @@ const classEvent = (
 	);
 };
 
+// A first-ballot lock: his case this far above the threshold, and a first-year share this far above the 75% needed
+export const HOF_LOCK_RATIO = 1.15;
+export const HOF_LOCK_PCT = 85;
+
+/**
+ * End of the regular season, ballot on: a news item naming the players newly eligible for this season's ballot (after the playoffs)
+ * who are sure to go in on their first ballot: screening score at least HOF_LOCK_RATIO of the threshold and a first-year vote, as
+ * the ballot will count it (the same seeded lean and noise), of HOF_LOCK_PCT% or more. Players who died during their waiting period
+ * count too (screened early, see runBallot). Returns their pids.
+ */
+export const announceHofLocks = async (conditions: Conditions = {}) => {
+	if (__SPORT !== "basketball" || !hofBallotOn() || isCollege()) {
+		return [];
+	}
+	const season = g.get("season");
+	const wait = hofBallotWait();
+	const locks: Player[] = [];
+	for (
+		let retiredYear = Math.max(g.get("startingSeason"), season - wait);
+		retiredYear < season;
+		retiredYear++
+	) {
+		const players = await idb.merged.players.getAll({ retiredYear });
+		for (const p of players) {
+			if (p.tid !== PLAYER.RETIRED || p.hof || p.hofBallot) {
+				continue;
+			}
+			if (retiredYear > season - wait && !diedBy(p, season)) {
+				continue;
+			}
+			const { score, threshold } = hofScoreBasketball(p);
+			if (!(threshold > 0)) {
+				continue;
+			}
+			// As runBallot will count it (rounded like the stored ballot)
+			const ratio = round1(score) / round1(threshold);
+			if (ratio < HOF_LOCK_RATIO) {
+				continue;
+			}
+			const pct = votePct({
+				ratio,
+				year: 1,
+				lean: voterLean(p.pid),
+				noise: yearNoise(p.pid, season),
+			});
+			if (pct >= HOF_LOCK_PCT) {
+				locks.push(p);
+			}
+		}
+	}
+	if (locks.length === 0) {
+		return [];
+	}
+	locks.sort((a, b) => a.pid - b.pid);
+	const names = locks.map(playerLink);
+	const list =
+		names.length === 1
+			? names[0]
+			: `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+	const tids = [...new Set(locks.flatMap((p) => p.statsTids))];
+	logEvent(
+		{
+			type: "hallOfFame",
+			text: `${list} ${locks.length === 1 ? "is a lock" : "are locks"} to be elected to the ${hofLink()} on the first ballot when the votes are counted after the playoffs.`,
+			showNotification: tids.includes(g.get("userTid")),
+			pids: locks.map((p) => p.pid),
+			tids,
+			score: 10,
+		},
+		conditions,
+	);
+	return locks.map((p) => p.pid);
+};
+
 /**
  * The ballot was just turned off: from now on players are inducted when they retire (player.retire), so the retired players the
  * ballot never got to (still waiting, or on it with votes left) would never be. Each of them who is worthy (madeHof, as at
