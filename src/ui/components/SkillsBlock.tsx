@@ -27,6 +27,9 @@ const BadgePill = ({ badge }: { badge: ParsedBadge }) => {
 	const popoverId = useId();
 	const { def, tier } = badge;
 	const effects = BADGE_EFFECTS[def.key];
+	// His own events, and the team-level ones (best on the floor, or his share of the floor's mean)
+	const own = effects?.filter((e) => !e.team) ?? [];
+	const team = effects?.filter((e) => e.team) ?? [];
 	return (
 		<OverlayTrigger
 			trigger="click"
@@ -47,21 +50,41 @@ const BadgePill = ({ badge }: { badge: ParsedBadge }) => {
 						<p className="mb-2">{def.meaning}</p>
 						{effects ? (
 							<>
-								<div className="fw-bold">
-									In games ({TIER_NAMES[tier]}, before league calibration)
-								</div>
-								<ul className="ps-3 mb-2">
-									{effects.map((e, i) => (
-										<li key={i}>
-											{formatBadgeEffect(e, tier)} to {e.what}
-										</li>
-									))}
-								</ul>
+								{own.length > 0 ? (
+									<>
+										<div className="fw-bold">
+											In games ({TIER_NAMES[tier]}, vs a league-average player)
+										</div>
+										<ul className="ps-3 mb-2">
+											{own.map((e, i) => (
+												<li key={i}>
+													{formatBadgeEffect(e, tier)} to {e.what}
+												</li>
+											))}
+										</ul>
+									</>
+								) : null}
+								{team.length > 0 ? (
+									<>
+										<div className="fw-bold">
+											Team effects while he is on the floor ({TIER_NAMES[tier]},
+											vs a league-average lineup)
+										</div>
+										<ul className="ps-3 mb-2">
+											{team.map((e, i) => (
+												<li key={i}>
+													{formatBadgeEffect(e, tier)} to {e.what}
+												</li>
+											))}
+										</ul>
+									</>
+								) : null}
 								<div className="text-body-secondary small mb-1">
 									Only when "2K Badge Effects in Sim" is on in League Extras.
-									Compared with a player without the badge: the sim re-centers
-									every event so league averages stay the same, so his edge over
-									an average player is a little smaller.
+									Net of the league calibration: the sim re-centers every event
+									so league averages stay the same, and these numbers are his
+									edge after that (a pick weight, "how often ... goes to him",
+									only changes who, not how many).
 								</div>
 							</>
 						) : (

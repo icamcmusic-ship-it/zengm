@@ -145,6 +145,7 @@ import {
 	teamSwitchDefenseBonus,
 	lineupSizeMismatch,
 	teamLateGameDecisionQuality,
+	clutchSituationWeight,
 	type TraitEffects,
 	type TraitSituation,
 } from "../../../common/playerTraits/index.ts";
@@ -4930,7 +4931,8 @@ class GameSim extends GameSimBase {
 						-min *
 						this.fatigueFactor *
 						(1 - p.compositeRating.endurance) *
-						(p.traitEffects?.energyDrainRate ?? 1); // player traits (motor)
+						(p.traitEffects?.energyDrainRate ?? 1) * // player traits (motor)
+						(this.badgeSim ? this.badgeEnergyMult(p) : 1); // 2K Badges (Iron Lungs, Workhorse)
 
 					if (p.stat.energy < 0) {
 						p.stat.energy = 0;
@@ -6988,6 +6990,7 @@ class GameSim extends GameSimBase {
 				}
 				probAndOne *= andOne / BADGE_CAL.andOne;
 			}
+			probMake += this.badgeClutchDelta(p);
 		}
 
 		// Always valid probabilities (only clamped before when player traits applied). Compared with Math.random() in [0, 1), so this
@@ -7510,6 +7513,40 @@ class GameSim extends GameSimBase {
 			badgeDiag("blk", x);
 		}
 		return x / BADGE_CAL.blk;
+	}
+
+	// 2K Badges: Charge Taker, the chance that a drive or post-up against him is an offensive foul (relative, centered)
+	badgeOffFoulMult(defender: PlayerGameSim) {
+		const x = 1 + BADGE_SIM.chargeTaker * tierScale(defender, BI.chargeTaker);
+		if (BADGE_DIAG.on) {
+			badgeDiag("offFoul", x);
+		}
+		return x / BADGE_CAL.offFoul;
+	}
+
+	// 2K Badges: Clutch Gene, his make probability in clutch time (the clutch weight of the moment, 0 to 1; centered on clutch shots)
+	badgeClutchDelta(p: PlayerGameSim) {
+		const w = clutchSituationWeight(this.traitSituation(this.o));
+		if (w <= 0) {
+			return 0;
+		}
+		const x = BADGE_SIM.clutchGene * tierScale(p, BI.clutchGene);
+		if (BADGE_DIAG.on) {
+			badgeDiag("clutch", x);
+		}
+		return (x - BADGE_CAL.clutch) * w;
+	}
+
+	// 2K Badges: Iron Lungs and Workhorse, his energy drain on the court (relative, centered)
+	badgeEnergyMult(p: PlayerGameSim) {
+		const x =
+			1 -
+			BADGE_SIM.ironLungs * tierScale(p, BI.ironLungs) -
+			BADGE_SIM.workhorse * tierScale(p, BI.workhorse);
+		if (BADGE_DIAG.on) {
+			badgeDiag("energy", x);
+		}
+		return x / BADGE_CAL.energy;
 	}
 
 	// 2K Badges: defensive rebound probability shift (centered)
@@ -8416,10 +8453,14 @@ class GameSim extends GameSimBase {
 		const { base, k } = SIM_FIX_OFF_FOUL;
 		const risk = p.compositeRating.offFoulRisk ?? 0.5;
 		const draw = defender.compositeRating.drawingCharges ?? 0.5;
-		const prob =
+		let prob =
 			base *
 			Math.max(0, 1 + k * (risk - 0.5)) *
 			Math.max(0, 1 + k * (draw - 0.5));
+		// 2K Badges: Charge Taker, the defender (centered)
+		if (this.badgeSim) {
+			prob *= this.badgeOffFoulMult(defender);
+		}
 		if (Math.random() >= prob) {
 			return;
 		}
@@ -8851,12 +8892,20 @@ class GameSim extends GameSimBase {
 							);
 				} else if (rating === "offRebounding" || rating === "rebounding") {
 					value *=
-						1 +
-						BADGE_SIM.rebWeight *
-							Math.max(
-								tierScale(p, BI.putbackBoss),
-								tierScale(p, BI.reboundChaser),
-							);
+						(1 +
+							BADGE_SIM.rebWeight *
+								Math.max(
+									tierScale(p, BI.putbackBoss),
+									tierScale(p, BI.reboundChaser),
+								)) *
+						(1 + BADGE_SIM.worm * tierScale(p, BI.worm));
+				} else if (rating === "fouling" && !this.pickingTechFoul) {
+					// Whistle Proof: fewer of his team's defensive fouls are his (only who, not how many)
+					value *= 1 - BADGE_SIM.whistleProof * tierScale(p, BI.whistleProof);
+				} else if (rating === "blocking") {
+					// Paint Patroller: more of his team's blocks are his (only who, not how many)
+					value *=
+						1 + BADGE_SIM.paintPatroller * tierScale(p, BI.paintPatroller);
 				}
 			}
 

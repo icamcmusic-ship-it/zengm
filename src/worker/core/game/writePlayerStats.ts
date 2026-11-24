@@ -1,5 +1,6 @@
 import { careerAgingOn, injuryAthleticLoss } from "../player/careerAging.ts";
 import { syncLatestSubs, tiltRowSubKeys } from "../player/subRatings.ts";
+import { refreshTieredBadgesFor } from "../player/tieredBadges.ts";
 import { isNitGame } from "../college/postseason.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { finances, player } from "../index.ts";
@@ -337,6 +338,9 @@ const doInjury = async (
 
 		p2.injuries.at(-1)!.ovrDrop = prevRatings.ovr - newRatings.ovr;
 		p2.injuries.at(-1)!.potDrop = prevRatings.pot - newRatings.pot;
+
+		// 2K Badges: his tiers from the new ratings (the sim's from his next game; never above this season's)
+		await refreshTieredBadgesFor(p2, { noRaise: true });
 	}
 
 	return {

@@ -21,7 +21,7 @@ import {
 	badgePoints,
 	computeCutoffs,
 	displayTiersOf,
-	enforceLegendLimit,
+	enforceLegendLimitAndReassign,
 	gatesMet,
 	entryForSeason,
 	progressToNext,
@@ -34,6 +34,7 @@ import {
 	type Tier,
 	type TieredBadgeCutoffs,
 	type TieredBadgeEntry,
+	type TierLimits,
 } from "../../../common/tieredBadges/index.ts";
 import { SUB_DEFS, SUB_INDEX } from "../../../common/subRatings.ts";
 import type { Player } from "../../../common/types.ts";
@@ -242,6 +243,9 @@ export const updateTieredBadges = async () => {
 				p,
 				pid: p.pid,
 				t,
+				// As assigned, before the re-centering (which mutates t)
+				assigned: { ...t },
+				prev,
 				capped,
 				fresh,
 				scoreOf: (key: string) =>
@@ -254,7 +258,13 @@ export const updateTieredBadges = async () => {
 		for (const x of out) {
 			x.scores = scoresOf(x.r, x.t);
 		}
-		enforceLegendLimit(out);
+		// A duplicate Legend lowered to Hall of Fame frees a point: re-assign those players with the lowered tiers as limits, so the cap
+		// gives it to the next badge under the same rules and "capped" is recomputed (legendReassignLimits)
+		enforceLegendLimitAndReassign(
+			out,
+			(x, limits) => assignTiers(x.r, x.r.ovr ?? 0, cutoffs, x.prev, limits),
+			(x) => scoresOf(x.r, x.t),
+		);
 		return out;
 	};
 	// The sim's tiers, from the true ratings
@@ -276,12 +286,17 @@ export const updateTieredBadges = async () => {
 };
 
 /**
- * One player who entered the league mid-season (imported, created or cloned in God Mode, ratings edited in God Mode): his tiers for the
- * current season against the season's saved cutoffs, like updateTieredBadges gives everyone at the preseason. Without it he had no sim
- * badges and no pills until the next preseason, and his page read live tiers that skipped the one-Legend rule. Legends already held this
- * season stay with their holders: he can't take one mid-season (Hall of Fame instead). Returns whether it stored an entry.
+ * One player who entered the league mid-season (imported, created or cloned in God Mode, ratings edited in God Mode) or lost ratings to
+ * an injury: his tiers for the current season against the season's saved cutoffs, like updateTieredBadges gives everyone at the
+ * preseason. Without it he had no sim badges and no pills until the next preseason, and his page read live tiers that skipped the
+ * one-Legend rule. Legends already held this season stay with their holders: he can't take one mid-season (Hall of Fame instead).
+ * noRaise (an injury's ratings loss): no badge goes above this season's tier and none is added, so a refresh against last season's tiers
+ * never undoes this season's re-centering. Returns whether it stored an entry.
  */
-export const refreshTieredBadgesFor = async (p: Player) => {
+export const refreshTieredBadgesFor = async (
+	p: Player,
+	{ noRaise = false }: { noRaise?: boolean } = {},
+) => {
 	if (
 		!tieredBadgesOn() ||
 		p.tid < PLAYER.FREE_AGENT ||
@@ -322,12 +337,25 @@ export const refreshTieredBadgesFor = async (p: Player) => {
 			}
 		}
 	}
-	const capLegends = (t: Record<string, Tier>, held: Set<string>) => {
-		for (const key of Object.keys(t)) {
-			if (t[key] === 5 && held.has(key)) {
-				t[key] = 4;
+	// A Legend someone else holds is Hall of Fame for him, applied before the cap (as limits), so the point it frees goes to his next
+	// badge under the same rules and "capped" is right, as updateTieredBadges does after enforceLegendLimit. noRaise: no tier above this
+	// season's (and no new badge)
+	const current = noRaise ? entryForSeason(p.badges2k, season) : undefined;
+	const limitsOf = (
+		held: Set<string>,
+		now: Partial<Record<string, Tier>> | undefined,
+	) => {
+		const limits: TierLimits = {};
+		for (const key of held) {
+			limits[key] = 4;
+		}
+		if (current) {
+			for (const def of TIERED_BADGES) {
+				const cap = (now?.[def.key] ?? 0) as Tier;
+				limits[def.key] = Math.min(limits[def.key] ?? 5, cap) as Tier;
 			}
 		}
+		return limits;
 	};
 
 	const r = rowOf(p);
@@ -336,16 +364,16 @@ export const refreshTieredBadgesFor = async (p: Player) => {
 		r.ovr ?? 0,
 		cutoffs,
 		prevTiers(p, season),
+		limitsOf(simLegends, current?.t),
 	);
-	capLegends(t, simLegends);
 	const shownRow = scoutedRowOf(p);
 	const d = assignTiers(
 		shownRow,
 		shownRow.ovr ?? 0,
 		cutoffs,
 		prevTiers(p, season, true),
+		limitsOf(shownLegends, current ? displayTiersOf(current) : undefined),
 	).t;
-	capLegends(d, shownLegends);
 
 	const entry: TieredBadgeEntry = { season, t };
 	if (capped.length > 0) {
