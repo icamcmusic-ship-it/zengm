@@ -19,6 +19,7 @@ import { FancySelect, height } from "./FancySelect.tsx";
 import { getTeamCols, SummaryTable } from "./SummaryTable.tsx";
 import { Dropdown } from "react-bootstrap";
 import { RegenerateScheduleModal } from "./RegenerateScheduleModal.tsx";
+import { ValidateSchedulePanel } from "./ValidateSchedulePanel.tsx";
 import clsx from "clsx";
 import { useBlocker } from "../../hooks/useBlocker.ts";
 import { StickyBottomButtons } from "../../components/StickyBottomButtons.tsx";
@@ -47,38 +48,59 @@ type ScheduleDay = {
 
 type Team = View<"scheduleEditor">["teams"][number];
 
+// Deleting the All-Star Game also deletes the All-Star break around it (the days with no games next to it, realistic schedule
+// length), so placing it again doesn't leave the old break behind
 const deleteSpecial = (
 	schedule: Schedule,
 	type: "allStarGame" | "tradeDeadline",
 ) => {
 	let day: number | undefined;
-	return schedule
-		.filter((row) => {
-			if (row.type === type) {
-				day = row.day;
-				return false;
-			}
-			return true;
-		})
-		.map((game) => {
-			if (day === undefined || game.day <= day) {
-				return game;
-			}
+	const filtered = schedule.filter((row) => {
+		if (row.type === type) {
+			day = row.day;
+			return false;
+		}
+		return true;
+	});
+	if (day === undefined) {
+		return filtered;
+	}
 
-			return {
-				...game,
-				day: game.day - 1,
-			};
-		});
+	let numDays = 1;
+	if (type === "allStarGame") {
+		const days = new Set(filtered.map((game) => game.day));
+		const lastDay = Math.max(0, ...days);
+		for (let d = day - 1; d >= 1 && !days.has(d); d--) {
+			numDays += 1;
+		}
+		for (let d = day + 1; d <= lastDay && !days.has(d); d++) {
+			numDays += 1;
+		}
+	}
+
+	return filtered.map((game) => {
+		if (game.day <= day!) {
+			return game;
+		}
+
+		return {
+			...game,
+			day: game.day - numDays,
+		};
+	});
 };
 
+// numDays > 1: the game is in the middle of that many new days (the All-Star break)
 const addGameOnDayByItself = (
 	schedule: Schedule,
 	gameToAdd: Schedule[number],
+	numDays: number = 1,
 ) => {
+	const startDay = gameToAdd.day;
+	gameToAdd.day += Math.floor((numDays - 1) / 2);
 	let added = false;
 	const scheduleWithNewDay = schedule.flatMap((game) => {
-		if (game.day < gameToAdd.day) {
+		if (game.day < startDay) {
 			return game;
 		}
 
@@ -88,14 +110,14 @@ const addGameOnDayByItself = (
 				gameToAdd,
 				{
 					...game,
-					day: game.day + 1,
+					day: game.day + numDays,
 				},
 			];
 		}
 
 		return {
 			...game,
-			day: game.day + 1,
+			day: game.day + numDays,
 		};
 	});
 
@@ -110,12 +132,13 @@ const addGameOnDayByItself = (
 const notifyPlaceSpecial = (
 	type: "allStarGame" | "tradeDeadline",
 	day: number,
+	breakLength: number,
 ) => {
 	// Without setTimeout, React complains about updating another component when rendering
 	setTimeout(() => {
 		showNotification({
 			type: "info",
-			text: `Placed the ${type === "allStarGame" ? ALL_STAR_GAME_LABEL : TRADE_DEADLINE_LABEL} on day ${day}`,
+			text: `Placed the ${type === "allStarGame" ? ALL_STAR_GAME_LABEL : TRADE_DEADLINE_LABEL} on day ${day}${breakLength > 1 ? `, in the middle of a ${breakLength}-day All-Star break` : ""}`,
 		});
 	});
 };
@@ -209,6 +232,8 @@ const reducer = (
 				type: "placeSpecial";
 				special: "allStarGame" | "tradeDeadline";
 				value: number;
+				// Days with no other games, including its own (the All-Star break)
+				numDays: number;
 		  },
 ): Schedule => {
 	switch (action.type) {
@@ -419,14 +444,28 @@ const reducer = (
 				)!;
 				specialGame.day = lastCompletedGame.day + 1;
 
-				newNewSchedule = addGameOnDayByItself(newSchedule, specialGame);
+				newNewSchedule = addGameOnDayByItself(
+					newSchedule,
+					specialGame,
+					action.numDays,
+				);
 			} else {
 				specialGame.day = existingGame.day + 1;
 
-				newNewSchedule = addGameOnDayByItself(newSchedule, specialGame);
+				newNewSchedule = addGameOnDayByItself(
+					newSchedule,
+					specialGame,
+					action.numDays,
+				);
 			}
 
-			notifyPlaceSpecial(action.special, specialGame.day);
+			notifyPlaceSpecial(
+				action.special,
+				specialGame.day,
+				existingGame && existingGame.type !== "placeholder"
+					? action.numDays
+					: 1,
+			);
 
 			return newNewSchedule;
 		}
@@ -434,6 +473,7 @@ const reducer = (
 };
 
 const ScheduleEditor = ({
+	allStarBreakLength,
 	allStarGame,
 	allStarGameAlreadyHappened,
 	allStarGameAllowed,
@@ -449,6 +489,7 @@ const ScheduleEditor = ({
 
 	const [schedule, dispatchUnwrapped] = useReducer(reducer, scheduleProp);
 	const [showSummaryStatistics, setShowSummaryStatistics] = useState(false);
+	const [showValidate, setShowValidate] = useState(false);
 
 	const { setDirty } = useBlocker();
 
@@ -908,6 +949,38 @@ const ScheduleEditor = ({
 				stickyHeader
 			/>
 
+			{showValidate ? (
+				<>
+					<h2 className="mt-5">Validate Schedule</h2>
+					<ValidateSchedulePanel
+						allStarGame={allStarGame}
+						allStarGameAlreadyHappened={allStarGameAlreadyHappened}
+						godMode={godMode}
+						onRepaired={(repaired) => {
+							dispatch({
+								type: "resetSchedule",
+								schedule: repaired,
+								dirty: true,
+							});
+						}}
+						phase={phase}
+						savedSchedule={scheduleProp}
+						schedule={schedule}
+						teams={teams}
+						userTid={userTid}
+					/>
+				</>
+			) : (
+				<button
+					className="btn btn-secondary me-2"
+					onClick={() => {
+						setShowValidate(true);
+					}}
+				>
+					Validate schedule
+				</button>
+			)}
+
 			{showSummaryStatistics ? (
 				<>
 					<h2 className="mt-5">Schedule Statistics</h2>
@@ -969,10 +1042,19 @@ const ScheduleEditor = ({
 										type: "placeSpecial",
 										special: "allStarGame",
 										value: allStarGame!,
+										numDays: allStarBreakLength,
 									});
 								}}
+								title={
+									allStarBreakLength > 1
+										? "With the All-Star break: days with no other games around it. Its length and the season length are League Settings (Realistic Schedule Length)."
+										: undefined
+								}
 							>
 								Place All-Star Game in default position
+								{allStarBreakLength > 1
+									? ` (${allStarBreakLength}-day break)`
+									: ""}
 							</Dropdown.Item>
 							<Dropdown.Item
 								onClick={() => {
@@ -1001,6 +1083,7 @@ const ScheduleEditor = ({
 										type: "placeSpecial",
 										special: "tradeDeadline",
 										value: tradeDeadline,
+										numDays: 1,
 									});
 								}}
 							>

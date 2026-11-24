@@ -1,4 +1,4 @@
-import { PHASE } from "../../common/constants.ts";
+import { PHASE, TIME_BETWEEN_GAMES } from "../../common/constants.ts";
 import type { Conditions, PlayoffSeries } from "../../common/types.ts";
 import { season, game, phase, freeAgents } from "../core/index.ts";
 import { idb } from "../db/index.ts";
@@ -16,6 +16,10 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { cleanupAutoPlay } from "../core/league/autoPlay.ts";
 import { getNumGameDaysInCalendarDays } from "../core/season/getDaysLeftSchedule.ts";
 import { isCollege } from "../core/college/isCollege.ts";
+import {
+	getNextHolidaySlate,
+	getRoadTripEndDay,
+} from "../core/season/getPlayUntilDays.ts";
 
 // More than a conference tournament can take (16 teams: 4 rounds)
 const COLLEGE_CONF_TOURNAMENT_MAX_DAYS = 10;
@@ -199,6 +203,27 @@ const playUntilEvent = async (
 	await game.play(numDays, conditions);
 };
 
+const isRegularSeason = () =>
+	g.get("phase") === PHASE.REGULAR_SEASON ||
+	g.get("phase") === PHASE.AFTER_TRADE_DEADLINE;
+
+// Play the regular season's days before calendar day `day` of the schedule, so that day's games are next. Days with no games
+// (the All-Star break with realistic schedule length) don't count, as in "One week".
+const playUntilDay = async (day: number, conditions: Conditions) => {
+	if (!isRegularSeason()) {
+		return;
+	}
+	const schedule = await season.getSchedule();
+	const today = schedule[0]?.day;
+	if (today === undefined || day <= today) {
+		return;
+	}
+	const numDays = await getNumGameDaysInCalendarDays(day - today);
+	if (numDays > 0) {
+		await game.play(numDays, conditions);
+	}
+};
+
 const playStop = async () => {
 	await lock.set("stopGameSim", true);
 
@@ -229,6 +254,56 @@ const playMenu = {
 	},
 	untilTradeDeadline: async (param: unknown, conditions: Conditions) => {
 		await playUntilEvent("tradeDeadline", conditions);
+	},
+	// A day of the schedule: param, or asked for
+	untilDay: async (param: unknown, conditions: Conditions) => {
+		if (!isRegularSeason()) {
+			return;
+		}
+		let day = typeof param === "number" ? param : undefined;
+		if (day === undefined) {
+			const schedule = await season.getSchedule();
+			const today = schedule[0]?.day;
+			const lastDay = schedule.at(-1)?.day;
+			if (today === undefined || lastDay === undefined) {
+				return;
+			}
+			// With defaultValue, confirm is a prompt returning the text or null (toUI's types only see its other overload)
+			const response: unknown = await toUI(
+				"confirm",
+				[
+					`Play until which ${TIME_BETWEEN_GAMES}? Today is ${TIME_BETWEEN_GAMES} ${today}, and the regular season's last scheduled ${TIME_BETWEEN_GAMES} is ${lastDay}. Play stops before that ${TIME_BETWEEN_GAMES}'s games.`,
+					{
+						defaultValue: String(Math.min(lastDay, today + 7)),
+						okText: "Play",
+					} as any,
+				],
+				conditions,
+			);
+			if (typeof response !== "string") {
+				return;
+			}
+			day = Number.parseInt(response);
+			if (Number.isNaN(day)) {
+				return;
+			}
+		}
+		await playUntilDay(day, conditions);
+	},
+	untilHoliday: async (param: unknown, conditions: Conditions) => {
+		const slate = getNextHolidaySlate(await season.getSchedule());
+		if (slate) {
+			await playUntilDay(slate.day, conditions);
+		}
+	},
+	untilEndOfRoadTrip: async (param: unknown, conditions: Conditions) => {
+		if (g.get("spectator")) {
+			return;
+		}
+		const day = getRoadTripEndDay(await season.getSchedule(), g.get("userTid"));
+		if (day !== undefined) {
+			await playUntilDay(day, conditions);
+		}
 	},
 	untilPlayoffs: async (param: unknown, conditions: Conditions) => {
 		if (g.get("phase") < PHASE.PLAYOFFS) {

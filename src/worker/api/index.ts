@@ -238,6 +238,7 @@ import {
 } from "../../common/draftPickConditions.ts";
 import { getNumPicksPerRound } from "../core/trade/getPickValues.ts";
 import { formatScheduleForEditor } from "../views/scheduleEditor.ts";
+import { repairEditedScheduleThreeInFour } from "../core/season/repairEditedSchedule.ts";
 import { fixEditedScheduleTags } from "../core/season/editedScheduleTags.ts";
 import type { KeyboardShortcutsLocal } from "../../ui/util/keyboardShortcuts.ts";
 import getNumPlayoffTeamsForSeason, {
@@ -342,8 +343,10 @@ import {
 	getEditedScheduleSpread,
 	getScheduleDayScale,
 } from "../core/season/scheduleDayScale.ts";
-import { validateEditedSchedule } from "../../common/validateEditedSchedule.ts";
-import { getEditedScheduleRules } from "../core/season/editedScheduleRules.ts";
+import {
+	getEditedScheduleRules,
+	validateEditedSchedule,
+} from "../../common/validateEditedSchedule.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { agePlayerFace, faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
@@ -6872,6 +6875,26 @@ const clearSavedTrades = async (hashes: string[]) => {
 	await toUI("realtimeUpdate", [["savedTrades"]]);
 };
 
+// The rules validateEditedSchedule checks a schedule from the editor against, from the saved schedule and the league
+const getEditedScheduleRulesWorker = async (
+	scheduleBefore: { homeTid: number; awayTid: number }[],
+) =>
+	getEditedScheduleRules({
+		activeTids: new Set(
+			(await idb.cache.teams.getAll())
+				.filter((t) => !t.disabled)
+				.map((t) => t.tid),
+		),
+		allStarGameAlreadyHappened: !!(await idb.cache.allStars.get(
+			g.get("season"),
+		)),
+		allStarGameSetting: g.get("allStarGame"),
+		phase: g.get("phase"),
+		scheduleHasAllStarGame: scheduleBefore.some(
+			(game) => game.homeTid === -1 && game.awayTid === -2,
+		),
+	});
+
 // Normally use season.setSchedule, but this skips various checks and saves exactly what the user has edited
 const setScheduleFromEditor = async ({
 	regenerated,
@@ -6883,18 +6906,9 @@ const setScheduleFromEditor = async ({
 	// Check the edited schedule before saving anything: the game loop assumes each team plays at most once a day and the
 	// All-Star Game and trade deadline are alone on their days
 	const scheduleBefore = await idb.cache.schedule.getAll();
-	const rules = await getEditedScheduleRules();
-	const activeTids = new Set(
-		(await idb.cache.teams.getAll())
-			.filter((t) => !t.disabled)
-			.map((t) => t.tid),
-	);
 	const errorMessage = validateEditedSchedule(
 		schedule.filter((game) => game.type !== "placeholder"),
-		{
-			activeTids,
-			...rules,
-		},
+		await getEditedScheduleRulesWorker(scheduleBefore),
 	);
 	if (errorMessage !== undefined) {
 		throw new Error(errorMessage);
@@ -6974,6 +6988,21 @@ const setScheduleFromEditor = async ({
 
 	// This is needed in case the upcoming game was edited/deleted
 	await initUILocalGames();
+};
+
+// Schedule editor's "Auto-repair 3-in-4s" (its "Validate schedule" panel): the edited schedule with games moved out of 3 games in
+// 4 nights, not saved
+const repairEditedSchedule = async (
+	schedule: View<"scheduleEditor">["schedule"],
+) => {
+	const errorMessage = validateEditedSchedule(
+		schedule.filter((game) => game.type !== "placeholder"),
+		await getEditedScheduleRulesWorker(await idb.cache.schedule.getAll()),
+	);
+	if (errorMessage !== undefined) {
+		throw new Error(errorMessage);
+	}
+	return repairEditedScheduleThreeInFour(schedule);
 };
 
 // Marks the worker as busy (which spins the logo in the UI) while function runs. For slow things.
@@ -7154,6 +7183,7 @@ const api = {
 		setNote,
 		setSavedTrade,
 		setScheduleFromEditor,
+		repairEditedSchedule,
 		updateExpansionDraftSetup,
 		advanceToPlayerProtection,
 		autoProtect,

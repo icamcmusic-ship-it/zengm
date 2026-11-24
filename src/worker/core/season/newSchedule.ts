@@ -1,7 +1,7 @@
 import { WEBSITE_ROOT } from "../../../common/constants.ts";
 import type { Conditions } from "../../../common/types.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
-import { featureOn } from "../../util/nativeFeatures.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import addDaysToSchedule from "./addDaysToSchedule.ts";
 import { getRealSchedule } from "./getRealSchedule.football.ts";
 import groupScheduleRealistic, {
@@ -21,6 +21,12 @@ export const realisticScheduleOn = () =>
 	__SPORT === "basketball" &&
 	featureOn("realisticSchedule") &&
 	!g.get("groupScheduleSeries");
+
+// The realisticScheduleDaysPerGame and realisticScheduleAllStarBreak settings, for groupScheduleRealistic
+export const getRealisticScheduleSettings = () => ({
+	daysPerGame: featureOption<number>("realisticScheduleDaysPerGame"),
+	allStarBreakLength: featureOption<number>("realisticScheduleAllStarBreak"),
+});
 
 export type NewScheduleOutput = {
 	tids: [number, number][];
@@ -99,6 +105,7 @@ export const newScheduleWithDays = (
 	const oldNumDays = oldSchedule.at(-1)?.day ?? 1;
 
 	// Marquee Games: holiday days kept light and rivalry games spread out while the schedule is built, then the marquee games placed
+	const settings = getRealisticScheduleSettings();
 	const marqueeOn = marqueeInput !== undefined && marqueeGamesOn();
 	let slates: ReturnType<typeof getHolidaySlates> = [];
 	if (marqueeOn) {
@@ -108,12 +115,16 @@ export const newScheduleWithDays = (
 			counts.set(away, (counts.get(away) ?? 0) + 1);
 		}
 		const maxGames = Math.max(0, ...counts.values());
-		slates = getHolidaySlates(maxGames, getExpectedSeasonLength(maxGames));
+		slates = getHolidaySlates(
+			maxGames,
+			getExpectedSeasonLength(maxGames, settings.daysPerGame),
+		);
 	}
 
 	const realistic = groupScheduleRealistic(tidsWithoutEvents, {
 		allStarGame: allStarGame !== null && allStarGame >= 0 ? allStarGame : null,
 		tradeDeadline: tradeDeadline < 1 ? tradeDeadline : null,
+		...settings,
 		...(marqueeOn
 			? {
 					slates: getSlateCaps(slates, tidsWithoutEvents, marqueeInput),

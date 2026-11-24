@@ -1,5 +1,8 @@
 // Schedule editor: checks on the schedule the user saves, so a broken schedule can't reach the game loop. Returns an
-// error message, or undefined if the schedule is fine.
+// error message, or undefined if the schedule is fine. Shared: the worker runs it on save, the editor's "Validate schedule"
+// panel before saving.
+import { PHASE } from "./constants.ts";
+
 type EditedGame = {
 	day: number;
 	homeTid: number;
@@ -106,3 +109,29 @@ export const validateEditedSchedule = (
 
 	return undefined;
 };
+
+// The options of validateEditedSchedule, from the league's state when the editor was opened (UI) or saved (worker)
+export const getEditedScheduleRules = ({
+	activeTids,
+	allStarGameAlreadyHappened,
+	allStarGameSetting,
+	phase,
+	scheduleHasAllStarGame,
+}: {
+	activeTids: ReadonlySet<number>;
+	allStarGameAlreadyHappened: boolean;
+	// The allStarGame setting
+	allStarGameSetting: number | null;
+	phase: number;
+	// The current (saved) schedule has an All-Star Game, which may stay
+	scheduleHasAllStarGame: boolean;
+}) => ({
+	activeTids,
+	allStarGameAllowed:
+		scheduleHasAllStarGame ||
+		(allStarGameSetting !== null &&
+			allStarGameSetting >= 0 &&
+			!allStarGameAlreadyHappened),
+	// Another one would start the AFTER_TRADE_DEADLINE phase again (play.ts)
+	tradeDeadlineAllowed: phase < PHASE.AFTER_TRADE_DEADLINE,
+});

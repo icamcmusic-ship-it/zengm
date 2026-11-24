@@ -11,9 +11,16 @@
 
 import { createScheduleEditor } from "./scheduleEditor.ts";
 
+// Shared with the schedule editor UI (its "Validate schedule" panel)
+export { getScheduleRestStats } from "../../../common/scheduleRestStats.ts";
+
 // Calendar days per game per team, including the All-Star break and the trade deadline (the last few games usually
-// run a little past this)
-const DAYS_PER_GAME = 2;
+// run a little past this). The default of the realisticScheduleDaysPerGame setting, which can change it within these bounds
+export const DAYS_PER_GAME = 2;
+export const MIN_DAYS_PER_GAME = 1.85;
+export const MAX_DAYS_PER_GAME = 3;
+// The realisticScheduleAllStarBreak setting (0 is by season length)
+export const MAX_ALL_STAR_BREAK_LENGTH = 9;
 
 // Back-to-backs per game, NBA-like: ~14 in 82 games
 const B2B_PER_GAME = 14 / 82;
@@ -85,19 +92,34 @@ export type RealisticScheduleEvents = {
 		priority?: readonly number[];
 	}[];
 	rivals?: ReadonlySet<string>;
+	// The realisticScheduleDaysPerGame and realisticScheduleAllStarBreak settings (default DAYS_PER_GAME, and 0 or missing for
+	// the All-Star break length by season length)
+	daysPerGame?: number;
+	allStarBreakLength?: number;
 };
 
-// Days with no games around the All-Star Game (including its own day), by season length
-export const getAllStarBreakLength = (numGames: number) =>
-	Math.max(1, Math.min(3, Math.round(numGames / 20)));
+// The settings, bounded (a league file could have anything)
+export const boundDaysPerGame = (daysPerGame: number | undefined) =>
+	typeof daysPerGame === "number" && Number.isFinite(daysPerGame)
+		? Math.max(MIN_DAYS_PER_GAME, Math.min(MAX_DAYS_PER_GAME, daysPerGame))
+		: DAYS_PER_GAME;
 
-// The number of days with games (not counting the All-Star break and trade deadline) the season aims for
-export const getTargetNumPlayDays = (numGames: number) =>
-	Math.max(1, Math.round(DAYS_PER_GAME * numGames));
+// Days with no games around the All-Star Game (including its own day): the setting, or by season length if it's 0
+export const getAllStarBreakLength = (numGames: number, setting?: number) =>
+	typeof setting === "number" && setting >= 1
+		? Math.min(MAX_ALL_STAR_BREAK_LENGTH, Math.round(setting))
+		: Math.max(1, Math.min(3, Math.round(numGames / 20)));
+
+// The number of calendar days (including the All-Star break and trade deadline) the season aims for
+export const getTargetNumPlayDays = (numGames: number, daysPerGame?: number) =>
+	Math.max(1, Math.round(boundDaysPerGame(daysPerGame) * numGames));
 
 // About where the season ends (the target and the few days past it the repair pass may use)
-export const getExpectedSeasonLength = (numGames: number) =>
-	getTargetNumPlayDays(numGames) +
+export const getExpectedSeasonLength = (
+	numGames: number,
+	daysPerGame?: number,
+) =>
+	getTargetNumPlayDays(numGames, daysPerGame) +
 	Math.round((REPAIR_EXTRA_DAYS * numGames) / 82);
 
 const groupScheduleRealistic = (
@@ -111,6 +133,9 @@ const groupScheduleRealistic = (
 		index.set(tid, i);
 	}
 	const numTeams = allTids.length;
+	// The rates below are for DAYS_PER_GAME days per game (0.5 games per team per day is on pace there), and scale with the setting
+	const paceScale = DAYS_PER_GAME / boundDaysPerGame(events.daysPerGame);
+	const maxRate = MAX_RATE * paceScale;
 
 	// Remaining matchups, by team index
 	const matchupsByTeam: number[][] = allTids.map(() => []);
@@ -168,17 +193,20 @@ const groupScheduleRealistic = (
 	const numGamesByTeam = [...rem];
 	const maxGames = Math.max(0, ...rem);
 
-	const breakLength = getAllStarBreakLength(maxGames);
+	const breakLength = getAllStarBreakLength(
+		maxGames,
+		events.allStarBreakLength,
+	);
 	const numPlayDaysTarget = Math.max(
 		1,
-		getTargetNumPlayDays(maxGames) -
+		getTargetNumPlayDays(maxGames, events.daysPerGame) -
 			(events.allStarGame !== null ? breakLength : 0) -
 			(events.tradeDeadline !== null ? 1 : 0) +
 			// Marquee Games: the days kept light for a holiday slate (and Christmas Eve) add up to about this many days without games
 			Math.round(
 				(events.slates ?? []).reduce(
 					(sum, { numGames }) =>
-						sum + Math.max(0, 1 - numGames / ((numTeams * MAX_RATE) / 2)),
+						sum + Math.max(0, 1 - numGames / ((numTeams * maxRate) / 2)),
 					0,
 				),
 			),
@@ -408,7 +436,7 @@ const groupScheduleRealistic = (
 			}
 			eligible[t] = 1;
 
-			let s = (need - 0.5) * PACE_WEIGHT + random() * RANDOMNESS;
+			let s = (need - 0.5 * paceScale) * PACE_WEIGHT + random() * RANDOMNESS;
 			const rest = day - last1[t]!;
 			if (rest === 1) {
 				// Back-to-back: not once the team's budget is used
@@ -442,9 +470,10 @@ const groupScheduleRealistic = (
 			}
 		}
 		const expectedGames =
-			Math.min(expectedTeamGames, numActiveTeams * MAX_RATE) / 2;
+			Math.min(expectedTeamGames, numActiveTeams * maxRate) / 2;
 		const behindNeed =
-			numActiveTeams <= 6 ? BEHIND_NEED_SMALL_LEAGUE : BEHIND_NEED;
+			(numActiveTeams <= 6 ? BEHIND_NEED_SMALL_LEAGUE : BEHIND_NEED) *
+			paceScale;
 		let numGamesToday = Math.floor(expectedGames);
 		if (random() < expectedGames - numGamesToday) {
 			numGamesToday += 1;
@@ -572,7 +601,10 @@ const groupScheduleRealistic = (
 	const editor = createScheduleEditor(
 		outTids,
 		outDays,
-		Math.min(lastDay + REPAIR_MAX_EXTENSION, getExpectedSeasonLength(maxGames)),
+		Math.min(
+			lastDay + REPAIR_MAX_EXTENSION,
+			getExpectedSeasonLength(maxGames, events.daysPerGame),
+		),
 	);
 	for (const [day, cap] of slateCap) {
 		editor.dayCap.set(day, cap);
@@ -584,75 +616,6 @@ const groupScheduleRealistic = (
 		tids: repaired.tids,
 		days: repaired.days,
 	};
-};
-
-// Rest stats of a schedule, by team: back-to-backs, 3 games in 4 nights, the longest run of game days and the longest
-// stretch of days without a game (between games)
-export const getScheduleRestStats = (
-	tids: readonly (readonly [number, number])[],
-	days: readonly number[],
-) => {
-	const daysByTid = new Map<number, number[]>();
-	for (const [i, [home, away]] of tids.entries()) {
-		if (home < 0 || away < 0) {
-			continue;
-		}
-		for (const tid of [home, away]) {
-			let list = daysByTid.get(tid);
-			if (!list) {
-				list = [];
-				daysByTid.set(tid, list);
-			}
-			list.push(days[i]!);
-		}
-	}
-
-	const byTid = new Map<
-		number,
-		{
-			numGames: number;
-			b2b: number;
-			threeInFour: number;
-			maxConsecutive: number;
-			maxDaysOff: number;
-			sameDay: number;
-		}
-	>();
-	for (const [tid, list] of daysByTid) {
-		list.sort((a, b) => a - b);
-		let b2b = 0;
-		let threeInFour = 0;
-		let maxConsecutive = list.length > 0 ? 1 : 0;
-		let consecutive = 1;
-		let maxDaysOff = 0;
-		let sameDay = 0;
-		for (let i = 1; i < list.length; i++) {
-			const gap = list[i]! - list[i - 1]!;
-			if (gap === 0) {
-				sameDay += 1;
-			}
-			if (gap === 1) {
-				b2b += 1;
-				consecutive += 1;
-				maxConsecutive = Math.max(maxConsecutive, consecutive);
-			} else {
-				consecutive = 1;
-			}
-			maxDaysOff = Math.max(maxDaysOff, gap - 1);
-			if (i >= 2 && list[i]! - list[i - 2]! <= 3) {
-				threeInFour += 1;
-			}
-		}
-		byTid.set(tid, {
-			numGames: list.length,
-			b2b,
-			threeInFour,
-			maxConsecutive,
-			maxDaysOff,
-			sameDay,
-		});
-	}
-	return byTid;
 };
 
 export default groupScheduleRealistic;
