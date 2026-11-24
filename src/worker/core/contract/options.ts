@@ -121,7 +121,8 @@ export const decideContractOptions = async () => {
 		0,
 		Infinity,
 	]);
-	const userTids = g.get("userTids");
+	// In spectator mode the AI runs the user's teams, so their options are no one's missed decision
+	const userTids = g.get("spectator") ? [] : g.get("userTids");
 
 	for (const p of players) {
 		const pending = getPendingOption(p, season);
