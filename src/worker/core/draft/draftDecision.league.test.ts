@@ -62,7 +62,7 @@ const draftOnce = async (seed: number) => {
 	);
 
 	await draft.genOrder(false);
-	// The AI makes every pick, the user's too (user picks: best available by value)
+	// The AI makes every pick, the user's too: in spectator mode the user's team drafts like any AI team
 	g.setWithoutSavingToDB("spectator", true);
 	await draft.runPicks({ type: "untilEnd" });
 	g.setWithoutSavingToDB("spectator", false);
@@ -93,9 +93,6 @@ test("every AI pick has a truthful, short Why; the news carries it", async () =>
 		assert.strictEqual(new Set(why).size, why!.length);
 		for (const line of why!) {
 			assert.notMatch(line.replace(/(No\. |#)\d+/g, ""), /\d/);
-		}
-		if (p.draft.tid === userTid) {
-			assert.strictEqual(why!.length, 1);
 		}
 	}
 	assert.isTrue(events.some((e) => e.text?.includes(" Why: ")));

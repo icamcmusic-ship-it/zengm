@@ -100,7 +100,7 @@ const writeRecords = async (records: RivalryGame[]) => {
 	// added to the season counts a second time
 	const fresh: RivalryGame[] = [];
 	for (const rec of records) {
-		if ((await games.getKey(rec.gid)) === undefined) {
+		if ((await games.get(rec.gid)) === undefined) {
 			fresh.push(rec);
 		}
 	}

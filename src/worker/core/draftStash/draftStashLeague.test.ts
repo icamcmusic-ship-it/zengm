@@ -18,6 +18,7 @@ import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
 import { getStashedPlayers } from "./index.ts";
+import { getContractDemand } from "../contract/index.ts";
 
 const realRandom = Math.random;
 afterAll(() => {
@@ -42,6 +43,20 @@ const fixUserRoster = async () => {
 	players.sort((a, b) => a.value - b.value);
 	while (players.length > g.get("maxRosterSize")) {
 		await player.release(players.shift()!, false);
+	}
+	// And up to the minimum, so the season can be played whatever the offseason left him
+	if (players.length < g.get("minRosterSize")) {
+		const freeAgentsList = await idb.cache.players.indexGetAll(
+			"playersByTid",
+			PLAYER.FREE_AGENT,
+		);
+		freeAgentsList.sort((a, b) => b.value - a.value);
+		while (players.length < g.get("minRosterSize")) {
+			const p = freeAgentsList.shift() ?? (await player.genRandomFreeAgent());
+			await player.sign(p, tid, getContractDemand(p), g.get("phase"));
+			await idb.cache.players.put(p);
+			players.push(p);
+		}
 	}
 };
 
