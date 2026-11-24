@@ -6,6 +6,9 @@ import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { range } from "../../../common/utils.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import { idb } from "../../db/index.ts";
+import { PLAYER } from "../../../common/constants.ts";
+import { getSkillBadgesForRow } from "./format.ts";
+import type { Player } from "../../../common/types.ts";
 import {
 	getTieredBadgeCutoffs,
 	simTiers,
@@ -17,6 +20,7 @@ import {
 	TIERED_BADGES,
 	badgePointCap,
 	badgePoints,
+	badgeToken,
 	entryForSeason,
 } from "../../../common/tieredBadges/index.ts";
 
@@ -140,6 +144,35 @@ describe("2K Badges in a league", () => {
 		for (const b of hidden.nextUp) {
 			assert.isUndefined(b.progress);
 			assert.isUndefined(b.score);
+		}
+	});
+
+	test("a draft prospect's pills are the badges his player page shows (traits as scouted included)", async () => {
+		const original = Math.random;
+		Math.random = makeSeededRandom(7);
+		g.setWithoutSavingToDB("playerTraits" as any, true);
+		try {
+			let compared = 0;
+			for (let i = 0; i < 60; i++) {
+				const p = player.generate(
+					PLAYER.UNDRAFTED,
+					19,
+					2026,
+					false,
+					DEFAULT_LEVEL,
+				) as Player;
+				await player.develop(p, 0);
+				p.pid = 100_000 + i;
+				const pills = getSkillBadgesForRow(p, p.ratings.at(-1)!)!;
+				const info = await tieredBadgesForPlayer(p, false);
+				const page = (info?.earned ?? []).map((b) => badgeToken(b.key, b.tier));
+				assert.deepStrictEqual(pills, page, `prospect ${i}`);
+				compared += page.length;
+			}
+			assert.isAbove(compared, 0);
+		} finally {
+			Math.random = original;
+			g.setWithoutSavingToDB("playerTraits" as any, false);
 		}
 	});
 });

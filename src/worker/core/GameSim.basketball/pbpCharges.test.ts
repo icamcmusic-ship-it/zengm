@@ -112,7 +112,9 @@ for (const flavor of [true, false]) {
 					assert.isAtLeast(pf, 1, where);
 					assert.match(
 						text,
-						flavor ? new RegExp(`\\bP${pf}\\b`) : new RegExp(`\\(${pf} PF\\)`),
+						flavor
+							? new RegExp(String.raw`\bP${pf}\b`)
+							: new RegExp(String.raw`\(${pf} PF\)`),
 						where,
 					);
 					assert.strictEqual(box.possession, ev.t === 0 ? 1 : 0, where);
