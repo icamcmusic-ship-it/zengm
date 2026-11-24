@@ -46,6 +46,7 @@ import { featureOn } from "../../util/nativeFeatures.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { earlyCombineRead } from "../frontOffice/index.ts";
 import { subRatingsOn } from "../player/subRatings.ts";
+import { applyFuzz } from "../player/fuzzRating.ts";
 import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
 
 type PlayerRatings = Player["ratings"][number] & Record<string, any>;
@@ -80,9 +81,12 @@ export const combineRatingsRow = (p: Player): PlayerRatings | undefined => {
 	return out ?? p.ratings[0];
 };
 
-// Projected draft stock from his combine-time ratings, for the invite list and who skips the drills
+// Projected draft stock from his combine-time ratings as scouted (his row's fuzz, also in God Mode so the order never changes with
+// it), for the invite list and who skips the drills: who is invited is public, so it never gives away true ratings
 const stock = (p: Player, r: PlayerRatings) =>
-	r.pot + 0.5 * r.ovr - 1.5 * (p.draft.year - p.born.year - 19);
+	applyFuzz(r.pot, r.fuzz ?? 0) +
+	0.5 * applyFuzz(r.ovr, r.fuzz ?? 0) -
+	1.5 * (p.draft.year - p.born.year - 19);
 
 // Sub-ratings (setting on): the subs the drills measure
 const combineSubs = (r: PlayerRatings) => {
