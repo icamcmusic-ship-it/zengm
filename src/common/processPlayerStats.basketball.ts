@@ -31,6 +31,9 @@ const straightThrough = new Set([
 	"td",
 	"qd",
 	"fxf",
+	// Technical and flagrant fouls: season counts, not per game
+	"tf",
+	"ff",
 	"pm100",
 	"onOff100",
 	"jerseyNumber",
