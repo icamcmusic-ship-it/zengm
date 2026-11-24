@@ -135,21 +135,29 @@ const playAmount = async (
 	}
 
 	if (g.get("phase") <= PHASE.PLAYOFFS) {
+		// College mode: conference tournament games are scheduled one day at a time
+		const collegeConfTournament =
+			isCollege() && g.get("phase") === PHASE.AFTER_TRADE_DEADLINE;
+
+		// A week is 7 calendar days, even if some of them have no games (realistic schedule length's All-Star break). Converted
+		// to days with games before the cap below, which counts days with games
+		if (
+			g.get("phase") !== PHASE.PLAYOFFS &&
+			!collegeConfTournament &&
+			numDays > 1
+		) {
+			numDays = await getNumGameDaysInCalendarDays(numDays);
+		}
+
 		const numDaysRemaining =
 			g.get("phase") === PHASE.PLAYOFFS
 				? await getNumDaysPlayoffs()
-				: isCollege() && g.get("phase") === PHASE.AFTER_TRADE_DEADLINE
-					? // College mode: conference tournament games are scheduled one day at a time
-						COLLEGE_CONF_TOURNAMENT_MAX_DAYS
+				: collegeConfTournament
+					? COLLEGE_CONF_TOURNAMENT_MAX_DAYS
 					: await season.getDaysLeftSchedule();
 
 		if (numDaysRemaining < numDays) {
 			numDays = numDaysRemaining;
-		}
-
-		// A week is 7 calendar days, even if some of them have no games (realistic schedule length's All-Star break)
-		if (g.get("phase") !== PHASE.PLAYOFFS && numDays > 1) {
-			numDays = await getNumGameDaysInCalendarDays(numDays);
 		}
 
 		await game.play(numDays, conditions);
@@ -167,6 +175,28 @@ const playAmount = async (
 			await phase.newPhase(PHASE.PRESEASON, conditions);
 		}
 	}
+};
+
+// Play until the All-Star Game or the trade deadline, if it's still on the schedule (getDaysLeftSchedule throws otherwise,
+// e.g. after the trade deadline)
+const playUntilEvent = async (
+	event: "allStarGame" | "tradeDeadline",
+	conditions: Conditions,
+) => {
+	if (g.get("phase") >= PHASE.PLAYOFFS) {
+		return;
+	}
+	const [homeTid, awayTid] = event === "allStarGame" ? [-1, -2] : [-3, -3];
+	const schedule = await season.getSchedule();
+	if (
+		!schedule.some(
+			(game) => game.homeTid === homeTid && game.awayTid === awayTid,
+		)
+	) {
+		return;
+	}
+	const numDays = await season.getDaysLeftSchedule(event);
+	await game.play(numDays, conditions);
 };
 
 const playStop = async () => {
@@ -195,16 +225,10 @@ const playMenu = {
 		await playAmount("month", conditions);
 	},
 	untilAllStarGame: async (param: unknown, conditions: Conditions) => {
-		if (g.get("phase") < PHASE.PLAYOFFS) {
-			const numDays = await season.getDaysLeftSchedule("allStarGame");
-			game.play(numDays, conditions);
-		}
+		await playUntilEvent("allStarGame", conditions);
 	},
 	untilTradeDeadline: async (param: unknown, conditions: Conditions) => {
-		if (g.get("phase") < PHASE.PLAYOFFS) {
-			const numDays = await season.getDaysLeftSchedule("tradeDeadline");
-			game.play(numDays, conditions);
-		}
+		await playUntilEvent("tradeDeadline", conditions);
 	},
 	untilPlayoffs: async (param: unknown, conditions: Conditions) => {
 		if (g.get("phase") < PHASE.PLAYOFFS) {
