@@ -14,7 +14,12 @@ import { shuffle } from "../../../common/random.ts";
 import { player } from "../index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { isRedshirting } from "../college/redshirt.ts";
-import { castVotes, selectFromVotes, type VoteCandidate } from "./vote.ts";
+import {
+	castVotes,
+	selectFromVotes,
+	slotsFor,
+	type VoteCandidate,
+} from "./vote.ts";
 import { courtOf, dunkTalent, threeTalent, weekendRandom } from "./weekend.ts";
 import { pickRisingStars } from "./risingStars.ts";
 import { pickSkillsField } from "./skills.ts";
@@ -193,19 +198,53 @@ export const getAllStarCandidates = async () => {
 		showNoStats: true,
 	});
 
-	const score = (p: (typeof players)[number]) =>
-		bySport({
+	// Basketball: games his team has played, for the games minimum and the per-game part of the score
+	const teamGpByTid = new Map<number, number>();
+	let maxTeamGp = 0;
+	if (__SPORT === "basketball") {
+		const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
+			"teamSeasonsBySeasonTid",
+			[[g.get("season")], [g.get("season"), "Z"]],
+		);
+		for (const ts of teamSeasons) {
+			const teamGp = ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0);
+			teamGpByTid.set(ts.tid, teamGp);
+			maxTeamGp = Math.max(maxTeamGp, teamGp);
+		}
+	}
+
+	// Basketball: has he played MIN_GP_FRAC of his team's games (once teams have played 10)? Those who haven't come after
+	// everyone who has, only picked if the league runs out of players
+	const meetsMinGp = (p: (typeof players)[number]) =>
+		__SPORT !== "basketball" ||
+		maxTeamGp < 10 ||
+		(p.stats.gp ?? 0) >= MIN_GP_FRAC * (teamGpByTid.get(p.tid) ?? 0);
+
+	const score = (p: (typeof players)[number]) => {
+		if (__SPORT === "basketball") {
+			// Value (2.5 x EWA + win shares) half as this season's total, half per game over his team's games, so a clearly
+			// elite player who missed some games isn't buried by players who compiled more minutes
+			const value = 2.5 * (p.stats.ewa ?? 0) + (p.stats.ws ?? 0);
+			const gp = p.stats.gp ?? 0;
+			const teamGp = teamGpByTid.get(p.tid) ?? 0;
+			if (gp > 0 && teamGp > 0 && meetsMinGp(p)) {
+				return 0.5 * value + 0.5 * (value / gp) * Math.max(gp, teamGp);
+			}
+			return value;
+		}
+		return bySport({
 			baseball: p.stats.war ?? 0,
 			football: mvpScore({ currentStats: getCurrentStats(p.stats) }),
-			basketball: 2.5 * (p.stats.ewa ?? 0) + (p.stats.ws ?? 0),
+			basketball: 0,
 			hockey: p.stats.ps ?? 0,
 		});
+	};
 
 	// pid last, so equal players always come out in the same order
 	return orderBy(
 		players,
-		[score, (p) => p.ratings.ovr, (p) => p.pid],
-		["desc", "desc", "asc"],
+		[(p) => (meetsMinGp(p) ? 1 : 0), score, (p) => p.ratings.ovr, (p) => p.pid],
+		["desc", "desc", "desc", "asc"],
 	);
 };
 
@@ -585,11 +624,41 @@ const create = async (conditions: Conditions) => {
 				return false;
 			},
 			basketball: () => {
+				// A light court balance, the vote's slot minimums (4 backcourt and 6 frontcourt of 12 a team with 5 on the
+				// court), the rest by value. A player at a court that's already filled its share waits, and is picked after all
+				// if the other court runs out of players
+				const slots = slotsFor(allStarNum, g.get("numPlayersOnCourt"));
+				const minByCourt = {
+					backcourt: numTeams * (slots.startersBack + slots.reservesBack),
+					frontcourt: numTeams * (slots.startersFront + slots.reservesFront),
+				};
+				const countByCourt = { backcourt: 0, frontcourt: 0 };
+				const deferred: typeof candidates = [];
 				for (const p of candidates) {
-					addPlayer(p);
+					const court = courtOf(p.ratings.pos);
+					const other = court === "backcourt" ? "frontcourt" : "backcourt";
+					const otherNeeded = Math.max(
+						0,
+						minByCourt[other] - countByCourt[other],
+					);
+					if (numPlayersNeeded - count <= otherNeeded) {
+						deferred.push(p);
+						continue;
+					}
+					if (addPlayer(p)) {
+						countByCourt[court] += 1;
+					}
 
 					if (count >= numPlayersNeeded) {
 						// Success!
+						return true;
+					}
+				}
+
+				for (const p of deferred) {
+					addPlayer(p);
+
+					if (count >= numPlayersNeeded) {
 						return true;
 					}
 				}
