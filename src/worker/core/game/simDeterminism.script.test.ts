@@ -23,6 +23,10 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers, lock } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import { recordsCheckNow } from "../../util/recordsBookData.ts";
+import {
+	cancelLeagueAchievementsCheck,
+	checkLeagueAchievements,
+} from "../../util/leagueAchievements.ts";
 
 const env = (globalThis as any).process.env;
 const SEEDS: number[] = String(env.SIM_DET_SEEDS ?? "1")
@@ -38,6 +42,10 @@ const drain = async () => {
 		await new Promise((resolve) => setTimeout(resolve, 0));
 	}
 	await recordsCheckNow();
+	// League achievements are checked the same way (a debounced timer, 1.5 s after games and phase changes, later while the sim is busy,
+	// so with a faster sim it could land in another stage): checked here instead
+	cancelLeagueAchievementsCheck();
+	await checkLeagueAchievements();
 };
 
 const hashOf = (str: string) => {

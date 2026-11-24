@@ -139,6 +139,16 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 		);
 		await league.loadGameAttributes();
 		await mark("create");
+		// SIM_BENCH_CREATE_ONLY=1: only the new league (league creation timings)
+		if (env.SIM_BENCH_CREATE_ONLY) {
+			const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, createOnly: true, times, cpu })}`;
+			console.log(line);
+			await stopProf();
+			if (env.SIM_BENCH_OUT) {
+				appendFileSync(env.SIM_BENCH_OUT, `${line}\n`);
+			}
+			return;
+		}
 
 		// SIM_BENCH_VIEWS=1: also time the heavy views' first loads (and a second load) at a few points. Views can store things
 		// (caches), so leave it off when comparing hashes
@@ -161,6 +171,9 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 				["powerRankings", {}],
 				["playerRatings", {}],
 				["standings", {}],
+				["mockDraft", {}],
+				["bigBoards", {}],
+				["roster", {}],
 			];
 			for (const [id, params] of list) {
 				for (const run of ["1", "2"]) {
