@@ -64,6 +64,7 @@ const agingContext = (p: AgingPlayer) => {
 	const base = p.faceAging?.b;
 	return {
 		seed: p.pid,
+		familySeed: p.faceAging?.gs,
 		born: p.born.year,
 		minutes: careerMinutes(p),
 		weight: p.weight,
@@ -226,7 +227,11 @@ export const faceAgingOnCustomize = (
 	season: number,
 ) => {
 	if (!p.imgURL && p.face?.hair && isFreshFace(p)) {
+		const gs = prev?.faceAging?.gs ?? p.faceAging?.gs;
 		p.faceAging = freshFaceAging(p.face);
+		if (gs !== undefined) {
+			p.faceAging.gs = gs;
+		}
 		return true;
 	}
 	// "Reset to generated face": his generated fields back, unlocked, his history kept, and aged back to now on save (unless
@@ -250,6 +255,9 @@ export const faceAgingOnCustomize = (
 				}
 			}
 			p.faceAging = { b: generated, h };
+			if (prev?.faceAging?.gs !== undefined) {
+				p.faceAging.gs = prev.faceAging.gs;
+			}
 			return true;
 		}
 	}

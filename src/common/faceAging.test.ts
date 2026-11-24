@@ -5,6 +5,8 @@ import {
 	agedFields,
 	extractAgingFields,
 	faceAgingAfterEdit,
+	faceGenes,
+	familyFaceGenes,
 	faceForSeason,
 	faceHistory,
 	facialHairTier,
@@ -199,5 +201,52 @@ describe("faceAging", () => {
 				expect(svg).toContain(aged.bc);
 			}
 		}
+	});
+});
+
+describe("family resemblance", () => {
+	test("no family seed: his own genes, unchanged", () => {
+		for (let seed = 0; seed < 50; seed++) {
+			expect(familyFaceGenes(seed)).toEqual(faceGenes(seed));
+			expect(familyFaceGenes(seed, seed)).toEqual(faceGenes(seed));
+		}
+	});
+
+	test("relatives share hair loss and greying far more often than strangers", () => {
+		const n = 2000;
+		let sameLossFamily = 0;
+		let sameLossStrangers = 0;
+		let greyFamily = 0;
+		let greyStrangers = 0;
+		for (let i = 0; i < n; i++) {
+			const father = faceGenes(100000 + i);
+			const son = familyFaceGenes(200000 + i, 100000 + i);
+			const stranger = faceGenes(300000 + i);
+			const bald = (x: number) => x > 0.5;
+			sameLossFamily += bald(son.hairLoss) === bald(father.hairLoss) ? 1 : 0;
+			sameLossStrangers +=
+				bald(stranger.hairLoss) === bald(father.hairLoss) ? 1 : 0;
+			greyFamily += Math.abs(son.greyStart - father.greyStart) <= 2 ? 1 : 0;
+			greyStrangers +=
+				Math.abs(stranger.greyStart - father.greyStart) <= 2 ? 1 : 0;
+			// The rest of his genes are his own
+			expect(son.eyeLine).toBe(faceGenes(200000 + i).eyeLine);
+		}
+		expect(sameLossFamily / n).toBeGreaterThan(sameLossStrangers / n + 0.15);
+		expect(greyFamily / n).toBeGreaterThan(greyStrangers / n + 0.3);
+	});
+
+	test("the family seed reaches aging", () => {
+		const base = extractAgingFields(makeFace(3));
+		let differ = 0;
+		for (let seed = 0; seed < 40; seed++) {
+			const ctx = { seed, age: 50, born: 1950 };
+			const own = agedFields(base, ctx, OPTIONS);
+			const fam = agedFields(base, { ...ctx, familySeed: 999 }, OPTIONS);
+			if (own.hc !== fam.hc || own.hi !== fam.hi) {
+				differ += 1;
+			}
+		}
+		expect(differ).toBeGreaterThan(10);
 	});
 });

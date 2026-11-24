@@ -11,6 +11,7 @@
 //   rebuilt (faceForSeason) without storing whole faces
 // - s: last season aged; e: face edited by the user (locked from aging unless a: "allow aging" ticked)
 // - g: the generated fields once an edit has replaced b (Customize Player's "Reset to generated face")
+// - gs: family seed (relatives share hair loss and greying genes)
 import type { FaceConfig } from "facesjs";
 import {
 	facialHairTier,
@@ -56,6 +57,8 @@ export type FaceAging = {
 	g?: FaceAgingFields;
 	// Sent by Customize Player's "Reset to generated face" (never stored)
 	r?: 1;
+	// Family seed (a father's or brother's seed): hair loss and greying run in the family (familyFaceGenes)
+	gs?: number | string;
 };
 
 export type FaceAgingOptions = {
@@ -338,6 +341,37 @@ export const faceGenes = (seed: number | string): FaceGenes => {
 	};
 };
 
+// With a family seed (faceAging.gs: a father's or brother's seed, shared down the family), hair loss and greying run in the
+// family: 70% of the time each takes after the family's genes (faceGenes of the family seed, so the relative it came from has
+// exactly them), within a couple of years of its onsets; the rest of his genes are his own
+export const FAMILY_INHERIT = 0.7;
+export const familyFaceGenes = (
+	seed: number | string,
+	family?: number | string,
+): FaceGenes => {
+	const own = faceGenes(seed);
+	if (family === undefined || family === seed) {
+		return own;
+	}
+	const fam = faceGenes(family);
+	const r = seededRandom("faceGenesFamily", seed, family);
+	const hairDraw = r();
+	const hairShift = Math.floor(r() * 5) - 2;
+	const greyDraw = r();
+	const greyShift = Math.floor(r() * 5) - 2;
+	const out = { ...own };
+	if (hairDraw < FAMILY_INHERIT) {
+		out.hairLoss = fam.hairLoss;
+		out.hairLossOnset = clamp(fam.hairLossOnset + hairShift, 26, 35);
+		out.widowsPeak = fam.widowsPeak;
+	}
+	if (greyDraw < FAMILY_INHERIT) {
+		out.greyStart = clamp(fam.greyStart + greyShift, 32, 43);
+		out.greySpan = fam.greySpan;
+	}
+	return out;
+};
+
 const speedFactor = (speed: FaceAgingOptions["speed"]) =>
 	speed === "subtle" ? 0.6 : speed === "strong" ? 1.5 : 1;
 
@@ -346,6 +380,8 @@ const speedFactor = (speed: FaceAgingOptions["speed"]) =>
 
 export type AgeContext = {
 	seed: number | string;
+	// faceAging.gs: hair loss and greying genes shared with his family
+	familySeed?: number | string;
 	age: number;
 	// Birth year, for the per-season draws (season = born + age)
 	born: number;
@@ -527,7 +563,7 @@ export const agedFields = (
 	ctx: AgeContext,
 	options: FaceAgingOptions = DEFAULT_FACE_AGING_OPTIONS,
 ): FaceAgingFields => {
-	const genes = faceGenes(ctx.seed);
+	const genes = familyFaceGenes(ctx.seed, ctx.familySeed);
 	const factor = speedFactor(options.speed);
 	const age = ctx.age;
 	const edited = ctx.baseAge !== undefined;
@@ -795,6 +831,9 @@ export const faceAgingAfterEdit = (
 	const generated = generatedBase(aging);
 	if (generated) {
 		out.g = generated;
+	}
+	if (aging?.gs !== undefined) {
+		out.gs = aging.gs;
 	}
 	return out;
 };
