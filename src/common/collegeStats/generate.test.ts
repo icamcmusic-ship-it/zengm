@@ -116,7 +116,10 @@ describe("generateCollegeClass", () => {
 		for (const result of results) {
 			for (const season of result.seasons) {
 				const s = season.stats;
-				for (const key of [...stats.raw, ...stats.derived]) {
+				// (Technical and flagrant fouls aren't simulated for pre-draft seasons)
+				for (const key of [...stats.raw, ...stats.derived].filter(
+					(key) => key !== "tf" && key !== "ff",
+				)) {
 					assert(
 						Number.isFinite(s[key]),
 						`${key} is not a finite number: ${s[key]}`,

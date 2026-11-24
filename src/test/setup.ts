@@ -22,6 +22,30 @@ Math.random = (globalThis as any)[NATIVE_RANDOM];
 // it's set (idb.merged, getPlayersOfDraftYear, ...) see that other league's players. (Imported here, after every setup file,
 // since importing the worker's db before src/worker/index.ts breaks the import order)
 beforeAll(async () => {
+	// And IndexedDB itself: some files install fake-indexeddb's globals and delete them when they finish (db/migrations,
+	// db/merged, newPhaseDraft, ...), which left every later file in the same worker that imported "fake-indexeddb/auto"
+	// (a module that only runs once per worker) without indexedDB or IDBDatabase. Put back whatever is missing
+	const fakeIndexedDB: any = await import("fake-indexeddb");
+	for (const name of [
+		"IDBCursor",
+		"IDBCursorWithValue",
+		"IDBDatabase",
+		"IDBIndex",
+		"IDBKeyRange",
+		"IDBObjectStore",
+		"IDBOpenDBRequest",
+		"IDBRequest",
+		"IDBTransaction",
+		"IDBVersionChangeEvent",
+	]) {
+		if ((globalThis as any)[name] === undefined && fakeIndexedDB[name]) {
+			(globalThis as any)[name] = fakeIndexedDB[name];
+		}
+	}
+	if ((globalThis as any).indexedDB === undefined) {
+		(globalThis as any).indexedDB = new fakeIndexedDB.IDBFactory();
+	}
+
 	const { idb } = await import("../worker/db/index.ts");
 	// (closed first, so the next league made with the same lid deletes and recreates its database instead of waiting on this
 	// connection, and stop the old cache's automatic flushes, which would write into whatever league is open next)
