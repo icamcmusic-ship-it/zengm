@@ -211,6 +211,7 @@ import {
 	roleFactor,
 	startersOut,
 	usageForm,
+	benchCool,
 	usageRanks,
 } from "./breakout.ts";
 import {
@@ -3440,7 +3441,8 @@ class GameSim extends GameSimBase {
 					? S.tier[0]! + S.firstAbility * (s.ability - 0.5)
 					: S.tier[rank]!) *
 				(rank >= 3 ? s.roleForce : 1) *
-				(this.bigGame && p.stat.gs === 0 ? S.playoffBench : 1);
+				(this.bigGame && p.stat.gs === 0 ? S.playoffBench : 1) *
+				(this.breakout ? benchCool(p.stat.gs, p.stat.pts) : 1);
 			this.ssRole[i] = role;
 			this.ssPlan[i] = s.plan;
 			const huntMult = hunt[i]!;

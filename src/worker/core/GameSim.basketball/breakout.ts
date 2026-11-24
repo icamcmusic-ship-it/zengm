@@ -59,6 +59,10 @@ export const BREAKOUT = {
 	closerHot: 0.15,
 	closerPts: 16,
 	closerEff: 1.2,
+	// The defense keys on a hot bench player (gs 0): past benchCoolPts points tonight his shooter-draw weight × 1 / (1 + benchCoolK ×
+	// (points − benchCoolPts) / 5), so big bench nights stay rare
+	benchCoolPts: 14,
+	benchCoolK: 0, // (0: off until tuned)
 	// Calibration: taken off the make probability of every shot from the shooter draw (more of the shots now go to whoever is shooting
 	// well tonight, so league FG% and 3P% would go up)
 	makeCal: 0.0045,
@@ -177,6 +181,12 @@ export const matchupOpening = (
 		finisher * ((B.intRef - def.int) / B.intSpan);
 	return 1 + B.matchK * rf * clamp(edge, -0.5, 1);
 };
+
+// A bench player's shooter-draw multiplier once he's scoring a lot tonight (1 for a starter, or below benchCoolPts)
+export const benchCool = (gs: number, pts: number) =>
+	gs !== 0 || pts <= BREAKOUT.benchCoolPts
+		? 1
+		: 1 / (1 + (BREAKOUT.benchCoolK * (pts - BREAKOUT.benchCoolPts)) / 5);
 
 // Points per shot so far (FGA + 0.44 FTA)
 export const ptsPerShot = (stat: { pts: number; fga: number; fta: number }) =>
