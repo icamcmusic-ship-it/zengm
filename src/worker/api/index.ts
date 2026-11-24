@@ -330,7 +330,12 @@ import {
 	importLinkedCollegeClass,
 	setLinkedCollege,
 } from "../core/draft/linkedCollege.ts";
-import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
+import {
+	getEditedScheduleSpread,
+	getScheduleDayScale,
+} from "../core/season/scheduleDayScale.ts";
+import { validateEditedSchedule } from "../core/season/validateEditedSchedule.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 import { faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
 import { getSidebarCounts } from "../util/sidebarCounts.ts";
@@ -4018,7 +4023,16 @@ const regenerateAllDraftClasses = async (
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 };
 
+// Marquee Games: the last schedule made by regenerateSchedule, with temporary gids, so saving it from the editor keeps the tags of
+// the games the user didn't change (fixEditedScheduleTags matches games by gid)
+let lastRegeneratedSchedule: ScheduleGameWithoutKey[] | undefined;
+
 const regenerateSchedule = async (param: unknown, conditions: Conditions) => {
+	// College mode makes its own schedule (rounds, the season's poll weeks and conference tournaments), not this one
+	if (isCollege()) {
+		throw new Error("The schedule can't be regenerated in college mode.");
+	}
+
 	const teams = await team.getFormattedAll({
 		attrs: ["tid"],
 		seasonAttrs: ["cid", "did", "abbrev"],
@@ -4026,7 +4040,15 @@ const regenerateSchedule = async (param: unknown, conditions: Conditions) => {
 		active: true,
 	});
 
-	const { tids, days } = season.newScheduleWithDays(teams, conditions);
+	// Same as newPhaseRegularSeason
+	const marqueeInput = season.marqueeGamesOn()
+		? await season.getMarqueeInput(teams.map((t) => t.tid))
+		: undefined;
+	const { tids, days, marquee } = season.newScheduleWithDays(
+		teams,
+		conditions,
+		marqueeInput,
+	);
 
 	const schedule = season.addDaysToSchedule(
 		tids.map(([homeTid, awayTid]) => ({
@@ -4036,6 +4058,17 @@ const regenerateSchedule = async (param: unknown, conditions: Conditions) => {
 		undefined,
 		days,
 	);
+	for (const [i, game] of schedule.entries()) {
+		game.gid = -1 - i;
+		const tags = marquee?.[i];
+		if (tags?.marquee !== undefined) {
+			game.marquee = tags.marquee;
+		}
+		if (tags?.rivalry) {
+			game.rivalry = true;
+		}
+	}
+	lastRegeneratedSchedule = schedule;
 
 	return formatScheduleForEditor(schedule, teams, []);
 };
@@ -6716,6 +6749,30 @@ const setScheduleFromEditor = async ({
 	regenerated: boolean;
 	schedule: View<"scheduleEditor">["schedule"];
 }) => {
+	// Check the edited schedule before saving anything: the game loop assumes each team plays at most once a day and the
+	// All-Star Game and trade deadline are alone on their days
+	const scheduleBefore = await idb.cache.schedule.getAll();
+	const allStarGameSetting = g.get("allStarGame");
+	const allStarGameAllowed =
+		scheduleBefore.some((game) => game.homeTid === -1 && game.awayTid === -2) ||
+		(allStarGameSetting !== null &&
+			allStarGameSetting >= 0 &&
+			!(await idb.cache.allStars.get(g.get("season"))));
+	const activeTids = new Set(
+		(await idb.cache.teams.getAll())
+			.filter((t) => !t.disabled)
+			.map((t) => t.tid),
+	);
+	const errorMessage = validateEditedSchedule(schedule, {
+		activeTids,
+		allStarGameAllowed,
+		// Another one would start the AFTER_TRADE_DEADLINE phase again (play.ts)
+		tradeDeadlineAllowed: g.get("phase") < PHASE.AFTER_TRADE_DEADLINE,
+	});
+	if (errorMessage !== undefined) {
+		throw new Error(errorMessage);
+	}
+
 	if (regenerated) {
 		// It's the regular season with 0 games played and we're allowed to regenerate the schedule (see canRegenerateSchedule). In that case, season.newSchedule uses the latest settings for numGames/numGamesConf/numGamesDiv/divs, both because that's what the user would want (tweaking schedule settings) and because numGamesConf/numGamesDiv are currently not wrapped. So if we know numGames or divs has changed for next season, we need to update the setting for those (and also confs for consistency) to apply to this season.
 		// Originally I added this so updateClinchedPlayoffs would work correctly, but now updateClinchedPlayoffs uses the actual upcoming schedule rather than (numGames - GP) so this shouldn't affect that now. TBH I'm not sure if this matters for other things, but probably it does for something at least!
@@ -6749,24 +6806,27 @@ const setScheduleFromEditor = async ({
 	}
 
 	// Marquee Games: tags of games whose teams or holiday day were edited no longer apply
-	const scheduleBefore = await idb.cache.schedule.getAll();
 	const edited = fixEditedScheduleTags(
 		schedule
 			.filter(
 				(game) => game.type !== "placeholder" && game.type !== "completed",
 			)
 			.map((game) => ({ ...game })),
-		scheduleBefore,
+		regenerated && lastRegeneratedSchedule
+			? lastRegeneratedSchedule
+			: scheduleBefore,
 	);
+	lastRegeneratedSchedule = undefined;
 
 	await idb.cache.schedule.clear();
 	await idb.cache.schedule.addAll(
 		edited.map((game) => omit(game, ["gid", "type"])),
 	);
 
-	// Realistic schedule length: keep the daily processes calibrated to the edited schedule
+	// Realistic schedule length: keep the daily processes and the rest days calibrated to the edited schedule, like
+	// newPhaseRegularSeason does (which leaves both alone in college mode)
 	if (
-		(g.get("scheduleDayScale") < 1 || season.realisticScheduleOn()) &&
+		!isCollege() &&
 		(g.get("phase") === PHASE.REGULAR_SEASON ||
 			g.get("phase") === PHASE.AFTER_TRADE_DEADLINE)
 	) {
@@ -6775,6 +6835,13 @@ const setScheduleFromEditor = async ({
 		);
 		if (dayScale !== g.get("scheduleDayScale")) {
 			await league.setGameAttributes({ scheduleDayScale: dayScale });
+		}
+		const spread = getEditedScheduleSpread(
+			dayScale,
+			season.realisticScheduleOn(),
+		);
+		if (g.get("scheduleSpread") !== spread) {
+			await league.setGameAttributes({ scheduleSpread: spread });
 		}
 	}
 
