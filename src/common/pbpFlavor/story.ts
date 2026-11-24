@@ -36,12 +36,18 @@ export const PBP_TRAIT_KEYS = [
 ] as const;
 // Stored after the 14 ratings and the temper (store.ts version 4). Never reorder; add new keys at the end. "former": he has played for the
 // other team (worker/util/pbpGameContext.ts). "lft": his shooting hand (common/shootingHand.ts), 1 left, 0 right; missing in games stored
-// before it (a count of keys comes first, so those still decode)
+// before it (a count of keys comes first, so those still decode). Then a few of his 2K badges' tiers as the user sees them (PBP_BADGE_KEYS)
+export const PBP_BADGE_KEYS = {
+	limitlessRange: "btLim",
+	rimProtector: "btRim",
+	deadeye: "btDead",
+} as const;
 export const EXTRA_KEYS = [
 	...PBP_EXPANDED_KEYS,
 	...PBP_TRAIT_KEYS,
 	"former",
 	"lft",
+	...Object.values(PBP_BADGE_KEYS),
 ] as const;
 type ExtraKey = (typeof EXTRA_KEYS)[number];
 
@@ -178,7 +184,8 @@ export type StoryKind =
 	| "closer"
 	| "garbage"
 	| "benchMob"
-	| "system";
+	| "system"
+	| "badge";
 
 export type StoryEnv = {
 	idx: number;
@@ -240,6 +247,8 @@ export class StoryNotes {
 	private lastIdx = -100;
 	private count = 0;
 	private orb = new Map<number, number>();
+	// blocks at the rim, by blocker (the Rim Protector badge)
+	private rimBlocks = new Map<number, number>();
 	private garbage = false;
 	// players who came in after garbage time started
 	private garbageSubs = new Set<number>();
@@ -776,6 +785,9 @@ export class StoryNotes {
 		if (!this.room(env.idx, pid)) {
 			return;
 		}
+		if (this.onBadgeShot(rng, env, p, three, tags, shot)) {
+			return;
+		}
 		// a ball-secure passer: lots of assists, no turnovers, late
 		const astPid: number | undefined = ev.pidAst;
 		if (astPid !== undefined && finalPeriod) {
@@ -868,13 +880,114 @@ export class StoryNotes {
 		}
 	}
 
+	// 2K badges (only the tiers the user can see, sent with the ratings), named when the play is what the badge is about: a deep three
+	// (the line itself says how deep) for Limitless Range, an unassisted pull-up three for Deadeye. Once a game each, and only now and then
+	private onBadgeShot(
+		rng: Rng,
+		env: StoryEnv,
+		p: FPlayer,
+		three: boolean,
+		tags: readonly string[],
+		shot: string,
+	) {
+		if (!three) {
+			return false;
+		}
+		const text = env.res.text ?? "";
+		if (
+			(shot === "deep-three" || shot === "logo-three") &&
+			(this.x(p.pid, "btLim") ?? 0) >= 1 &&
+			!this.said.has(`btLim${p.pid}`) &&
+			rng.random() < 0.5
+		) {
+			const feet = /\b(\d{2}) feet\b/.exec(text)?.[1];
+			return this.record(
+				env,
+				"badge",
+				p.pid,
+				this.pick(
+					rng,
+					feet
+						? [
+								`Limitless Range from ${feet} feet.`,
+								`${feet} feet is nothing for ${p.name}: Limitless Range.`,
+							]
+						: shot === "logo-three"
+							? [
+									`From the logo. That's Limitless Range.`,
+									`Limitless Range: ${p.name} can hit from the logo.`,
+								]
+							: [
+									`Limitless Range: no distance is too far for ${p.name}.`,
+									`That's the Limitless Range badge at work.`,
+								],
+				),
+				`btLim${p.pid}`,
+			);
+		}
+		if (
+			PULL_UP_SHOTS.has(shot) &&
+			!tags.includes("assisted") &&
+			(this.x(p.pid, "btDead") ?? 0) >= 1 &&
+			!this.said.has(`btDead${p.pid}`) &&
+			rng.random() < 0.4
+		) {
+			return this.record(
+				env,
+				"badge",
+				p.pid,
+				this.pick(rng, [
+					`${p.name} is a Deadeye off the dribble.`,
+					`That's the Deadeye in ${p.name}: off the bounce, no hesitation.`,
+				]),
+				`btDead${p.pid}`,
+			);
+		}
+		return false;
+	}
+
 	// ---- defense ----
 	private onBlock(rng: Rng, env: StoryEnv) {
 		const blocker: number = env.ev.pid;
+		const type0: string = env.ev.type;
+		// (counted whether or not there is room to say anything)
+		const rimBlock =
+			type0 === "blkAtRim" || type0 === "blkTipIn" || type0 === "blkPutBack";
+		const rimBlocks = (this.rimBlocks.get(blocker) ?? 0) + (rimBlock ? 1 : 0);
+		this.rimBlocks.set(blocker, rimBlocks);
 		if (!this.room(env.idx, blocker)) {
 			return;
 		}
 		const b = env.pl(blocker);
+		// the Rim Protector badge: his second block at the rim, then maybe one more later
+		if (
+			rimBlock &&
+			rimBlocks >= 2 &&
+			(this.x(blocker, "btRim") ?? 0) >= 1 &&
+			!this.said.has(`btRim${blocker}:${rimBlocks >= 4 ? 2 : 1}`) &&
+			rng.random() < 0.5
+		) {
+			const again = rimBlocks >= 4;
+			this.record(
+				env,
+				"badge",
+				blocker,
+				this.pick(
+					rng,
+					again
+						? [
+								`${rimBlocks} blocks at the rim for ${b.name}. The Rim Protector is having a night.`,
+								`Another one at the rim: ${b.name} lives up to the Rim Protector badge.`,
+							]
+						: [
+								`The Rim Protector strikes again.`,
+								`${b.name}, Rim Protector, turns away another one at the rim.`,
+							],
+				),
+				`btRim${blocker}:${again ? 2 : 1}`,
+			);
+			return;
+		}
 		const shooter =
 			env.pendingShooter === undefined ? undefined : env.pl(env.pendingShooter);
 		const type: string = env.ev.type;

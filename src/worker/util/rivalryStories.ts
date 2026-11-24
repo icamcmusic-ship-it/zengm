@@ -61,6 +61,13 @@ const advOf = (results: GameResults) => {
 };
 
 const pbpCounts = (results: GameResults) => {
+	// (from the sim, which counts them whether or not the game logged its play-by-play, game/play.ts)
+	if (results.techCounts) {
+		return {
+			techs: results.techCounts.techs as number,
+			ejections: results.techCounts.ejections as number,
+		};
+	}
 	let techs = 0;
 	let ejections = 0;
 	if (Array.isArray(results.playByPlay)) {

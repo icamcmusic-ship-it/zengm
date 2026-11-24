@@ -22,6 +22,10 @@ import loadTeams from "./loadTeams.ts";
 import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
 import { setPbpGameContext } from "../../util/pbpGameContext.ts";
 import {
+	getPbpStoreScope,
+	shouldStorePbp,
+} from "../../../common/pbpSettings.ts";
+import {
 	dailyTick as injuryDepthDailyTick,
 	isInjuryDepthEnabled,
 	onHealed as injuryDepthOnHealed,
@@ -563,11 +567,25 @@ const play = async (
 		}
 	};
 
+	// Basketball: whether a game's events are saved with its box score (writeGameStats.ts makes the same call), so whether the
+	// sim logs them at all for a game nobody watches, and whether loadTeams adds what only the play-by-play text reads
+	const pbpStored = (game: { homeTid: number; awayTid: number }) =>
+		__SPORT === "basketball" &&
+		shouldStorePbp(
+			getPbpStoreScope({
+				pbpStore: g.get("pbpStore"),
+				storePlayByPlay: g.get("storePlayByPlay"),
+			}),
+			[game.homeTid, game.awayTid],
+			g.get("userTids"),
+		);
+
 	const getResult = ({
 		gid,
 		day,
 		teams,
 		doPlayByPlay = false,
+		storePbp,
 		homeCourtFactor = 1,
 		neutralSite = false,
 	}: {
@@ -575,6 +593,7 @@ const play = async (
 		day: number | undefined;
 		teams: [any, any];
 		doPlayByPlay?: boolean;
+		storePbp?: boolean;
 		homeCourtFactor?: number;
 		neutralSite?: boolean;
 	}) => {
@@ -612,6 +631,7 @@ const play = async (
 			day,
 			teams,
 			doPlayByPlay,
+			storePbp,
 			homeCourtFactor,
 			neutralSite: neutralSite || allStarGame,
 			allStarGame,
@@ -643,6 +663,7 @@ const play = async (
 		const playoffSeriesState = await getPlayoffSeriesStateFn();
 		for (const game of schedule) {
 			const doPlayByPlay = gidOneGame === game.gid && playByPlay;
+			const storePbp = pbpStored(game);
 
 			const teamsInput = [teams[game.homeTid], teams[game.awayTid]] as any;
 
@@ -723,6 +744,7 @@ const play = async (
 						day: game.day,
 						teams: helpers.deepCopy(teamsInput), // So stats start at 0 each time
 						doPlayByPlay,
+						storePbp,
 						homeCourtFactor,
 					});
 
@@ -797,6 +819,7 @@ const play = async (
 					day: game.day,
 					teams: teamsInput,
 					doPlayByPlay,
+					storePbp,
 					neutralSite,
 				});
 				results.push(result);
@@ -888,7 +911,16 @@ const play = async (
 				tids.add(matchup.awayTid);
 			}
 
-			const teams = await loadTeams(Array.from(tids), conditions); // Play games
+			// Teams whose game's play-by-play is stored or watched live: only their players get what only the text reads
+			const pbpTids = new Set<number>();
+			for (const matchup of schedule) {
+				if (pbpStored(matchup) || (playByPlay && gidOneGame === matchup.gid)) {
+					pbpTids.add(matchup.homeTid);
+					pbpTids.add(matchup.awayTid);
+				}
+			}
+
+			const teams = await loadTeams(Array.from(tids), conditions, pbpTids); // Play games
 
 			// How heated each matchup's rivalry is, for the wording of the play-by-play only (the sim never reads it)
 			if (__SPORT === "basketball") {

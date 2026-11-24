@@ -209,6 +209,8 @@ export const PLAYER_STATS_TABLES = {
 			"blk",
 			"ba",
 			"pf",
+			"tf",
+			"ff",
 			"pts",
 		],
 	},

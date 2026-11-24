@@ -1,3 +1,4 @@
+import { FoulMarks } from "./FoulMarks.basketball.tsx";
 import { ResponsiveTableWrapper } from "./ResponsiveTableWrapper.tsx";
 import { SafeHtml } from "../components/SafeHtml.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -156,7 +157,10 @@ const StatsTable = ({
 						<th>{t.stl}</th>
 						<th>{t.blk}</th>
 						<th>{t.ba}</th>
-						<th>{t.pf}</th>
+						<th>
+							{t.pf}
+							<FoulMarks tf={t.tf} ff={t.ff} />
+						</th>
 						<th>{t.pts}</th>
 						<th />
 						<th />

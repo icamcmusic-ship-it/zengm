@@ -1,3 +1,4 @@
+import { FoulMarks } from "./FoulMarks.basketball.tsx";
 import clsx from "clsx";
 import type { MouseEvent } from "react";
 import { PlayerNameLabels } from "./PlayerNameLabels.tsx";
@@ -52,7 +53,10 @@ const BoxScoreRow = ({
 			<td>{p.stl}</td>
 			<td>{p.blk}</td>
 			<td>{p.ba}</td>
-			<td>{p.pf}</td>
+			<td>
+				{p.pf}
+				<FoulMarks tf={p.tf} ff={p.ff} />
+			</td>
 			<td>{p.pts}</td>
 			<td>{helpers.plusMinus(p.pm, 0)}</td>
 			<td>{helpers.gameScore(p).toFixed(1)}</td>

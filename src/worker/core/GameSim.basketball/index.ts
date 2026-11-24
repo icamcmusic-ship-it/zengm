@@ -364,6 +364,8 @@ type Stat =
 	| "tov"
 	| "tp"
 	| "tpa"
+	| "tf"
+	| "ff"
 	| "sAtt"
 	| "sPts";
 type CompositeRating =
@@ -714,6 +716,8 @@ class GameSim extends GameSimBase {
 	// Injured or ejected players who had to stay on the court because no substitute was eligible (updatePlayersOnCourt)
 	stuckOnCourt = new Set<PlayerGameSim>();
 	techs = new Map<PlayerGameSim | number, number>();
+	// Ejections of players and coaches, counted for the results (rivalry stories), which no longer read them from the play-by-play
+	numEjections = 0;
 	flagrants = new Map<PlayerGameSim, number>();
 	// The realistic possession model (the realisticPossessions setting, see possessionModel.ts): a real shot clock, transition and
 	// half-court possessions, late-clock shots and violations, end-of-period clock management. When it is off, nothing here is used and no
@@ -983,6 +987,7 @@ class GameSim extends GameSimBase {
 		day,
 		teams,
 		doPlayByPlay,
+		storePbp,
 		homeCourtFactor,
 		allStarGame,
 		baseInjuryRate,
@@ -993,6 +998,9 @@ class GameSim extends GameSimBase {
 		day?: number;
 		teams: [TeamGameSim, TeamGameSim];
 		doPlayByPlay: boolean;
+		// Whether this game's events are saved with its box score (game/play.ts: the pbpStore setting, common/pbpSettings.ts). When
+		// undefined, the storePlayByPlay setting alone decides. Logging never draws a random number, so the game is the same either way
+		storePbp?: boolean;
 		homeCourtFactor: number;
 		allStarGame: boolean;
 		baseInjuryRate: number;
@@ -1008,8 +1016,9 @@ class GameSim extends GameSimBase {
 			baseInjuryRate,
 			neutralSite,
 		});
-		// Every game logs its events when they are stored with the box score (only what the text needs, if nobody watches it live)
-		const storePlayByPlay = !!g.get("storePlayByPlay");
+		// A game logs its events when they are stored with the box score (only what the text needs, if nobody watches it live), and
+		// not at all when they would just be thrown away (writeGameStats.ts)
+		const storePlayByPlay = storePbp ?? !!g.get("storePlayByPlay");
 		this.playByPlay = new PlayByPlayLogger(
 			doPlayByPlay || storePlayByPlay,
 			doPlayByPlay,
@@ -1602,6 +1611,15 @@ class GameSim extends GameSimBase {
 				? { shotLog: this.adv.shotLog }
 				: {}),
 			// scoringSummary: this.playByPlay.scoringSummary,
+			// (Technical fouls: the game's technicals and ejections, for rivalry stories, play-by-play or not)
+			...(this.techFouls
+				? {
+						techCounts: {
+							techs: [...this.techs.values()].reduce((a, b) => a + b, 0),
+							ejections: this.numEjections,
+						},
+					}
+				: {}),
 			...(this.shootoutShots.length > 0
 				? { shootoutShots: this.shootoutShots }
 				: {}),
@@ -8605,6 +8623,7 @@ class GameSim extends GameSimBase {
 		shooter?: PlayerGameSim,
 	) {
 		this.ejected.add(p);
+		this.numEjections += 1;
 		this.playByPlay.logEvent({
 			type: "ejection",
 			t,
@@ -8657,6 +8676,8 @@ class GameSim extends GameSimBase {
 		const key = p ?? t;
 		const num = (this.techs.get(key) ?? 0) + 1;
 		this.techs.set(key, num);
+		// (a box score stat: the player's, or only the team's for a bench or coach technical)
+		this.recordStat(t, p, "tf");
 
 		this.playByPlay.logEvent({
 			type: "techFoul",
@@ -8670,6 +8691,7 @@ class GameSim extends GameSimBase {
 			if (p) {
 				this.eject(t, p, "techs");
 			} else {
+				this.numEjections += 1;
 				this.playByPlay.logEvent({
 					type: "ejection",
 					t,
@@ -8704,6 +8726,7 @@ class GameSim extends GameSimBase {
 		const fouler = this.pickTechFouler(t);
 		const level: 1 | 2 = Math.random() < TECHNICAL_FOUL_RATES.flagrant2 ? 2 : 1;
 		this.recordStat(t, fouler, "pf");
+		this.recordStat(t, fouler, "ff");
 		this.foulsThisQuarter[t] += 1;
 		if (this.t <= 2 * 60) {
 			this.foulsLastTwoMinutes[t] += 1;

@@ -86,6 +86,8 @@ export const simExhibition = async ({
 			day: undefined,
 			teams: [t0 as any, t1 as any],
 			doPlayByPlay: false,
+			// (its events are never read)
+			storePbp: false,
 			homeCourtFactor: 1,
 			allStarGame: true,
 			baseInjuryRate: 0,
