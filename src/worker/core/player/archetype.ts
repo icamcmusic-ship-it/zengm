@@ -475,11 +475,13 @@ export const classifyPlayer = (
 	const season =
 		typeof row.season === "number" ? (row.season as number) : g.get("season");
 	const pos: Pos = isPos(row.pos) ? row.pos : "F";
+	// A prospect's ovr and pot as scouted, like his ratings above, so his tier and upside ("Raw", "Project") never give away the true ones
+	const levelFuzz = p.tid === PLAYER.UNDRAFTED ? getFuzz(row.fuzz ?? 0) : 0;
 	// His position as the game shows it decides which builds he may have
 	const opts = {
-		ovr: row.ovr,
+		ovr: levelFuzz ? applyFuzz(row.ovr, levelFuzz) : row.ovr,
 		// (archreview2: upside for the honest names)
-		pot: row.pot,
+		pot: levelFuzz ? applyFuzz(row.pot, levelFuzz) : row.pot,
 		previousId,
 		...(previousId && previousDefense ? { previousDefense } : {}),
 		pos: isPos(row.pos) ? row.pos : undefined,
