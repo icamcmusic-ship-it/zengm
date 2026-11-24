@@ -25,7 +25,7 @@ import { FAMILIES, type Family } from "../families.ts";
 import { hasExpandedRatings } from "../../expandedRatings.ts";
 import { mergedId } from "../merges.data.ts";
 import { familyProbs } from "../model.ts";
-import { isPos } from "../position.ts";
+import { isPos, positionOf } from "../position.ts";
 import { nameAt } from "../posNames.ts";
 import { ATH_NAME_RE, promiseMiss } from "../score.ts";
 import { FLOOR, RULES } from "../rulebook.data.ts";
@@ -45,7 +45,7 @@ import type { RatingQuantiles } from "./gateScale.ts";
 import { defenseSentence } from "./defenseLabels.ts";
 import { pickNouns } from "./cover.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
-import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
+import type { ArchetypeRatings, Classification, Norms, Pos } from "../types.ts";
 import {
 	compatible,
 	composedId,
@@ -407,6 +407,63 @@ const allowedBuild = (
 		!a.tags.includes("allAround") &&
 		promiseMiss(a, cv) <= 1e-9
 	);
+};
+
+// archnouns: what the noun reading (cover.ts pickNouns) reads about him
+const nounInputOf = (
+	ratings: ArchetypeRatings,
+	opts: V2Options,
+	norms: Norms,
+	pos: Pos,
+): NounInput => {
+	const prevRaw = opts.previousId;
+	const prevComposed = isComposedId(prevRaw);
+	const prevParsed = prevComposed ? parseComposedId(prevRaw) : undefined;
+	const prevNouns =
+		prevParsed &&
+		(prevParsed.role.key.startsWith("pos") ||
+			prevParsed.role.key === "bruiser" ||
+			prevParsed.role.key === "enigma" ||
+			END_WORDS.some((e) => e.key === prevParsed.role.key))
+			? prevParsed.descs
+					.map((d) => nounOfDesc(d.key))
+					.filter((n): n is NounKey => n !== undefined)
+			: undefined;
+	return {
+		r: ratings,
+		pos,
+		ovr: opts.ovr,
+		pot: opts.pot,
+		age: opts.age,
+		prospect: opts.prospect,
+		traits: opts.traits as Record<string, number> | undefined,
+		rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+		...(norms.ng ? { ng: norms.ng as NounGroupQuantiles } : {}),
+		...(norms.common ? { common: norms.common } : {}),
+		rejected: opts.rejects?.map((rj): Rejection => ({
+			name: rj.name,
+			own: rj.key !== undefined && rj.key === opts.pickKey,
+			...(rj.ratings
+				? {
+						pct: Object.fromEntries(
+							nounScores(
+								rj.ratings,
+								(norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+							).map((x) => [x.key, x.pct]),
+						),
+					}
+				: {}),
+		})),
+		prev: {
+			nouns: prevNouns,
+			special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
+			// archstick: his whole label last season
+			...(prevRaw ? { id: prevComposed ? prevRaw : mergedId(prevRaw) } : {}),
+			...(prevRaw && opts.previousDefense
+				? { defense: opts.previousDefense }
+				: {}),
+		},
+	};
 };
 
 // The label v2 gives: classify's Classification (id: a build or a composed "v2:..." id) plus what decided it
@@ -1029,52 +1086,7 @@ export const classifyV2 = (
 	let nounExplain: CoverExplain | undefined;
 	let nounIn: NounInput | undefined;
 	if (P.nouns && isPos(pos)) {
-		const prevParsed = prevComposed ? parseComposedId(prevRaw) : undefined;
-		const prevNouns =
-			prevParsed &&
-			(prevParsed.role.key.startsWith("pos") ||
-				prevParsed.role.key === "bruiser" ||
-				prevParsed.role.key === "enigma" ||
-				END_WORDS.some((e) => e.key === prevParsed.role.key))
-				? prevParsed.descs
-						.map((d) => nounOfDesc(d.key))
-						.filter((n): n is NounKey => n !== undefined)
-				: undefined;
-		nounIn = {
-			r: ratings,
-			pos,
-			ovr: opts.ovr,
-			pot: opts.pot,
-			age: opts.age,
-			prospect: opts.prospect,
-			traits: opts.traits as Record<string, number> | undefined,
-			rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
-			...(norms.ng ? { ng: norms.ng as NounGroupQuantiles } : {}),
-			...(norms.common ? { common: norms.common } : {}),
-			rejected: opts.rejects?.map((rj): Rejection => ({
-				name: rj.name,
-				own: rj.key !== undefined && rj.key === opts.pickKey,
-				...(rj.ratings
-					? {
-							pct: Object.fromEntries(
-								nounScores(
-									rj.ratings,
-									(norms.nq ?? norms.rq) as RatingQuantiles | undefined,
-								).map((x) => [x.key, x.pct]),
-							),
-						}
-					: {}),
-			})),
-			prev: {
-				nouns: prevNouns,
-				special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
-				// archstick: his whole label last season
-				...(prevRaw ? { id: prevComposed ? prevRaw : mergedId(prevRaw) } : {}),
-				...(prevRaw && opts.previousDefense
-					? { defense: opts.previousDefense }
-					: {}),
-			},
-		};
+		nounIn = nounInputOf(ratings, opts, norms, pos);
 		const np = pickNouns(nounIn);
 		// (archstick: his name's words are then read in the order his nouns were picked in)
 		if (np.tie === false) {
@@ -1251,6 +1263,47 @@ export const classifyV2 = (
 			classicScore: classicCand.score,
 		},
 	};
+};
+
+// classifyV2(ratings, opts).label (speed, same label), without the rest of the reading when the noun reading names him
+// on its own: with the nouns on, a special, composed or trait pick replaces the reading's choice whatever it was, and
+// the label is that pick's name at his position (the same code as classifyV2's). An honest pick takes the whole reading.
+export const classifyV2Label = (
+	ratings: ArchetypeRatings,
+	opts: V2Options = {},
+): string => {
+	const P = { ...V2_PARAMS, ...opts.params };
+	if (P.nouns) {
+		// (scoreAll's position: his own when he has one, else from his ratings)
+		const pos = isPos(opts.pos) ? opts.pos : positionOf(ratings);
+		if (isPos(pos)) {
+			const norms = opts.norms ?? defaultNormsFor(ratings);
+			const np = pickNouns(nounInputOf(ratings, opts, norms, pos));
+			let id: string | undefined;
+			if (np.kind === "special") {
+				id = np.id;
+			} else if (np.kind === "composed" || np.kind === "trait") {
+				const role = ROLE_BY_KEY.get(np.kind === "trait" ? np.key : np.role)!;
+				const descs =
+					np.kind === "trait" ? [] : np.descs.map((k) => DESC_BY_KEY.get(k)!);
+				const wp: WordPick =
+					np.kind === "trait" ? { [np.key]: np.name } : (np.pick ?? {});
+				const keep =
+					np.kind === "composed" && np.keepId
+						? archetypeById(np.keepId)
+						: undefined;
+				id = keep ? keep.id : composedId(role, descs, GROUP_OF[pos], wp);
+			}
+			if (id !== undefined) {
+				const a = archetypeById(id)!;
+				return (
+					(isComposedId(a.id) ? a.name : nameAt(a, pos)) +
+					(np.defense ? ` · ${np.defense}` : "")
+				);
+			}
+		}
+	}
+	return classifyV2(ratings, opts).label;
 };
 
 // The shipped picks (userPicks.data.ts) under the league's own (a league's copy of a shipped pick replaces it)

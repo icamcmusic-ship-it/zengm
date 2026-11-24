@@ -33,6 +33,7 @@ import {
 import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
 import {
 	classifyV2,
+	classifyV2Label,
 	warmArchetypeEngine,
 	V2_PARAMS,
 } from "../../../common/archetypes/v2/engine.ts";
@@ -443,7 +444,7 @@ export const fuzzedArchetypeLabel = (
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
 	const model = tunedModelFor(shown);
 	const { refs, rejects } = activePickRefs();
-	return classifyV2(shown, {
+	return classifyV2Label(shown, {
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
@@ -452,7 +453,7 @@ export const fuzzedArchetypeLabel = (
 		...(model ? { model } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
 		...(rejects.length > 0 ? { rejects } : {}),
-	}).label;
+	});
 };
 
 // (JSON turns NaN and Infinity into null: keep them apart in the key)
