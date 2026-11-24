@@ -3,11 +3,12 @@
 // `.ovr` or `.pot` must be on this allow-list with the reason it is safe (fuzzed a line or two up, a drafted or past player, a
 // rating being written, the AI's own decision, ...), so a new read of a true rating on these pages fails here until someone has
 // looked at it. Reads on a line that applies the fuzz (fuzzRating, applyFuzz, ...) are fine as they are.
-import fs from "node:fs";
-import path from "node:path";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
+import { existsSync, readFileSync } from "node:fs";
 import { assert, test } from "vitest";
 
-const ROOT = path.resolve(import.meta.dirname, "../../..");
+// src/
+const ROOT = new URL("../../../", import.meta.url).pathname;
 
 // Views and APIs that show prospects, and the core code that builds what they show
 const FILES = [
@@ -387,7 +388,7 @@ const FUZZED =
 const scan = () => {
 	const hits: { file: string; line: string; n: number }[] = [];
 	for (const file of FILES) {
-		const lines = fs.readFileSync(path.join(ROOT, file), "utf8").split("\n");
+		const lines = readFileSync(`${ROOT}${file}`, "utf8").split("\n");
 		for (const [i, raw] of lines.entries()) {
 			const line = raw.trim();
 			if (
@@ -423,6 +424,6 @@ test("the allow-list has no stale entries", () => {
 	);
 	assert.deepEqual(stale, []);
 	for (const file of FILES) {
-		assert.isTrue(fs.existsSync(path.join(ROOT, file)), file);
+		assert.isTrue(existsSync(`${ROOT}${file}`), file);
 	}
 });
