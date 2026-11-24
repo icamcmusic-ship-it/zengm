@@ -139,3 +139,19 @@ export const forgetLeague = (lid: number) =>
 	run(undefined, async (db) => {
 		await db.delete(STORE, IDBKeyRange.bound([lid], [lid, []]));
 	});
+
+// Delete Old Data: the database's size (JSON length of its entries, every league) and clearing it (every league; the pages
+// just read their seasons again)
+export const cacheBytes = () =>
+	run(0, async (db) => {
+		let bytes = 0;
+		for await (const cursor of db.transaction(STORE).store) {
+			bytes += (cursor.value as Entry).json.length + 40;
+		}
+		return bytes;
+	});
+
+export const clearAll = () =>
+	run(undefined, async (db) => {
+		await db.clear(STORE);
+	});

@@ -8,6 +8,7 @@ import { endContractEarly } from "../contract/index.ts";
 import { advOnRetire } from "./advStatsStorage.ts";
 import { storeHofStoryAtInduction } from "../../util/hofStory.ts";
 import { hofBallotOn } from "../hallOfFame/index.ts";
+import { endRunningStreaks } from "./featLedger.ts";
 
 /**
  * Have a player retire, including all event and HOF bookkeeping.
@@ -95,6 +96,8 @@ const retire = async (
 	};
 	p.numDaysFreeAgent = 0;
 	p.gamesUntilTradable = 0;
+	// Feat Rarity & Streaks: his running streaks end
+	endRunningStreaks(p.pid);
 	delete p.numPlayersTradedAwayNormalized;
 
 	await player.checkJerseyNumberRetirement(p);

@@ -66,6 +66,10 @@ import {
 	setGmSuccessor as setGmSuccessorCore,
 } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
+import { deleteOldRivalryLog } from "../util/rivalryStories.ts";
+import { storageSizes } from "../util/dbSize.ts";
+import { clearAll as clearPageCache } from "../util/pagePersist.ts";
+import { clearAll as clearWrappedCache } from "../util/wrappedPersist.ts";
 import { buildGameExport } from "../util/gameExport/index.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import {
@@ -1017,6 +1021,11 @@ const deleteOldData = async (options: {
 	retiredPlayers: boolean;
 	playerStatsUnnotable: boolean;
 	playerStats: boolean;
+	// Rivalry Stories game log of past seasons (the rivalry score's season rows are kept)
+	rivalryLog?: boolean;
+	// The cache databases shared by all leagues (rebuilt as pages are visited)
+	pageCache?: boolean;
+	wrappedCache?: boolean;
 }) => {
 	const tx = idb.league.transaction(
 		[
@@ -1174,6 +1183,16 @@ const deleteOldData = async (options: {
 	}
 
 	await tx.done;
+
+	if (options.rivalryLog) {
+		await deleteOldRivalryLog();
+	}
+	if (options.pageCache) {
+		await clearPageCache();
+	}
+	if (options.wrappedCache) {
+		await clearWrappedCache();
+	}
 
 	// Without this, cached values will still exist
 	await idb.cache.fill();
@@ -7058,6 +7077,7 @@ const api = {
 		createLeague: whileWorkerBusy(createLeague),
 		createTrade,
 		deleteOldData: whileWorkerBusy(deleteOldData),
+		storageSizes,
 		deleteScheduledEvent,
 		deleteScheduledEvents,
 		discardUnsavedProgress,

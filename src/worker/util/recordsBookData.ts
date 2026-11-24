@@ -2,8 +2,8 @@
 // common/recordsBook.ts, keeps the single-game highs and streaks as games are played, and announces league records
 // broken and career milestones reached in the news.
 //
-// Players: everyone who ever played is read once per league, season and phase (retired players don't change within
-// a phase) and the players in the cache, whose stats change with every game, are laid over that on every request.
+// Players: retired players are read once per league and session (and then only the ones written since, see baseline) and
+// the players in the cache, whose stats change with every game, are laid over that on every request.
 //
 // Single-game highs and streaks need box scores, which BBGM deletes after a while, so they are kept as games are
 // played, in the "recordsBook" game attribute (like leagueAchievements: the league's own key-value store, carried by
@@ -39,6 +39,7 @@ import type { Game, Player } from "../../common/types.ts";
 import type { EraAdjuster } from "../../common/eraAdjust.ts";
 import { getEraAdjuster } from "./eraBaselines.ts";
 import { idb } from "../db/index.ts";
+import { changeLog } from "../db/changeLog.ts";
 import { g, helpers, local, lock, logEvent } from "./index.ts";
 import { featureOn, featureOption } from "./nativeFeatures.ts";
 
@@ -85,32 +86,80 @@ export const toRBPlayer = (p: Player): RBPlayer => ({
 
 // ---- players ----
 
-const baseCache = new Map<string, Promise<Map<number, RBPlayer>>>();
+// Retired players (not in the cache, which has every other player), read once per league and session and then kept up to
+// date from the change log: only the players written or deleted since are read again (players who retired, edits in God
+// Mode). Reloading the league or anything that changes the database behind the cache's back (Cache.fill, a new epoch)
+// reads them all again.
+type RetiredBase = {
+	key: string;
+	seq: number;
+	players: Map<number, RBPlayer>;
+};
+let retiredBase: Promise<RetiredBase> | undefined;
 
-const baseline = () => {
-	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}`;
-	let hit = baseCache.get(key);
-	if (!hit) {
-		hit = (async () => {
-			const out = new Map<number, RBPlayer>();
-			await idb.merged.players.getAll(
-				{ activeAndRetired: true },
-				{
-					map: (p) => {
-						if (p.stats.length > 0) {
-							out.set(p.pid, toRBPlayer(p));
-						}
-						return undefined;
-					},
-				},
-			);
-			return out;
-		})();
-		baseCache.clear();
-		baseCache.set(key, hit);
-		hit.catch(() => baseCache.delete(key));
+const readRetired = async () => {
+	const out = new Map<number, RBPlayer>();
+	for await (const { value: p } of idb.league
+		.transaction("players")
+		.store.index("tid")
+		.iterate(PLAYER.RETIRED)) {
+		if (p.stats.length > 0) {
+			out.set(p.pid, toRBPlayer(p));
+		}
 	}
-	return hit;
+	return out;
+};
+
+const baseline = async () => {
+	const key = `${g.get("lid")}|${changeLog.epoch}`;
+	const prev = retiredBase
+		? await retiredBase.catch(() => undefined)
+		: undefined;
+	if (prev && prev.key === key) {
+		const written = changeLog.playersSince(prev.seq);
+		if (written.length === 0) {
+			return prev.players;
+		}
+		if (!written.includes(-1)) {
+			const seq = changeLog.seq;
+			// The cache's copy is the latest (a player who just retired stays in the cache until it is filled again). Not in
+			// the cache: deleted (and not saved yet), or retired and saved, then only in the database.
+			const rows: (Player | undefined)[] = [];
+			const fromDb: number[] = [];
+			for (const pid of written) {
+				const p = await idb.cache.players.get(pid);
+				rows.push(p);
+				if (!p && !idb.cache._deletes.players?.has(pid)) {
+					fromDb.push(pid);
+				}
+			}
+			if (fromDb.length > 0) {
+				const store = idb.league.transaction("players").store;
+				const found = await Promise.all(fromDb.map((pid) => store.get(pid)));
+				const byPid = new Map(
+					found.filter((p) => p !== undefined).map((p) => [p.pid, p]),
+				);
+				for (const [i, pid] of written.entries()) {
+					rows[i] ??= byPid.get(pid);
+				}
+			}
+			for (const [i, pid] of written.entries()) {
+				const p = rows[i];
+				if (p && p.tid === PLAYER.RETIRED && p.stats.length > 0) {
+					prev.players.set(pid, toRBPlayer(p));
+				} else {
+					// Deleted, or not retired (then in the cache)
+					prev.players.delete(pid);
+				}
+			}
+			prev.seq = seq;
+			return prev.players;
+		}
+	}
+	const seq = changeLog.seq;
+	const p = readRetired().then((players) => ({ key, seq, players }));
+	retiredBase = p;
+	return (await p).players;
 };
 
 // Every player who played, with the cache's players up to date

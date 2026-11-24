@@ -16,6 +16,7 @@ import { onRegularSeason as gmOnRegularSeason } from "../gm/index.ts";
 import markUserControl from "../team/markUserControl.ts";
 import { recordsCheckBeforeBoxScoresDeleted } from "../../util/recordsBookData.ts";
 import { updateTalentCenter } from "../game/talentCenter.ts";
+import { pruneRivalryLog } from "../../util/rivalryStories.ts";
 
 class GameHasYourTeamCache {
 	cache: Record<number, boolean> = {};
@@ -47,7 +48,7 @@ class GameHasYourTeamCache {
 	}
 }
 
-const deleteOldBoxScores = async () => {
+export const deleteOldBoxScores = async () => {
 	const saveOldBoxScores = g.get("saveOldBoxScores");
 	if (
 		saveOldBoxScores.pastSeasons === "all" &&
@@ -90,28 +91,21 @@ const deleteOldBoxScores = async () => {
 			);
 		};
 
-		for await (const { value: game } of gameIndex.iterate(range)) {
-			if (saveIfMeetsConditions("pastSeasonsType", game)) {
-				if (
-					saveOldBoxScores.pastSeasons === "all" ||
-					game.season >= g.get("season") - saveOldBoxScores.pastSeasons
-				) {
-					continue;
-				}
-			}
+		// Kept for something other than being in the seasons kept in full
+		const keptForOtherReason = (game: Game) => {
 			if (saveIfMeetsConditions("note", game)) {
 				if (game.noteBool) {
-					continue;
+					return true;
 				}
 			}
 			if (saveIfMeetsConditions("playoffs", game)) {
 				if (game.playoffs) {
-					continue;
+					return true;
 				}
 			}
 			if (saveIfMeetsConditions("finals", game)) {
 				if (game.finals) {
-					continue;
+					return true;
 				}
 			}
 			if (saveIfMeetsConditions("playerFeat", game)) {
@@ -123,26 +117,78 @@ const deleteOldBoxScores = async () => {
 							(saveOldBoxScores.playerFeat === "all" || t.tid === userTid),
 					)
 				) {
-					continue;
+					return true;
 				}
 			}
 			if (saveIfMeetsConditions("clutchPlays", game)) {
 				if (game.clutchPlays && game.clutchPlays.length > 0) {
-					continue;
+					return true;
 				}
 			}
 			if (saveIfMeetsConditions("allStar", game)) {
 				const isAllStarGame =
 					game.teams[0].tid === -1 && game.teams[1].tid === -2;
 				if (isAllStarGame) {
+					return true;
+				}
+			}
+
+			return false;
+		};
+
+		// Games kept for another reason (playoffs, a note, a feat...) once they are older than the seasons kept in full: the box
+		// score stays, its play-by-play and shot log (most of its size) go
+		const stripBefore =
+			saveOldBoxScores.pastSeasons === "all"
+				? undefined
+				: g.get("season") - saveOldBoxScores.pastSeasons;
+		const toStrip: number[] = [];
+
+		for await (const { value: game } of gameIndex.iterate(range)) {
+			if (saveIfMeetsConditions("pastSeasonsType", game)) {
+				if (
+					saveOldBoxScores.pastSeasons === "all" ||
+					game.season >= g.get("season") - saveOldBoxScores.pastSeasons
+				) {
 					continue;
 				}
+			}
+			if (keptForOtherReason(game)) {
+				if (
+					stripBefore !== undefined &&
+					game.season < stripBefore &&
+					(game.pbp !== undefined || game.shotLog !== undefined)
+				) {
+					toStrip.push(game.gid);
+				}
+				continue;
 			}
 
 			// If we made it this far, game is not to be saved
 			await idb.cache.games.delete(game.gid);
 		}
+
+		await stripOldBoxScores(toStrip);
 	}
+};
+
+// Drops the play-by-play and shot log of these stored box scores (past seasons, not in the cache, which only has the current
+// season). Direct to the database, and safe to repeat. Views without them show the box score alone, as for games played
+// with play-by-play storage off.
+export const stripOldBoxScores = async (gids: number[]) => {
+	if (gids.length === 0) {
+		return;
+	}
+	const tx = idb.league.transaction("games", "readwrite");
+	for (const gid of gids) {
+		const game = await tx.store.get(gid);
+		if (game && (game.pbp !== undefined || game.shotLog !== undefined)) {
+			delete game.pbp;
+			delete game.shotLog;
+			await tx.store.put(game);
+		}
+	}
+	await tx.done;
 };
 
 const newPhaseRegularSeason = async (
@@ -186,6 +232,11 @@ const newPhaseRegularSeason = async (
 	await updateTalentCenter({ onlyIfMissing: true });
 
 	await deleteOldBoxScores();
+
+	// Rivalry Stories: old seasons' game log keeps only the games and their top scorers
+	if (__SPORT === "basketball") {
+		await pruneRivalryLog();
+	}
 
 	// Without this, then there is a race condition creating it on demand in addGame, and some of the first day's games are lost
 	await idb.cache.headToHeads.put({

@@ -19,10 +19,8 @@ import type {
 	IDBPTransaction,
 	StoreNames,
 } from "@dumbmatter/idb";
-import type {
-	RivalryGame,
-	RivalrySeason,
-} from "../../common/rivalryStories/types.ts";
+import type { RivalrySeason } from "../../common/rivalryStories/types.ts";
+import type { StoredRivalryGame } from "../../common/rivalryStories/compact.ts";
 import type {
 	DraftLotteryResult,
 	AllStars,
@@ -145,7 +143,7 @@ export interface LeagueDB extends DBSchema {
 	};
 	rivalryGames: {
 		key: number;
-		value: RivalryGame;
+		value: StoredRivalryGame;
 		indexes: {
 			pair: string;
 			season: number;

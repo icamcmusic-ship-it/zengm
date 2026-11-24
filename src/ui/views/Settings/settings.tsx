@@ -3066,6 +3066,11 @@ export const settings: Setting[] = (
 						be saved, including those with statistical feats.
 					</p>
 					<p>To keep all past seasons, enter "all" instead of a number.</p>
+					<p>
+						Box scores saved for another reason (playoffs, notes, feats...) keep
+						their play-by-play and shot log only for the past seasons entered
+						here. After that the box score itself is kept, without them.
+					</p>
 				</>
 			),
 			stringify: (

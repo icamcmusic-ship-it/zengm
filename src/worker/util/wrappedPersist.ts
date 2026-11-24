@@ -224,3 +224,28 @@ export const forgetLeague = (lid: number) =>
 			tx.done,
 		]);
 	});
+
+const STORES = ["meta", "players", "games", "teams"];
+
+// Delete Old Data: the database's size (JSON length of its entries, every league) and clearing it (every league; Wrapped
+// and Storylines just read the league again)
+export const cacheBytes = () =>
+	run(0, async (db) => {
+		let bytes = 0;
+		for (const name of STORES) {
+			for await (const cursor of db.transaction(name).store) {
+				const v = cursor.value;
+				bytes += typeof v === "string" ? v.length : JSON.stringify(v).length;
+			}
+		}
+		return bytes;
+	});
+
+export const clearAll = () =>
+	run(undefined, async (db) => {
+		const tx = db.transaction(STORES, "readwrite");
+		await Promise.all([
+			...STORES.map((name) => tx.objectStore(name).clear()),
+			tx.done,
+		]);
+	});

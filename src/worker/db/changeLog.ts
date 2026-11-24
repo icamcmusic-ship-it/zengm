@@ -180,6 +180,17 @@ export const changeLog = {
 		return Math.max(playerSeq.get(pid) ?? 0, playerSeq.get(-1) ?? 0);
 	},
 
+	// Players written or deleted after sequence number since (-1 in the list: every player, a clear)
+	playersSince(since: number) {
+		const out: number[] = [];
+		for (const [pid, s] of playerSeq) {
+			if (s > since) {
+				out.push(pid);
+			}
+		}
+		return out;
+	},
+
 	// Last write to a store of any kind
 	store(store: Store) {
 		return storeSeq.get(store) ?? 0;

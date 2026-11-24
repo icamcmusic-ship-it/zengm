@@ -86,6 +86,22 @@ import { grantDisabledPlayerExceptions } from "../contract/capExceptions.ts";
 
 const FLUSH_COALESCE_MS = 5000;
 
+// Long multi-day sims (a month, the rest of the season, Auto Play) hold the gameSim lock the whole time, so the automatic
+// flush never runs and every change waits in memory until the sim stops. Between two days, when everything a day writes is
+// done, they are saved every FLUSH_EVERY_DAYS days: a crash or a closed tab loses at most that many days, and the pending
+// write sets don't grow for the whole sim.
+export const FLUSH_EVERY_DAYS = 14;
+let daysSinceFlush = 0;
+export const flushBetweenDays = async () => {
+	daysSinceFlush += 1;
+	if (daysSinceFlush >= FLUSH_EVERY_DAYS) {
+		daysSinceFlush = 0;
+		await idb.cache.flush();
+		return true;
+	}
+	return false;
+};
+
 /**
  * Play one or more days of games.
  *
@@ -143,6 +159,7 @@ const play = async (
 			// sim stops)
 			if (g.get("saveEveryDay")) {
 				await idb.cache.flush();
+				daysSinceFlush = 0;
 			} else {
 				await idb.cache.flushUnlessRecent(FLUSH_COALESCE_MS);
 			}
@@ -539,6 +556,9 @@ const play = async (
 		if (numDays - 1 <= 0 || playoffsOver) {
 			await cbNoGames(playoffsOver);
 		} else {
+			if (dayOver) {
+				await flushBetweenDays();
+			}
 			await play(numDays - 1, conditions, false);
 		}
 	};
