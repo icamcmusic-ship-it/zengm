@@ -6,7 +6,8 @@
 //   LONG_RUN=1 LONG_RUN_CONFIG=defaults|all|off|random LONG_RUN_SEASONS=20 LONG_RUN_SEED=1 LONG_RUN_OUT=/tmp/run.jsonl \
 //     node_modules/.bin/vitest run --project basketball src/worker/core/league/longRun.script.test.ts
 //
-// LONG_RUN_SETTINGS='{"elam":true}' adds settings on top of the config.
+// LONG_RUN_SETTINGS='{"elam":true}' adds settings on top of the config. LONG_RUN_YOUNG_MINUTES='{"amount":0}' turns Career Aging's
+// young players' minutes term off.
 import "fake-indexeddb/auto";
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { appendFileSync } from "node:fs";
@@ -540,8 +541,9 @@ const ratingsInfo = async (s: number) => {
 	] as const) {
 		const rows = active
 			.filter((p) => s - p.born.year >= from && s - p.born.year <= to)
-			.map((p) => last(p.ratings) as any)
-			.filter((row) => row.season === s && row.devParts);
+			// (his last row of season s: the end-of-season call runs after the next preseason)
+			.map((p) => (p.ratings as any[]).findLast((row) => row.season === s))
+			.filter((row) => row?.devParts);
 		if (rows.length > 0) {
 			const sums: Record<string, number> = {};
 			for (const row of rows) {

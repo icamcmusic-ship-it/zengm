@@ -263,9 +263,7 @@ const Player2 = ({
 								r.pos,
 								showRatings ? (
 									<MaybeBold bold={leaders[r.season]?.ratings.has("ovr")}>
-										<DevPartsOvr devParts={(r as any).devParts}>
-											{r.ovr}
-										</DevPartsOvr>
+										<DevPartsOvr devParts={r.devParts}>{r.ovr}</DevPartsOvr>
 									</MaybeBold>
 								) : null,
 								showRatings ? (

@@ -2156,6 +2156,8 @@ type PlayerRatingsPlus = Record<PlayerRatingKey, number> & {
 	tid: number | undefined;
 	// Sub-ratings, basketball only (the subRatings setting; undefined when off or on a row without them)
 	sub: number[] | undefined;
+	// Development breakdown, basketball only (undefined on rows without it)
+	devParts: import("./types.basketball.ts").DevParts | undefined;
 
 	// Not in basketball
 	ovrs: Record<PositionBaseball | PositionFootball | PositionHockey, number>;
