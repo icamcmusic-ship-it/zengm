@@ -8,6 +8,7 @@ import injury from "./injury.ts";
 import {
 	dailyTick,
 	getInjuryRiskFactor,
+	getLateSeasonRest,
 	getRestrictionFactor,
 	getRestrictionGames,
 	getReturnGames,
@@ -191,6 +192,80 @@ describe("player state", () => {
 		assert.isFalse(
 			shouldRest({ ...base, p: { ...p, loadManagement: true }, age: 35 }),
 		);
+	});
+
+	test("late-season rest: teams that clinched the #1 seed or are eliminated, last 10 games, never in the playoffs", () => {
+		g.setWithoutSavingToDB("numGames", 82);
+		const ts = (
+			clinchedPlayoffs: "w" | "x" | "y" | "z" | "o" | undefined,
+			gp: number,
+		) => ({ clinchedPlayoffs, won: gp - 20, lost: 20 });
+		assert.isUndefined(getLateSeasonRest(ts(undefined, 78)));
+		assert.isUndefined(getLateSeasonRest(ts("x", 78)));
+		assert.isUndefined(getLateSeasonRest(ts("y", 78)));
+		assert.isUndefined(getLateSeasonRest(ts("z", 71)));
+		assert.deepEqual(getLateSeasonRest(ts("z", 72)), {
+			status: "clinched",
+			gameNumber: 73,
+		});
+		assert.strictEqual(getLateSeasonRest(ts("o", 80))?.status, "eliminated");
+		assert.isUndefined(getLateSeasonRest(ts("o", 82)));
+		// Scaled with the season length: the last 5 of 41
+		g.setWithoutSavingToDB("numGames", 41);
+		assert.isUndefined(getLateSeasonRest(ts("z", 35)));
+		assert.isDefined(getLateSeasonRest(ts("z", 36)));
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		assert.isUndefined(getLateSeasonRest(ts("z", 36)));
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+
+		const lateSeason = { status: "clinched" as const, gameNumber: 75 };
+		const base = {
+			teamLoadManagement: false,
+			aiControlled: true,
+			numHealthy: 13,
+			rank: 2,
+			backToBack: false,
+		};
+		const vet = makePlayer(2000);
+		const young = makePlayer(2001);
+		assert.isFalse(isInjuryProne(vet) || isInjuryProne(young));
+		// Not a back-to-back: nobody rests without the late-season window
+		assert.isFalse(shouldRest({ ...base, p: vet, age: 35 }));
+		// A 30+ player sits every other game, alternating with the next pid
+		const nights = [75, 76, 77, 78].map((gameNumber) =>
+			shouldRest({
+				...base,
+				p: vet,
+				age: 31,
+				lateSeason: { ...lateSeason, gameNumber },
+			}),
+		);
+		assert.deepEqual(nights, [false, true, false, true]);
+		assert.isTrue(shouldRest({ ...base, p: young, age: 31, lateSeason }));
+		// Young and healthy players play, and so do the bench, short-handed teams and the user's team
+		assert.isFalse(shouldRest({ ...base, p: young, age: 24, lateSeason }));
+		assert.isFalse(
+			shouldRest({ ...base, p: young, age: 31, lateSeason, rank: 8 }),
+		);
+		assert.isFalse(
+			shouldRest({ ...base, p: young, age: 31, lateSeason, numHealthy: 9 }),
+		);
+		assert.isFalse(
+			shouldRest({
+				...base,
+				p: young,
+				age: 31,
+				lateSeason,
+				aiControlled: false,
+			}),
+		);
+		// Back-to-backs: every 30+ player in the rotation
+		assert.isTrue(
+			shouldRest({ ...base, p: vet, age: 30, lateSeason, backToBack: true }),
+		);
+		assert.isFalse(shouldRest({ ...base, p: vet, age: 30, backToBack: true }));
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		assert.isFalse(shouldRest({ ...base, p: young, age: 31, lateSeason }));
 	});
 });
 

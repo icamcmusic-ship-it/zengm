@@ -8,7 +8,7 @@ import { idb } from "../../db/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { isRedshirting } from "../college/redshirt.ts";
 import { g, helpers, local } from "../../util/index.ts";
-import type { Player, Conditions } from "../../../common/types.ts";
+import type { Player, Conditions, TeamSeason } from "../../../common/types.ts";
 import {
 	COMPOSITE_WEIGHTS,
 	DEFAULT_PLAY_THROUGH_INJURIES,
@@ -207,6 +207,8 @@ export const processTeam = async (
 		otl: number;
 		cid: number;
 		did: number;
+		// Injury Depth's late-season rest
+		clinchedPlayoffs?: TeamSeason["clinchedPlayoffs"];
 	},
 	players: Player[],
 ) => {
