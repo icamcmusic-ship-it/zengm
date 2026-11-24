@@ -74,7 +74,6 @@ import {
 import { traitsEnabled } from "../core/player/traits.ts";
 import fuzzRating from "../core/player/fuzzRating.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
-import fuzzRating from "../core/player/fuzzRating.ts";
 import { TWO_K_NAMES } from "../../common/archetypes/defs.data.ts";
 import { user2kLabel } from "../../common/archetypes/twoK/user2kLookup.ts";
 
