@@ -63,6 +63,15 @@ export const PHASE = {
 	FREE_AGENCY: 8,
 } satisfies Record<string, Phase>;
 
+// Phases where God Mode can change a team's status (Manage Teams, Manage Conferences), checked in the worker too
+export const PHASES_WHERE_TEAMS_CAN_BE_DISABLED = new Set<Phase>([
+	PHASE.PRESEASON,
+	PHASE.DRAFT_LOTTERY,
+	PHASE.AFTER_DRAFT,
+	PHASE.RESIGN_PLAYERS,
+	PHASE.FREE_AGENCY,
+]);
+
 export const REMAINING_PLAYOFF_TEAMS_PHASES = new Set<Phase>([
 	PHASE.REGULAR_SEASON,
 	PHASE.AFTER_TRADE_DEADLINE,

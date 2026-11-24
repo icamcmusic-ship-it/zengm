@@ -1,6 +1,6 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, local } from "../../util/index.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import { getContractDemand } from "../contract/index.ts";
 import type { Player } from "../../../common/types.ts";
@@ -47,7 +47,10 @@ export const getDemandMarket = async (freeAgents: Player[]) => {
 		if (index >= 0) {
 			lastManValues.push(values[index]!);
 		}
-		if (userTids.includes(t.tid) || roster.length >= maxRosterSize) {
+		// User teams sign free agents like AI teams in spectator mode and auto play (autoSign), so their cap space is part of the market then
+		const aiSigns =
+			!userTids.includes(t.tid) || !!local.autoPlayUntil || g.get("spectator");
+		if (!aiSigns || roster.length >= maxRosterSize) {
 			continue;
 		}
 		if (salaryCapType === "none") {

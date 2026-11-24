@@ -1139,7 +1139,7 @@ const ScheduleEditor = ({
 									if (!canRegenerateSchedule) {
 										showNotification({
 											type: "error",
-											text: "You can only regenerate the schedule at the start of the regular season, when no games have been played.",
+											text: "You can only regenerate the schedule at the start of the regular season, when no games have been played (and not in college mode).",
 										});
 										return;
 									}
@@ -1208,7 +1208,9 @@ const ScheduleEditor = ({
 									type: "error",
 									text: `Error saving schedule: ${error.message}`,
 								});
-								throw error;
+								// A schedule the worker rejected (validateEditedSchedule) can be fixed and saved again
+								setSaving(false);
+								return;
 							}
 
 							showNotification({

@@ -7,6 +7,7 @@ import type {
 } from "../../common/types.ts";
 import { groupByUnique, maxBy, orderBy } from "../../common/utils.ts";
 import { season, team } from "../core/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
@@ -92,7 +93,9 @@ export default defineView({
 				active: true,
 			});
 
-			let canRegenerateSchedule = g.get("phase") === PHASE.REGULAR_SEASON;
+			// Not in college mode, which makes its own schedule (rounds, poll weeks, conference tournaments)
+			let canRegenerateSchedule =
+				g.get("phase") === PHASE.REGULAR_SEASON && !isCollege();
 			if (canRegenerateSchedule) {
 				const teams = await team.getFormattedAll({
 					attrs: ["tid"],

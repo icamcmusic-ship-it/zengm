@@ -355,6 +355,23 @@ describe("options", () => {
 		const contract = getCurrentContract(p)!;
 		assert.isFalse(applyOptionDecision(contract, "exercised"));
 	});
+
+	test('automatic team option decision: no "you didn\'t decide" in spectator mode', async () => {
+		const p = await getTeamPlayer(0);
+		await setContract(p, {
+			start: 2015,
+			exp: 2017,
+			amount: 1000,
+			extra: { option: { type: "team", season: 2017 } },
+		});
+		g.setWithoutSavingToDB("spectator", true);
+		await decideContractOptions();
+		const event = (await idb.cache.events.getAll()).find(
+			(event) => event.type === "contractOption" && event.pids?.[0] === p.pid,
+		);
+		assert.ok(event);
+		assert.notInclude(event.text, "you didn't decide");
+	});
 });
 
 describe("extensions", () => {

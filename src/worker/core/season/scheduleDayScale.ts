@@ -101,3 +101,11 @@ export const getScheduleDayScale = (
 	}
 	return Math.min(1, getCompactNumDays(games) / numDays);
 };
+
+// scheduleSpread for a schedule saved from the schedule editor. Like newPhaseRegularSeason, spread whenever realistic schedule
+// length is on (also in 2-3 team leagues, where the scale is 1). With it off, only if the edited schedule itself is spread
+// out (scale < 1), so a schedule regenerated after turning it off doesn't keep marking games as back-to-backs and 3-in-4s
+export const getEditedScheduleSpread = (
+	dayScale: number,
+	realisticScheduleOn: boolean,
+) => realisticScheduleOn || dayScale < 1;

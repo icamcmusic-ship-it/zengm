@@ -322,6 +322,24 @@ describe("decreaseDemands", () => {
 		assert.strictEqual(m.tiers[0]!.aboveMin, 0);
 	});
 
+	test("spectator mode: the user's team is part of the market (the AI signs for it)", async () => {
+		// The user's team (tid 0) has the most cap space in the league
+		for (const p of await idb.cache.players.indexGetAll("playersByTid", 0)) {
+			const contract = getCurrentContract(p)!;
+			contract.amounts = contract.amounts.map(() => g.get("minContract"));
+			await idb.cache.players.put(p);
+		}
+		const freeAgents = await idb.cache.players.indexGetAll(
+			"playersByTid",
+			PLAYER.FREE_AGENT,
+		);
+		const best = freeAgents.reduce((a, b) => (b.value > a.value ? b : a));
+		const without = (await getDemandMarket(freeAgents)).getMarket(best);
+		g.setWithoutSavingToDB("spectator", true);
+		const withUser = (await getDemandMarket(freeAgents)).getMarket(best);
+		assert.isAbove(withUser, without);
+	});
+
 	test.runIf(!!(globalThis as any).process?.env?.FA_METRICS)(
 		"metrics",
 		async () => {
