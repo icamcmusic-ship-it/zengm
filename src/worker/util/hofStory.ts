@@ -6,7 +6,7 @@ import {
 	type CareerFacts,
 	type HofTeam,
 } from "../../common/hofStory.ts";
-import { archetypeById } from "../../common/archetypes/index.ts";
+import { viewOf } from "../../common/archetypes/index.ts";
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
 import { getTeamInfoBySeason } from "./getTeamInfoBySeason.ts";
@@ -207,9 +207,24 @@ export const careerFacts = async (
 	}
 
 	// Archetype label of his best stored season
-	const arch = p.archetypes?.at(-1);
+	// (his highest-ovr season with a stored label, the later on a tie; named as the player page names it: a merged build
+	// as the build it was merged into, at his position that season)
+	let arch:
+		| {
+				e: NonNullable<Player["archetypes"]>[number];
+				ovr: number;
+				pos?: string;
+		  }
+		| undefined;
+	for (const e of p.archetypes ?? []) {
+		const row = (p.ratings as any[]).find((r) => r.season === e.season);
+		const ovr = typeof row?.ovr === "number" ? row.ovr : -Infinity;
+		if (!arch || ovr >= arch.ovr) {
+			arch = { e, ovr, pos: row?.pos };
+		}
+	}
 	if (arch) {
-		facts.archetype = archetypeById(arch.id)?.name;
+		facts.archetype = (viewOf(arch.e, arch.pos) ?? viewOf(arch.e))?.name;
 	}
 
 	if (!ctx.full) {

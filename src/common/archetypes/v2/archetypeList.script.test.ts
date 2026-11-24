@@ -24,6 +24,7 @@ import {
 	TRAIT_KEYWORDS,
 	WORD_REQ,
 	specialNounsOf,
+	BIG_HANDLE_PCT,
 } from "./nouns.ts";
 import {
 	CRAFTY_COVER,
@@ -39,6 +40,7 @@ import {
 	RAMP_HI,
 	RAMP_LO,
 	SECOND_COST,
+	SKILL_NAME_MIN,
 	SPECIAL_EDGE,
 	STICK_COVER,
 	THREE_LEVEL_BAR,
@@ -102,7 +104,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		);
 		out.push("");
 		out.push(
-			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best families it names (2-Way names all his defensive ones), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two (2-Way counts as one; a noun name says at most ${MAX_PARTS}). Its skills must be among his best ${TOP_N} families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets ${SPECIAL_EDGE} over a noun name that covers the same. The many-skills names are gated by how many elite skills (the ${pctTop(ELITE_SKILL)}) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most ${FLAT_ELITE} and covers each of his best ${GENERIC_COVER} of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs ${MANY_ELITE} or more and covers each ${ELITE_COVER}. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). Every skill has a plain noun (Rebounder, Spot-Up Shooter, Contact Finisher, Rim Protector, ...): a one-skill name is that noun, a two-skill name the front word of one skill and the noun of the other ("Glass-Cleaning Contact Finisher"). With no real skill (or one at OVR under 50, with no modifier) he is named by his best skill (or best two) against the league and his position, however low: there are no honest, depth or development names.`,
+			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best families it names (2-Way names all his defensive ones), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two (2-Way counts as one; a noun name says at most ${MAX_PARTS}). Its skills must be among his best ${TOP_N} families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets ${SPECIAL_EDGE} over a noun name that covers the same. The many-skills names are gated by how many elite skills (the ${pctTop(ELITE_SKILL)}) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most ${FLAT_ELITE} and covers each of his best ${GENERIC_COVER} of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs ${MANY_ELITE} or more and covers each ${ELITE_COVER}. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). Every skill has a plain noun (Rebounder, Spot-Up Shooter, Contact Finisher, Rim Protector, ...): a one-skill name is that noun, a two-skill name the front word of one skill and the noun of the other ("Glass-Cleaning Contact Finisher"). With no real skill (or one at OVR under 50, with no modifier) he is named by his best skill (or best two) against the league and his position, provided it stands at the ${pctTop(SKILL_NAME_MIN)} or better; below that, by his position alone (Guard, Wing, Forward, Big): there are no honest, depth or development names. Some words never go with a position, whatever his ratings say: rim-protection words (Rim-Protecting, Shot-Erasing, Shot Blocker, Paint Protector, Backline) not on a guard (PG, G, SG), post words not on a PG or G, and on an FC or C the primary handler's words (Ball-Handling, Ball Handler, Floor General, Point, Playmaker / Playmaking, Dimer) only with his handle at the ${pctTop(BIG_HANDLE_PCT)} or better; a skill his position rules out is never his plain skill name either.`,
 		);
 		out.push("");
 		out.push(

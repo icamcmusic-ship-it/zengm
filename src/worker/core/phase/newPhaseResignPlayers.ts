@@ -25,6 +25,7 @@ import { getAllGmWeights } from "../gm/index.ts";
 import * as college from "../college/index.ts";
 import { careerAgingOn, usefulVeteran } from "../player/careerAging.ts";
 import type { Player } from "../../../common/types.ts";
+import { storeScoutedArchetype } from "../player/archetype.ts";
 
 // Career Aging: would this expiring veteran be in his team's top 13 for next season, and does he take the minimum from it?
 const keepVeteranOnMinimum = async (p: Player, payroll: number | undefined) => {
@@ -452,6 +453,10 @@ const newPhaseResignPlayers = async (
 	const numPlayersTradedAwayNormalized =
 		await getNumPlayersTradedAwayNormalizedAll();
 	const playersToMakeFreeAgents = [...existingFreeAgents, ...undraftedPlayers];
+	for (const p of undraftedPlayers) {
+		// (his label as scouted stays until his first preseason)
+		await storeScoutedArchetype(p);
+	}
 	for (const p of playersToMakeFreeAgents) {
 		player.addToFreeAgents(p, numPlayersTradedAwayNormalized);
 	}

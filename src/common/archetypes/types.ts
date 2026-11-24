@@ -292,8 +292,6 @@ export type Classification = {
 	alternates: { id: string; name: string }[];
 	// archv4: the runner-up when it is close (v2 params.alsoMargin), shown as a small "Also:" line in the popover
 	also?: { id: string; name: string };
-	// archnouns: his defensive label, shown after the name ("Pull-Up Shot Hunter · Point-of-Attack Pest")
-	defense?: string;
 	// archcov: why the label was chosen
 	reason?: ArchetypeReason;
 	// 0..1: how similar the shape of his ratings is to the build's profile (absolute, see POOR_FIT in classify.ts)
@@ -347,10 +345,13 @@ export type StoredArchetype = {
 	conf?: number;
 	// archv4: the runner-up's id when it was close (shown as "Also:" in the archetype popover only)
 	also?: string;
-	// archnouns: his defensive label
+	// archnouns: his defensive label (readings 23-27; ignored since there is no defensive tag)
 	def?: string;
 	// archcov: why it was chosen
 	why?: ArchetypeReason;
+	// A drafted rookie's reading as he was scouted, stored at the draft so his label doesn't change when he is picked; the
+	// first preseason reads him afresh from his true ratings (never kept by stickiness)
+	scouted?: true;
 	// The reading's version (ARCHETYPE_READING_VERSION) when it was stored: an entry from an older reading is read again
 	v?: number;
 };

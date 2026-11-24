@@ -4,7 +4,6 @@ import {
 	displayTiersOf,
 	entryForSeason,
 } from "../../../common/tieredBadges/compute.ts";
-import { defenseWhy } from "../../../common/archetypes/v2/defenseLabels.ts";
 import {
 	labelSourceOf,
 	user2kLabel,
@@ -21,6 +20,7 @@ import {
 	explain,
 	ARCHETYPE_READING_VERSION,
 	archetypeById,
+	tierFromPercentile,
 	toStored,
 	viewOf,
 	withEntry,
@@ -30,6 +30,7 @@ import {
 	type Norms,
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
+import { ovrPercentile } from "../../../common/archetypes/norms.ts";
 import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
 import {
 	classifyV2,
@@ -43,7 +44,7 @@ import type { Player } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
 import { idb } from "../../db/index.ts";
 import { g, local, lock } from "../../util/index.ts";
-import { applyFuzz, getFuzz } from "./fuzzRating.ts";
+import fuzzRating, { applyFuzz, getFuzz } from "./fuzzRating.ts";
 import ovr from "./ovr.ts";
 import posFn from "./pos.ts";
 import { expandedRatingsOn, expandedRatingsApply } from "./expandedRatings.ts";
@@ -135,6 +136,13 @@ export const ratingsForArchetype = (
 	if (!row || row.hgt === undefined) {
 		return undefined;
 	}
+	// (a rating that is missing or not a number, from a hand-edited or old league file, would read as a skill or turn
+	// every standing NaN: no label then, rather than a wrong one)
+	for (const key of RATING_KEYS) {
+		if (typeof row[key] !== "number" || !Number.isFinite(row[key])) {
+			return undefined;
+		}
+	}
 	const fuzz = fuzzed ? getFuzz(row.fuzz ?? 0) : 0;
 	const out = {} as ArchetypeRatings;
 	for (const key of RATING_KEYS) {
@@ -142,7 +150,12 @@ export const ratingsForArchetype = (
 	}
 	// Expanded ratings, when the setting is on: interior/perimeter defense for the defensive labels, wingspan for rim protection and
 	// length (wingspan is a measurement, never fuzzed)
-	if (expandedRatingsApply(row)) {
+	if (
+		expandedRatingsApply(row) &&
+		["wng", "pdef", "idef", ...EXPANDED_RATINGS2].every(
+			(k) => typeof row[k] === "number" && Number.isFinite(row[k]),
+		)
+	) {
 		out.wng = row.wng;
 		out.pdef = applyFuzz(row.pdef, fuzz);
 		out.idef = applyFuzz(row.idef, fuzz);
@@ -448,8 +461,9 @@ export const fuzzedArchetypeLabel = (
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
-		ovr: level.ovr,
-		pot: level.pot,
+		// (his ovr and pot as scouted too, like his ratings, so the tier and upside words never give away the true ones)
+		ovr: level.ovr === undefined ? undefined : applyFuzz(level.ovr, f),
+		pot: level.pot === undefined ? undefined : applyFuzz(level.pot, f),
 		...(model ? { model } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
 		...(rejects.length > 0 ? { rejects } : {}),
@@ -464,8 +478,6 @@ export const classifyPlayer = (
 	p: Player,
 	norms: Norms,
 	previousId?: string,
-	// archstick: last season's defensive label (with previousId, his whole label then)
-	previousDefense?: string,
 ): Classification | undefined => {
 	const ratings = ratingsForArchetype(p);
 	if (!ratings) {
@@ -483,7 +495,6 @@ export const classifyPlayer = (
 		// (archreview2: upside for the honest names)
 		pot: levelFuzz ? applyFuzz(row.pot, levelFuzz) : row.pot,
 		previousId,
-		...(previousId && previousDefense ? { previousDefense } : {}),
 		pos: isPos(row.pos) ? row.pos : undefined,
 		traits:
 			typeof row.season === "number"
@@ -585,16 +596,11 @@ export const storeArchetype = (p: Player, norms: Norms): boolean => {
 	if (!featureOn("archetypes")) {
 		return false;
 	}
-	// (a label from an older reading is not kept by stickiness: he is read afresh)
-	// (archstick: with its defensive label: his whole label is kept while it still fits)
+	// (a label from an older reading is not kept by stickiness: he is read afresh; nor is a drafted rookie's scouted
+	// reading, storeScoutedArchetype: his first label from his true ratings is his own)
 	const prev = currentEntry(p.archetypes);
-	const fresh = prev && !isStale(prev);
-	const c = classifyPlayer(
-		p,
-		norms,
-		fresh ? prev.id : undefined,
-		fresh ? prev.def : undefined,
-	);
+	const fresh = prev && !isStale(prev) && !prev.scouted;
+	const c = classifyPlayer(p, norms, fresh ? prev.id : undefined);
 	if (!c) {
 		return false;
 	}
@@ -612,12 +618,112 @@ export const updateArchetypesForPreseason = async (players: Player[]) => {
 	const norms = await getLeagueNorms(true);
 	// archfb: the user's tuning from all picks so far
 	await refitArchetypeTuning();
+	let n = 0;
 	for (const p of players) {
 		if (p.tid === PLAYER.RETIRED || p.tid === PLAYER.UNDRAFTED) {
 			continue;
 		}
 		storeArchetype(p, norms);
 		await idb.cache.players.put(p);
+		// (a reading costs several ms, a league holds hundreds of players: yield now and then so the UI stays responsive)
+		if (++n % STORE_CHUNK === 0) {
+			await yieldToEventLoop();
+		}
+	}
+};
+const STORE_CHUNK = 25;
+const yieldToEventLoop = () =>
+	__NODE_ENV === "test"
+		? Promise.resolve()
+		: new Promise((resolve) => setTimeout(resolve, 0));
+
+// arch audit: a drafted prospect (or one who goes undrafted into free agency) keeps the reading the user's scouts gave
+// him until his first preseason, instead of flipping to his true ratings' reading the moment he is picked. Call while
+// he is still a prospect (before his tid changes).
+export const storeScoutedArchetype = async (p: Player) => {
+	if (
+		__SPORT !== "basketball" ||
+		!featureOn("archetypes") ||
+		p.tid !== PLAYER.UNDRAFTED
+	) {
+		return;
+	}
+	const c = classifyPlayer(p, await getLeagueNorms());
+	if (!c) {
+		return;
+	}
+	const season = (last(p.ratings) as any).season as number;
+	p.archetypes = withEntry(p.archetypes, {
+		...toStored(season, c),
+		scouted: true,
+	});
+};
+
+// arch audit: after a reading-version bump every stored label is stale, so every page read everyone live (several ms
+// each, on every load). Once per league load (in the background, in chunks that yield, like warmProspectArchetypes),
+// players whose current entry is stale or missing are read and stored again. Stickiness is off for a stale entry
+// (storeArchetype), so the label stored is the live reading the pages already showed.
+let restoreToken = 0;
+export const restoreStaleArchetypes = () => {
+	if (
+		__NODE_ENV === "test" ||
+		__SPORT !== "basketball" ||
+		!featureOn("archetypes")
+	) {
+		return;
+	}
+	const token = ++restoreToken;
+	const lid = g.get("lid");
+	const busy = () =>
+		token !== restoreToken ||
+		g.get("lid") !== lid ||
+		local.autoPlayUntil !== undefined ||
+		lock.get("newPhase") ||
+		lock.get("gameSim");
+	setTimeout(async () => {
+		try {
+			if (busy()) {
+				return;
+			}
+			const norms = await getLeagueNorms();
+			const players = (
+				await idb.cache.players.indexGetAll("playersByTid", [
+					PLAYER.FREE_AGENT,
+					Infinity,
+				])
+			).filter((p) => {
+				const e = currentEntry(p.archetypes);
+				return !e || isStale(e);
+			});
+			await restoreChunks(players, norms, busy);
+		} catch (error) {
+			console.error(error);
+		}
+	}, 1000);
+};
+export const restoreChunks = async (
+	players: Player[],
+	norms: Norms,
+	busy: () => boolean = () => false,
+) => {
+	for (let i = 0; i < players.length; i += 8) {
+		if (busy()) {
+			return;
+		}
+		for (const p of players.slice(i, i + 8)) {
+			// (re-read from the cache: a player changed since the list was read is stored as he is now)
+			const cur = await idb.cache.players.get(p.pid);
+			if (!cur || cur.tid < PLAYER.FREE_AGENT) {
+				continue;
+			}
+			const e = currentEntry(cur.archetypes);
+			if (e && !isStale(e)) {
+				continue;
+			}
+			storeArchetype(cur, norms);
+			await idb.cache.players.put(cur);
+		}
+		await yieldToEventLoop();
 	}
 };
 
@@ -839,7 +945,30 @@ export const reasonLine = (
 	return `Named for his ${list}${kept}${other}.`;
 };
 
-// Everything the player page shows. A non-prospect with no entry gets one stored here, once.
+// The tier shown with his label: from his ovr as the user's scouts see it (scouting fuzz, as everywhere an ovr is shown)
+// in the season the label is for; none under the No Visible Ratings challenge (a tier is his ovr in words)
+const shownTier = (
+	p: Player,
+	norms: Norms,
+	season: number,
+): ArchetypeView["tier"] => {
+	if (g.get("challengeNoRatings")) {
+		return undefined;
+	}
+	const row =
+		(p.ratings as any[]).findLast((r) => r.season <= season) ??
+		(last(p.ratings) as any);
+	if (typeof row?.ovr !== "number") {
+		return undefined;
+	}
+	return tierFromPercentile(
+		ovrPercentile(norms, fuzzRating(row.ovr, row.fuzz ?? 0)),
+	);
+};
+
+// Everything the player page shows. Read-only: a player with no valid entry is read live, as on every other page (the
+// roster panel, League > Archetypes), and gets his entry at the next preseason. Viewing him never stores one (a stored
+// entry is the next preseason's "last season's label", so a page view would change his future labels).
 export const archetypeInfoForPlayer = async (
 	p: Player,
 ): Promise<PlayerArchetypeInfo | undefined> => {
@@ -847,21 +976,6 @@ export const archetypeInfoForPlayer = async (
 		return undefined;
 	}
 	const norms = await getLeagueNorms();
-	const isProspect =
-		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
-	// No entry yet, or one that is no longer valid for his position (or an archetype that no longer exists): store a new one
-	if (
-		!isProspect &&
-		p.tid !== PLAYER.RETIRED &&
-		!viewOf(currentEntry(p.archetypes), posNow(p), viewContext())
-	) {
-		const cached = await idb.cache.players.get(p.pid);
-		if (cached) {
-			storeArchetype(cached, norms);
-			await idb.cache.players.put(cached);
-			p = cached;
-		}
-	}
 	const found = archetypeFor(p, norms);
 	if (!found) {
 		return undefined;
@@ -902,10 +1016,6 @@ export const archetypeInfoForPlayer = async (
 		);
 	}
 	const v = found.view;
-	// archnouns: the defensive label's own why line, after the main label's
-	if (v.defense) {
-		whyList = [...(whyList ?? []), defenseWhy(v.defense)];
-	}
 	// archcov: why this name and not another (the reason stored with the label), in words
 	const reason = found.stored ? currentEntry(p.archetypes)?.why : undefined;
 	if (reason) {
@@ -936,7 +1046,7 @@ export const archetypeInfoForPlayer = async (
 		...(tk && mode === "both" ? { twoK: tk } : {}),
 		desc: v.desc,
 		group: v.group,
-		tier: v.tier,
+		tier: shownTier(p, norms, found.stored ? v.season : season),
 		conf: v.conf,
 		...(v.also ? { also: v.also } : {}),
 		season: found.stored ? v.season : undefined,

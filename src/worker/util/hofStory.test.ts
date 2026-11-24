@@ -2,6 +2,7 @@ import { afterEach, assert, beforeEach, test } from "vitest";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import type { Player, TeamSeason } from "../../common/types.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../test/helpers.ts";
+import { archetypeById, viewOf } from "../../common/archetypes/index.ts";
 import { team } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g } from "./index.ts";
@@ -151,4 +152,27 @@ test("words are written once and stored on the player, and written again for an 
 	const rebuilt = (await getHofStories([p], [p, b])).get(1)!;
 	assert.strictEqual(rebuilt.v, HOF_STORY_VERSION);
 	assert.include(rebuilt.plaque, "Changed A");
+});
+
+test("archetype: his best season's label (highest ovr), named as the player page names it", async () => {
+	const p = makePlayer(1, "A", [statsRow(2010, 0), statsRow(2011, 0)]);
+	p.ratings = [
+		{ season: 2010, ovr: 70, pos: "SF" },
+		{ season: 2011, ovr: 50, pos: "SF" },
+	] as any;
+	// (2010: a build merged into another, at a position where that one has its own name; 2011, his final season, is not
+	// his best)
+	p.archetypes = [
+		{ season: 2010, id: "shot-obliterating-lock" },
+		{ season: 2011, id: "iso-savant" },
+	];
+	const facts = await careerFacts(p, { full: false });
+	// (a merged id has no build of its own: it is named as the build it was merged into)
+	assert.strictEqual(archetypeById("shot-obliterating-lock"), undefined);
+	assert.strictEqual(
+		facts.archetype,
+		viewOf({ season: 2010, id: "lockdown-eraser" }, "SF")?.name ??
+			archetypeById("lockdown-eraser")!.name,
+	);
+	assert.ok(facts.archetype);
 });

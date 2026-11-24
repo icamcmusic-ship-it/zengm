@@ -98,6 +98,7 @@ import {
 	tieFavored,
 	traitKeywordOf,
 	wordsFit,
+	nounFitsPos,
 	type CoverCtx,
 	type CoverScore,
 	type CustomSpecial,
@@ -116,6 +117,9 @@ export const MISS_TOP2 = 2;
 // A second skill named costs this much (it is named from about the 66th percentile), each beyond two this much (from
 // about the 72nd), so a skill earns its word smoothly, with no cliff
 export const SECOND_COST = 0.3;
+// archaudit: a skill name (skillPick) needs his best skill at this standing or more (league and position group); below it
+// he is named by his position alone
+export const SKILL_NAME_MIN = 0.5;
 export const EXTRA_COST = 0.6;
 // archfam: the many-skills names are gated by how many elite skills he has (skills at ELITE_SKILL, offensive IQ apart),
 // not by his best skill's standing. A broad name (Jack-Of-All-Trades, Swiss-Army-Knife, the user's names with no
@@ -711,7 +715,8 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			}
 		}
 		return (
-			wordsFit(sp.name, pos, x.traits) && okName(sp.name, main, specialTw(sp))
+			wordsFit(sp.name, pos, x.traits, pct.handle) &&
+			okName(sp.name, main, specialTw(sp))
 		);
 	};
 	const pushSpecial = (sp: Special) =>
@@ -952,7 +957,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		}
 		const name = nameOf(role, descs, pick);
 		if (
-			!wordsFit(name, pos, x.traits) ||
+			!wordsFit(name, pos, x.traits, pct.handle) ||
 			!okName(name, main, cn.tw) ||
 			(skillNoun && stemRepeat(name))
 		) {
@@ -1119,11 +1124,12 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		return c.pick;
 	};
 	const skillPick = (): NounPick => {
+		// (archaudit: a skill his position rules out, rim protection on a guard, ..., never names him: nouns.ts nounFitsPos)
 		const heads = [
 			...new Set(
 				NOUNS.filter((n) => !ATH_KEYS.has(n) && n !== "crafty").map(familyOf),
 			),
-		];
+		].filter((h) => nounFitsPos(h, pos, pct.handle));
 		const fams = heads
 			.map((h) => {
 				let rep = h;
@@ -1153,6 +1159,27 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			);
 		const w = (p: number) => skillWeight(p) + p / 100;
 		const [f1, f2] = fams;
+		// archaudit: a skill name needs a skill: when even his best one is below SKILL_NAME_MIN (the league's and his
+		// position group's median), he is named by his position alone ("Guard", "Wing", "Forward", "Big"), the modest
+		// form, rather than by a skill he doesn't have
+		if (!f1 || f1.p < SKILL_NAME_MIN) {
+			skillPicked = true;
+			const role = POS_WORD[pos];
+			push(
+				{
+					kind: "composed",
+					descs: [],
+					role,
+					nouns: [],
+					pick: {},
+					conf: confFor([]),
+				},
+				[],
+				idOf(role, [], {}),
+				0,
+			);
+			return skillCand();
+		}
 		// (a second skill only when it may be named: its bar, SKILL_BAR, "two modest skills")
 		const pair =
 			f2 !== undefined &&
@@ -1192,7 +1219,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				(vetoed(name) ||
 					nameProblem(name) !== undefined ||
 					stemRepeat(name) ||
-					!wordsFit(name, pos, x.traits) ||
+					!wordsFit(name, pos, x.traits, pct.handle) ||
 					coverPromises(name, main, ctx, true).length > 0)
 			) {
 				return undefined;

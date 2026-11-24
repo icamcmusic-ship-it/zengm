@@ -30,10 +30,15 @@ import {
 	classifyPlayer,
 	getLeagueNorms,
 	initArchetypesForNewLeague,
+	fuzzedArchetypeLabel,
 	resetArchetypeNorms,
+	restoreChunks,
 	storeArchetype,
+	storeScoutedArchetype,
 	updateArchetypesForPreseason,
 } from "./archetype.ts";
+import { tierFromPercentile } from "../../../common/archetypes/index.ts";
+import { ovrPercentile } from "../../../common/archetypes/norms.ts";
 
 const season = 2025;
 
@@ -306,14 +311,19 @@ describe("stored archetypes", () => {
 		assert.strictEqual(archetypeStats(p as any, season), undefined);
 	});
 
-	test("the player page lazily stores one entry for a player who has none", async () => {
+	test("the player page is read-only: a player with no entry is read live, as on the other pages, and nothing is stored", async () => {
 		const vet = (await idb.cache.players.indexGetAll("playersByTid", 3))[0]!;
 		assert.strictEqual(vet.archetypes, undefined);
 		const info = await archetypeInfoForPlayer(vet);
 		assert.ok(info);
-		assert.strictEqual(info!.live, false);
+		assert.strictEqual(info!.live, true);
 		const stored = (await idb.cache.players.get(vet.pid))!;
-		assert.strictEqual(stored.archetypes?.length, 1);
+		assert.strictEqual(stored.archetypes, undefined);
+		// (the same label the roster panel and League > Archetypes show)
+		assert.strictEqual(
+			info!.id,
+			archetypeFor(stored, await getLeagueNorms())!.view.id,
+		);
 		const info2 = await archetypeInfoForPlayer(stored);
 		assert.strictEqual(info2!.id, info!.id);
 		// (the build's three strongest dimensions. archnouns: a composed name's profile is the dimensions its words say, up to
@@ -430,6 +440,120 @@ describe("stored archetypes", () => {
 		assert.strictEqual(changed, false);
 		assert.strictEqual(currentEntry(p.archetypes)!.id, id);
 	});
+
+	test("the tier shown is read from his ovr as scouted, and hidden under the No Visible Ratings challenge", async () => {
+		await initArchetypesForNewLeague();
+		const norms = await getLeagueNorms();
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 6))[0]!;
+		const row = last(p.ratings) as any;
+		// (a stored tier from his true ovr: shown as the scouts see him)
+		row.ovr = 60;
+		row.fuzz = -10;
+		const info = (await archetypeInfoForPlayer(p))!;
+		assert.strictEqual(info.tier, tierFromPercentile(ovrPercentile(norms, 50)));
+		g.setWithoutSavingToDB("challengeNoRatings", true);
+		assert.strictEqual((await archetypeInfoForPlayer(p))!.tier, undefined);
+		g.setWithoutSavingToDB("challengeNoRatings", false);
+	});
+
+	test("ratings that are missing or not numbers give no label instead of a wrong one", async () => {
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 8))[0]!;
+		assert.ok(ratingsForArchetype(p));
+		(last(p.ratings) as any).spd = Number.NaN;
+		assert.strictEqual(ratingsForArchetype(p), undefined);
+		delete (last(p.ratings) as any).spd;
+		assert.strictEqual(ratingsForArchetype(p), undefined);
+		assert.strictEqual(classifyPlayer(p, await getLeagueNorms()), undefined);
+	});
+
+	test("a drafted prospect keeps his scouted reading until his first preseason, which reads him afresh", async () => {
+		const norms = await getLeagueNorms();
+		const prospect = (
+			await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+		)[0]!;
+		(last(prospect.ratings) as any).fuzz = 8;
+		const scouted = archetypeFor(prospect, norms)!.view.label;
+		await storeScoutedArchetype(prospect);
+		prospect.tid = 0;
+		const after = archetypeFor(prospect, norms)!;
+		assert.strictEqual(after.stored, true);
+		assert.strictEqual(after.view.label, scouted);
+		assert.strictEqual(currentEntry(prospect.archetypes)!.scouted, true);
+		// (the first preseason: his true ratings' reading, the scouted one never kept by stickiness)
+		g.setWithoutSavingToDB(
+			"season",
+			(last(prospect.ratings) as any).season + 1,
+		);
+		player.addRatingsRow(prospect, DEFAULT_LEVEL);
+		await player.develop(prospect, 1, false, 0);
+		await updateArchetypesForPreseason([prospect]);
+		const e = currentEntry(prospect.archetypes)!;
+		assert.ok(
+			e.season > (prospect.archetypes![0]!.season as number),
+			"a new entry",
+		);
+		assert.strictEqual(e.scouted, undefined);
+		assert.strictEqual(
+			e.id,
+			classifyPlayer(prospect, await getLeagueNorms())!.id,
+		);
+	});
+
+	test("stale entries are stored again in chunks, live readings kept", async () => {
+		await initArchetypesForNewLeague();
+		const norms = await getLeagueNorms();
+		const all = await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.FREE_AGENT,
+			Infinity,
+		]);
+		for (const p of all) {
+			p.archetypes = p.archetypes!.map((e) => ({ ...e, v: 1 }));
+			await idb.cache.players.put(p);
+		}
+		const live = new Map(
+			all.map((p) => [p.pid, archetypeFor(p, norms)!.view.id]),
+		);
+		await restoreChunks(all, norms);
+		for (const p of await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.FREE_AGENT,
+			Infinity,
+		])) {
+			const found = archetypeFor(p, norms)!;
+			assert.strictEqual(found.stored, true);
+			assert.strictEqual(found.view.id, live.get(p.pid));
+		}
+	}, 120_000);
+
+	test("Regenerate Ratings' preview: the level (ovr, pot) is read as scouted, like the ratings", async () => {
+		const norms = await getLeagueNorms();
+		for (let i = 0; i < 30; i++) {
+			const prospect = player.generate(
+				PLAYER.UNDRAFTED,
+				19,
+				season,
+				false,
+				DEFAULT_LEVEL,
+			) as any;
+			prospect.pid = 2000 + i;
+			const prow = last(prospect.ratings) as any;
+			// (an elite shooter, scouted across the elite-word ovr line: 61 seen as 51, 50 seen as 60)
+			prow.tp = 97;
+			prow.fuzz = i % 2 === 0 ? -10 : 10;
+			prow.ovr = prow.fuzz < 0 ? 61 : 50;
+			prow.pot = prow.ovr + 6;
+			prow.pos = player.pos(prow);
+			assert.strictEqual(
+				fuzzedArchetypeLabel(
+					ratingsForArchetype(prospect, false)!,
+					prow.fuzz,
+					norms,
+					{ ovr: prow.ovr, pot: prow.pot },
+				),
+				classifyPlayer(prospect, norms)!.label,
+				`prospect ${i}`,
+			);
+		}
+	}, 120_000);
 });
 
 describe("wiring", () => {

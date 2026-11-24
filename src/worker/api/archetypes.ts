@@ -72,6 +72,7 @@ import {
 	type VerdictStats,
 } from "../../common/archetypes/tuning.ts";
 import { traitsEnabled } from "../core/player/traits.ts";
+import fuzzRating from "../core/player/fuzzRating.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 import fuzzRating from "../core/player/fuzzRating.ts";
 import { TWO_K_NAMES } from "../../common/archetypes/defs.data.ts";
@@ -102,6 +103,11 @@ const EMPTY_COMPOSITION: Composition = {
 	warnings: [],
 	known: 0,
 };
+
+// His ovr as the user's scouts see it (scouting fuzz, as on the roster page): the panel and League > Archetypes show it
+// and sort by it. Under the No Visible Ratings challenge the UI hides the number.
+const shownOvr = (row: { ovr: number; fuzz?: number }) =>
+	fuzzRating(row.ovr, row.fuzz ?? 0);
 
 export const archetypeRoster = async ({
 	tid,
@@ -134,11 +140,12 @@ export const archetypeRoster = async ({
 		if (!found) {
 			continue;
 		}
+		const ovr = shownOvr(row);
 		players.push({
 			pid: p.pid,
 			name: `${p.firstName} ${p.lastName}`,
 			pos: row.pos,
-			ovr: row.ovr,
+			ovr,
 			label: displayArchetypeLabel(
 				p,
 				found.stored ? found.view.season : row.season,
@@ -149,7 +156,7 @@ export const archetypeRoster = async ({
 		});
 		rated.push({
 			pid: p.pid,
-			ovr: row.ovr,
+			ovr,
 			archetypeId: found.view.id,
 			pos: row.pos,
 		});
@@ -232,7 +239,7 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 		}
 		rated.push({
 			pid: p.pid,
-			ovr: (last(p.ratings) as any).ovr,
+			ovr: shownOvr(last(p.ratings) as any),
 			archetypeId: found.view.id,
 			pos: (last(p.ratings) as any).pos,
 			name: `${p.firstName} ${p.lastName}`,

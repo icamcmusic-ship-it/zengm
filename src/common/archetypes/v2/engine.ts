@@ -42,7 +42,6 @@ import {
 	type Rejection,
 } from "./nouns.ts";
 import type { RatingQuantiles } from "./gateScale.ts";
-import { defenseSentence } from "./defenseLabels.ts";
 import { pickNouns } from "./cover.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Norms, Pos } from "../types.ts";
@@ -383,8 +382,6 @@ export type V2Options = ClassifyOptions & {
 	pickKey?: string;
 	// archreview2: his potential (the honest names: upside is potential well above his ovr)
 	pot?: number;
-	// archstick: last season's defensive label (with previousId, his whole label last season)
-	previousDefense?: string;
 	// archnouns: the user's "Doesn't fit" verdicts with no pick: the name shown, the player's key and his ratings then
 	rejects?: readonly {
 		key?: string;
@@ -459,9 +456,6 @@ const nounInputOf = (
 			special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
 			// archstick: his whole label last season
 			...(prevRaw ? { id: prevComposed ? prevRaw : mergedId(prevRaw) } : {}),
-			...(prevRaw && opts.previousDefense
-				? { defense: opts.previousDefense }
-				: {}),
 		},
 	};
 };
@@ -1082,7 +1076,6 @@ export const classifyV2 = (
 	// archnouns: the name from his nouns (nouns.ts): a special name (a build), his two best nouns and his position, a
 	// trait name, or (one noun at low ovr, or none) an honest name about that noun
 	let nounConf: number | undefined;
-	let nounDefense: string | undefined;
 	let nounExplain: CoverExplain | undefined;
 	let nounIn: NounInput | undefined;
 	if (P.nouns && isPos(pos)) {
@@ -1098,7 +1091,6 @@ export const classifyV2 = (
 		}
 		const score = eff(first);
 		nounConf = np.conf;
-		nounDefense = np.defense;
 		nounExplain = np.explain;
 		if (np.kind === "special") {
 			const a = archetypeById(np.id)!;
@@ -1212,28 +1204,23 @@ export const classifyV2 = (
 		...classic,
 		id: a.id,
 		name: isComposedId(a.id) ? a.name : first.classic ? classic.name : atPos,
-		label:
-			(isComposedId(a.id) ? a.name : first.classic ? classic.label : atPos) +
-			(nounDefense ? ` · ${nounDefense}` : ""),
-		...(nounDefense ? { defense: nounDefense } : {}),
+		label: isComposedId(a.id) ? a.name : first.classic ? classic.label : atPos,
 		// archcov: why the label was chosen
 		...(nounExplain
 			? {
 					reason: {
 						...nounExplain,
-						name:
-							(isComposedId(a.id)
-								? a.name
-								: first.classic
-									? classic.label
-									: atPos) + (nounDefense ? ` · ${nounDefense}` : ""),
+						name: isComposedId(a.id)
+							? a.name
+							: first.classic
+								? classic.label
+								: atPos,
 					},
 				}
 			: {}),
 		group: a.group,
 		family: a.family,
-		// (archnouns: both labels in the description)
-		desc: nounDefense ? `${a.desc} ${defenseSentence(nounDefense)}` : a.desc,
+		desc: a.desc,
 		tags: a.tags,
 		alternates: rest.slice(1, 3).map((c) => ({ id: c.id, name: c.name })),
 		shortfall: isClassic ? classic.shortfall : 0,
@@ -1296,10 +1283,7 @@ export const classifyV2Label = (
 			}
 			if (id !== undefined) {
 				const a = archetypeById(id)!;
-				return (
-					(isComposedId(a.id) ? a.name : nameAt(a, pos)) +
-					(np.defense ? ` · ${np.defense}` : "")
-				);
+				return isComposedId(a.id) ? a.name : nameAt(a, pos);
 			}
 		}
 	}

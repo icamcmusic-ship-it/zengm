@@ -1,5 +1,4 @@
 // Pure helpers the UI and the worker views share: how an archetype is stored on a player, shown, aggregated and warned about.
-import { defenseSentence } from "./v2/defenseLabels.ts";
 import { ARCHETYPES, archetypeById } from "./classify.ts";
 import { mergedId } from "./merges.data.ts";
 import { isPos } from "./position.ts";
@@ -95,9 +94,6 @@ export const toStored = (
 	if (c.also) {
 		out.also = c.also.id;
 	}
-	if (c.defense) {
-		out.def = c.defense;
-	}
 	if (c.reason) {
 		out.why = c.reason;
 	}
@@ -116,8 +112,6 @@ export type ArchetypeView = {
 	season: number;
 	// archv4: the close runner-up's name at his position
 	also?: string;
-	// archnouns: his defensive label (also in `label`, after the name)
-	defense?: string;
 };
 
 // A stored entry as the UI shows it; null if its archetype no longer exists (an id from an older version), or, given his
@@ -164,12 +158,11 @@ export const viewOf = (
 	return {
 		id: a.id,
 		name,
-		label: e.def ? `${name} · ${e.def}` : name,
-		...(e.def ? { defense: e.def } : {}),
+		// (a defensive tag stored by readings 23-27, `def`, is ignored: there is no defensive tag)
+		label: name,
 		group: a.group,
 		family: a.family,
-		// (archnouns: both labels in the description)
-		desc: e.def ? `${a.desc} ${defenseSentence(e.def)}` : a.desc,
+		desc: a.desc,
 		tier: e.tier,
 		conf: e.conf,
 		season: e.season,

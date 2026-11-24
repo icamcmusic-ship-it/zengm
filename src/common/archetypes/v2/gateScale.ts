@@ -5,6 +5,7 @@
 // gateScale.script.test.ts) is mapped to the rating at that percentile among the league's own players (Norms.rq, built
 // with the league's norms). In a random league the two tables are about the same, so the cutoffs are the user's.
 import type { ArchetypeRatings } from "../types.ts";
+import { SUB_INDEX } from "../../subRatings.ts";
 import { GATE_REF } from "./gateScale.data.ts";
 
 export const GATE_SCALE_KEYS = [
@@ -27,6 +28,8 @@ export const GATE_SCALE_KEYS = [
 	"best",
 	"ath",
 	"ovr",
+	// (the rim-protection noun's own value, nouns.ts: its standing is read against its own table, not defensive IQ's)
+	"rimD",
 ] as const;
 export type GateScaleKey = (typeof GATE_SCALE_KEYS)[number];
 export type RatingQuantiles = Partial<Record<GateScaleKey, number[]>>;
@@ -48,11 +51,27 @@ export const gateScaleValue = (
 			return Math.max(r.spd ?? 0, r.jmp ?? 0);
 		case "ovr":
 			return ovr;
+		case "rimD":
+			return rimDValue(r);
 		default: {
 			const v = r[k];
 			return typeof v === "number" ? v : undefined;
 		}
 	}
+};
+
+// Rim protection (nouns.ts rimD): his interior defense (defensive IQ without expanded ratings) and, with Sub-Ratings on,
+// his shot blocking. The block sub-rating and defensive IQ carry no size, so with either of them his size and leaping count
+// too: a small guard who blocks well is not a rim protector. (the expanded interior-defense rating alone, without the
+// sub-rating, is read as it is: its split from defensive IQ leans on size; a sub-rating of 0 is missing)
+export const rimDValue = (r: ArchetypeRatings): number => {
+	const blk = r.sub?.[SUB_INDEX.blk!];
+	const hasBlk = typeof blk === "number" && blk > 0;
+	if (!hasBlk && r.idef !== undefined) {
+		return r.idef;
+	}
+	const xs = [...(hasBlk ? [blk] : []), r.idef ?? r.diq, r.hgt, r.jmp];
+	return xs.reduce((x, y) => x + y, 0) / xs.length;
 };
 
 // The quantiles of each gate key among some players (ratings with their ovr)

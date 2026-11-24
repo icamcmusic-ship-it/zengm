@@ -35,48 +35,48 @@ A build's words are its name's concepts (`twoK/concepts.ts`: the regexes there d
 is named). The head word's bar is **lead** (for a word with two classes, one of them at lead and the other at support); every other
 word's bar is **support**. "none" means no bar beyond the promise floor.
 
-| Words | Concept | Promises (classes) | Lead bar | Support bar | Sub-ratings (z, all) | Play types (z, any) |
-| --- | --- | --- | --- | --- | --- | --- |
-| 2-Way, Two Way, Both Ends | `twoWay` | [def] | top 30% | top 40% | - | - |
-| Lockdown, Lock, Clamp, Guard Dog, Defender, 3 & D, Switch-Defending, Tenacious, Warden | `lockdown` | [perD] | top 20% | top 30% | pdf: 0.25 | - |
-| Ball-Hawking, Ball Snatcher, Thief, Pickpocket, Disruptive, Chaos, Pesky, Pest, Bandit | `steal` | [perD] | top 20% | top 30% | stl: 0.52 | - |
-| Rim Protector, Shot-Erasing, Eraser, Apex-Erasing, Obliterator, Swats, Backline, Anchor, Guardian, Rim Reaper, Paint Hawk, Paint Defender, Paint Protector, Paint-Protecting, Terror, Shot-Axing, Fortress, Pillar | `rimD` | [rimD] | top 20% | top 30% | blk: 0.52 | - |
-| Crasher, Putback, Board-Hunting, Tip-In, Possession Extender | `oreb` | [reb] | top 25% | top 30% | orb: 0.25 | any of pb: 0.25 |
-| Glass, Board, Cleaner, Rebounder, Floor-Sweeping, Floor Sweeper | `reb` | [reb] | top 25% | top 30% | - | - |
-| Break Starter, Break Leader | `outlet` | [pass] | top 30% | top 40% | - | - |
-| 3-Level, Versatile Scorer (with Scorer) | `threeLevel` | [shoot, mid] | top 30% | top 40% | - | - |
-| Inside-Out | `insideOut` | [shoot, finish] | top 30% | top 40% | - | - |
-| Sharpshooter, Stretch, Pick & Pop, Popper, 3 & D, Catch & Shoot, Off-Screen, Big Range, Automatic, Laser, Silk, Splash | `catchShoot` | [shoot] | top 25% | top 30% | - | any of spot: 0, offs: 0 |
-| 3PT, Sniper, Shot Hunter, Gunner, Logo, Cash Out, Bomber | `shotHunt` | [shoot] | top 15% | top 25% | rng: 0.25 | - |
-| Mid-Paint | `midPaint` | [mid] | top 30% | top 40% | - | - |
-| Mid-Post | `midPost` | [mid, post] | top 30% | top 40% | - | - |
-| Mid-Range, Middy, Mid-Slash, Maestro, Menace, Smooth, Faceup, Hash-Sinking | `mid` | [mid] | top 25% | top 40% | - | - |
-| Post, Footwork (Bully: see strength; not High-Post) | `post` | [post] | top 25% | top 40% | pst: 0.25 | any of post: 0 |
-| Paint (Paint Finisher, Paint Beast; not Paint Defender) | `paint` | [finish] | top 30% | top 40% | - | - |
-| Slasher, Slashing, Blow-By, Drive & Rise, Downhill | `slash` | [finish] | top 25% | top 40% | - | - |
-| Finisher, Layup, Laymaker, Levitator | `finish` | [finish] | top 25% | top 40% | - | - |
-| Dunker, Rim Rocker, Rim Wrecker, Poster, Masher, Slammer, Flusher | `dunk` | [finish] | top 25% | top 40% | mxv: 0 | - |
-| High-Flying, Aerial, Glide, Athletic, Athlete, Explosive, Force of Nature, Bouncy, Apex | `air` | [ath] | top 25% | top 30% | mxv: 0.25 | - |
-| Lob Threat, Lob City | `lob` | [finish] | top 25% | top 30% | mxv: 0.25 | any of prr: 0.25, cut: 0.25 |
-| Riser, Rising (a style word: promises nothing measurable) | `riser` | [] | none | none | - | - |
-| Rim Runner, Wing Runner, Pick-Diving, Speedy | `run` | [ath] | top 30% | top 40% | - | any of tr: 0, prr: 0 |
-| Tempo, Pilot | `tempo` | [handle] | top 30% | top 40% | - | - |
-| Shot Creator, Iso, Ankle-Breaker, Shifty, Shot Hunter, Dribble Tech, Off-the-Bounce | `creator` | [handle] | top 25% | top 40% | - | - |
-| Playmaker, Dimer, Diming, Dot, Table Setter, Distributor, Point Forward/Four/Center, Visionary, Engine, Facilitating, General, Dish | `pass` | [pass] | top 25% | top 40% | vis: 0 | any of prb: 0 |
-| Triple-Double | `tripleDouble` | [reb] | top 30% | top 40% | - | - |
-| Scorer, Bucket, Engine (needs a way to score; never the head) | `scorer` | [score] | none | none | - | - |
-| Bully, Physical, Power, Bodyguard, Grinder, Tank, Masher, Pound, Bruiser, Bruising, Punishing, Punisher | `strength` | [stre] | top 30% | top 40% | - | - |
-| Crafty, Skilled, Fluid, Phenom, Prodigy, Savant, Versatile, King, Finesse, Dynamic (style words: promise nothing measurable) | `skill` | [] | none | none | - | - |
-| Burner, Open-Lane (speed in the open floor) | `burner` | [ath] | top 30% | top 40% | - | any of tr: 0 |
-| Hammer (finishes above the rim with force) | `hammer` | [finish, ath] | top 25% | top 40% | mxv: 0 | - |
-| Cutter, Off-Ball (moves without the ball and finishes) | `cutter` | [ath] | top 30% | top 40% | - | any of cut: 0 |
-| Scooper, Scooping (crafty layups) | `scoop` | [finish] | top 25% | top 40% | cls: 0 | - |
-| Pull-Up (the jumper off the dribble) | `pullUp` | [mid] | top 25% | top 40% | crt: 0 | - |
-| Chaser, Bucket Chaser (hunts his shot at every level) | `chaser` | [mid, shoot] | top 30% | top 40% | - | - |
-| Grab & Go (rebounds and pushes) | `grabGo` | [reb] | top 25% | top 30% | - | - |
-| Pressure Cooker (pressures the ball) | `pressure` | [perD] | top 20% | top 30% | pdf: 0.25 | - |
-| High-Low Threat (scores and passes from the high and low post) | `highLow` | [post] | top 30% | top 40% | pst: 0 | - |
-| Wizard (creates for others with the ball) | `wizard` | [pass, handle] | top 30% | top 40% | vis: 0 | - |
+| Words                                                                                                                                                                                                              | Concept        | Promises (classes) | Lead bar | Support bar | Sub-ratings (z, all) | Play types (z, any)         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ------------------ | -------- | ----------- | -------------------- | --------------------------- |
+| 2-Way, Two Way, Both Ends                                                                                                                                                                                          | `twoWay`       | [def]              | top 30%  | top 40%     | -                    | -                           |
+| Lockdown, Lock, Clamp, Guard Dog, Defender, 3 & D, Switch-Defending, Tenacious, Warden                                                                                                                             | `lockdown`     | [perD]             | top 20%  | top 30%     | pdf: 0.25            | -                           |
+| Ball-Hawking, Ball Snatcher, Thief, Pickpocket, Disruptive, Chaos, Pesky, Pest, Bandit                                                                                                                             | `steal`        | [perD]             | top 20%  | top 30%     | stl: 0.52            | -                           |
+| Rim Protector, Shot-Erasing, Eraser, Apex-Erasing, Obliterator, Swats, Backline, Anchor, Guardian, Rim Reaper, Paint Hawk, Paint Defender, Paint Protector, Paint-Protecting, Terror, Shot-Axing, Fortress, Pillar | `rimD`         | [rimD]             | top 20%  | top 30%     | blk: 0.52            | -                           |
+| Crasher, Putback, Board-Hunting, Tip-In, Possession Extender                                                                                                                                                       | `oreb`         | [reb]              | top 25%  | top 30%     | orb: 0.25            | any of pb: 0.25             |
+| Glass, Board, Cleaner, Rebounder, Floor-Sweeping, Floor Sweeper                                                                                                                                                    | `reb`          | [reb]              | top 25%  | top 30%     | -                    | -                           |
+| Break Starter, Break Leader                                                                                                                                                                                        | `outlet`       | [pass]             | top 30%  | top 40%     | -                    | -                           |
+| 3-Level, Versatile Scorer (with Scorer)                                                                                                                                                                            | `threeLevel`   | [shoot, mid]       | top 30%  | top 40%     | -                    | -                           |
+| Inside-Out                                                                                                                                                                                                         | `insideOut`    | [shoot, finish]    | top 30%  | top 40%     | -                    | -                           |
+| Sharpshooter, Stretch, Pick & Pop, Popper, 3 & D, Catch & Shoot, Off-Screen, Big Range, Automatic, Laser, Silk, Splash                                                                                             | `catchShoot`   | [shoot]            | top 25%  | top 30%     | -                    | any of spot: 0, offs: 0     |
+| 3PT, Sniper, Shot Hunter, Gunner, Logo, Cash Out, Bomber                                                                                                                                                           | `shotHunt`     | [shoot]            | top 15%  | top 25%     | rng: 0.25            | -                           |
+| Mid-Paint                                                                                                                                                                                                          | `midPaint`     | [mid]              | top 30%  | top 40%     | -                    | -                           |
+| Mid-Post                                                                                                                                                                                                           | `midPost`      | [mid, post]        | top 30%  | top 40%     | -                    | -                           |
+| Mid-Range, Middy, Mid-Slash, Maestro, Menace, Smooth, Faceup, Hash-Sinking                                                                                                                                         | `mid`          | [mid]              | top 25%  | top 40%     | -                    | -                           |
+| Post, Footwork (Bully: see strength; not High-Post)                                                                                                                                                                | `post`         | [post]             | top 25%  | top 40%     | pst: 0.25            | any of post: 0              |
+| Paint (Paint Finisher, Paint Beast; not Paint Defender)                                                                                                                                                            | `paint`        | [finish]           | top 30%  | top 40%     | -                    | -                           |
+| Slasher, Slashing, Blow-By, Drive & Rise, Downhill                                                                                                                                                                 | `slash`        | [finish]           | top 25%  | top 40%     | -                    | -                           |
+| Finisher, Layup, Laymaker, Levitator                                                                                                                                                                               | `finish`       | [finish]           | top 25%  | top 40%     | -                    | -                           |
+| Dunker, Rim Rocker, Rim Wrecker, Poster, Masher, Slammer, Flusher                                                                                                                                                  | `dunk`         | [finish]           | top 25%  | top 40%     | mxv: 0               | -                           |
+| High-Flying, Aerial, Glide, Athletic, Athlete, Explosive, Force of Nature, Bouncy, Apex                                                                                                                            | `air`          | [ath]              | top 25%  | top 30%     | mxv: 0.25            | -                           |
+| Lob Threat, Lob City                                                                                                                                                                                               | `lob`          | [finish]           | top 25%  | top 30%     | mxv: 0.25            | any of prr: 0.25, cut: 0.25 |
+| Riser, Rising (a style word: promises nothing measurable)                                                                                                                                                          | `riser`        | []                 | none     | none        | -                    | -                           |
+| Rim Runner, Wing Runner, Pick-Diving, Speedy                                                                                                                                                                       | `run`          | [ath]              | top 30%  | top 40%     | -                    | any of tr: 0, prr: 0        |
+| Tempo, Pilot                                                                                                                                                                                                       | `tempo`        | [handle]           | top 30%  | top 40%     | -                    | -                           |
+| Shot Creator, Iso, Ankle-Breaker, Shifty, Shot Hunter, Dribble Tech, Off-the-Bounce                                                                                                                                | `creator`      | [handle]           | top 25%  | top 40%     | -                    | -                           |
+| Playmaker, Dimer, Diming, Dot, Table Setter, Distributor, Point Forward/Four/Center, Visionary, Engine, Facilitating, General, Dish                                                                                | `pass`         | [pass]             | top 25%  | top 40%     | vis: 0               | any of prb: 0               |
+| Triple-Double                                                                                                                                                                                                      | `tripleDouble` | [reb]              | top 30%  | top 40%     | -                    | -                           |
+| Scorer, Bucket, Engine (needs a way to score; never the head)                                                                                                                                                      | `scorer`       | [score]            | none     | none        | -                    | -                           |
+| Bully, Physical, Power, Bodyguard, Grinder, Tank, Masher, Pound, Bruiser, Bruising, Punishing, Punisher                                                                                                            | `strength`     | [stre]             | top 30%  | top 40%     | -                    | -                           |
+| Crafty, Skilled, Fluid, Phenom, Prodigy, Savant, Versatile, King, Finesse, Dynamic (style words: promise nothing measurable)                                                                                       | `skill`        | []                 | none     | none        | -                    | -                           |
+| Burner, Open-Lane (speed in the open floor)                                                                                                                                                                        | `burner`       | [ath]              | top 30%  | top 40%     | -                    | any of tr: 0                |
+| Hammer (finishes above the rim with force)                                                                                                                                                                         | `hammer`       | [finish, ath]      | top 25%  | top 40%     | mxv: 0               | -                           |
+| Cutter, Off-Ball (moves without the ball and finishes)                                                                                                                                                             | `cutter`       | [ath]              | top 30%  | top 40%     | -                    | any of cut: 0               |
+| Scooper, Scooping (crafty layups)                                                                                                                                                                                  | `scoop`        | [finish]           | top 25%  | top 40%     | cls: 0               | -                           |
+| Pull-Up (the jumper off the dribble)                                                                                                                                                                               | `pullUp`       | [mid]              | top 25%  | top 40%     | crt: 0               | -                           |
+| Chaser, Bucket Chaser (hunts his shot at every level)                                                                                                                                                              | `chaser`       | [mid, shoot]       | top 30%  | top 40%     | -                    | -                           |
+| Grab & Go (rebounds and pushes)                                                                                                                                                                                    | `grabGo`       | [reb]              | top 25%  | top 30%     | -                    | -                           |
+| Pressure Cooker (pressures the ball)                                                                                                                                                                               | `pressure`     | [perD]             | top 20%  | top 30%     | pdf: 0.25            | -                           |
+| High-Low Threat (scores and passes from the high and low post)                                                                                                                                                     | `highLow`      | [post]             | top 30%  | top 40%     | pst: 0               | -                           |
+| Wizard (creates for others with the ball)                                                                                                                                                                          | `wizard`       | [pass, handle]     | top 30%  | top 40%     | vis: 0               | -                           |
 
 **archuser2k words** (the user's own NBA 2K archetypes, `user2k.data.ts`): synonyms of an existing word joined its concept
 (Pesky / Pest / Bandit: steals; Tip-In / Possession Extender: the offensive glass; Bouncy / Athlete / Apex: above the rim;
@@ -118,6 +118,11 @@ one, he is genuinely all-around: at least 4 of the 10 skill classes in the top 4
 **Precedence** when several qualify: (1) specific before generic; (2) coverage: the build whose words name more of his three best
 skill classes; (3) family priority: the build whose head word is his best skill first; (4) specificity: more measurable words;
 (5) the larger margin above the bars; (6) id. The first three are his acceptable builds.
+
+**Position gates (archaudit)**: whatever the classes say, rim-protection words (Rim-Protecting, Shot-Erasing, Shot Blocker,
+Paint Protector, Backline) never go on a guard (PG/G/SG), post words never on a PG or G, and the primary handler's words
+(Ball-Handling, Floor General, Point, Playmaker / Playmaking, Dimer) on an FC or C only with his handle at the 40th percentile
+or better (`v2/nouns.ts wordsFit`, `nounFitsPos`).
 
 **None qualifies**: the nearest specific build (smallest total shortfall in z below the bars), plus any within 0.25 z of it, at
 most three. Never a generic build unless it qualifies.
