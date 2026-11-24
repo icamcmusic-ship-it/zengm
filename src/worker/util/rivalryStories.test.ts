@@ -231,6 +231,15 @@ describe("rivalry stories in a league", () => {
 		assert.isAbove(fromGames.size, 10);
 	});
 
+	test("a day played again (crash in a multi-day sim) isn't counted twice in the season rows", async () => {
+		await ensureBackfill();
+		const before = structuredClone(await rivalrySeasonRows());
+		// The same games come back with the same gids
+		const games = (await allGames()).sort((x, y) => y.gid - x.gid).slice(0, 8);
+		await recordRivalryGames(games.map((gm) => ({ gid: gm.gid }) as any));
+		assert.deepEqual(await rivalrySeasonRows(), before);
+	});
+
 	test("games played while the setting was off are backfilled in the same session", async () => {
 		await ensureBackfill();
 		const total = await logCount();

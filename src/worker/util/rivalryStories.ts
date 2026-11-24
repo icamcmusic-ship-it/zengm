@@ -95,10 +95,19 @@ const writeRecords = async (records: RivalryGame[]) => {
 			rows.set(season, row);
 		}
 	}
+	// Games already in the log are being played again: these writes skip the cache, so after a crash or a closed tab in
+	// the middle of a multi-day sim the same days (same gids) come back. Their records are replaced, but they must not be
+	// added to the season counts a second time
+	const fresh: RivalryGame[] = [];
+	for (const rec of records) {
+		if ((await games.getKey(rec.gid)) === undefined) {
+			fresh.push(rec);
+		}
+	}
 	for (const rec of records) {
 		void games.put(rec);
 	}
-	for (const row of addToRivalrySeasons(rows, records)) {
+	for (const row of addToRivalrySeasons(rows, fresh)) {
 		void seasonsStore.put(row);
 	}
 	await tx.done;

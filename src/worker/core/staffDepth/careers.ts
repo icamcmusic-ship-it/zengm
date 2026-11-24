@@ -10,6 +10,7 @@ import {
 	coachSalaryDemand,
 } from "../../../common/staff.ts";
 import { PHASE } from "../../../common/constants.ts";
+import { applyAgingFields } from "../../../common/faceAging.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import type {
 	Coach,
@@ -297,7 +298,11 @@ export const exPlayerCoaches = async (): Promise<CoachWithoutKey[]> => {
 			firstName: p.firstName,
 			lastName: p.lastName,
 			born: { year: p.born.year, loc: p.born.loc },
-			face: p.face as any,
+			// His generated (un-aged) face: coach portraits are aged to the coach's age when drawn (StaffFace), so his
+			// already-aged player face would be aged a second time (balder, greyer, heavier than he was)
+			face: (p.faceAging?.b
+				? applyAgingFields(p.face, p.faceAging.b)
+				: p.face) as any,
 			tid: COACH_FREE_AGENT,
 			role,
 			ratings,
