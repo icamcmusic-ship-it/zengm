@@ -109,6 +109,26 @@ export type PlayerRatings = {
 	// Game Sim Fixes: shot zone tendencies learned from his own makes (worker/core/player/zoneTendencies.ts): multipliers on how often he
 	// picks [three, mid-range, rim, post]. Missing when all 1
 	zt?: number[];
+	// Development breakdown (worker/core/player/devParts.ts): the parts of this season's ovr change, in ovr points. Missing on rows from
+	// before it and on rows that didn't develop
+	devParts?: DevParts;
+};
+
+export type DevParts = {
+	// The rest: age, random development, his development rates, rounding
+	base: number;
+	// Coaching (budget or staff, Coaching Staff Depth's plans)
+	coach?: number;
+	// Veteran savvy mentoring (Player Traits)
+	mentor?: number;
+	// Work ethic and aging curve (Player Traits)
+	traits?: number;
+	// Career Aging: wear and tear, style, reinvention, past 39
+	aging?: number;
+	// Young players' minutes (Career Aging)
+	minutes?: number;
+	// Ratings lost to injuries during the season
+	injury?: number;
 };
 
 export type RatingKey =

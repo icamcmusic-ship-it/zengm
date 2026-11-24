@@ -308,6 +308,17 @@ const ageRowsFor = (age: number, realistic: boolean): AgeRow[] => {
 // league's development is unchanged on average for every rating
 let bustTail = 0;
 
+// The development breakdown (devParts): this season's base change without traits and coaching, and with traits but without coaching (set
+// by calcBaseChange, like bustTail)
+let baseNoTraits = 0;
+let baseNoCoach = 0;
+
+// Rating points of one season's change per rating, by part (develop.ts turns them into ovr points). Only filled when asked for
+export type DevPartsRatings = Record<
+	"traits" | "coach" | "aging" | "minutes",
+	Record<string, number>
+>;
+
 const calcBaseChange = (
 	age: number,
 	coachingLevel: number,
@@ -347,6 +358,8 @@ const calcBaseChange = (
 		noise = helpers.bound(realGauss(0, 3), -2, 4);
 	}
 
+	baseNoTraits = val + noise;
+
 	// Player traits (work ethic, aging curve), only in the preseason with the setting on. Same random numbers as without them
 	if (traitDev) {
 		if (noise < 0) {
@@ -355,6 +368,7 @@ const calcBaseChange = (
 		val += traitDev.baseChangeDelta;
 	}
 	val += noise;
+	baseNoCoach = val;
 
 	val *= 1 + (val > 0 ? 1 : -1) * coachingEffect(coachingLevel);
 
@@ -370,6 +384,8 @@ const developSeason = (
 	// Prospect variety: his development rate per rating group (common/prospectVariety.ts, devRatesOf). Pot estimates get only what scouts
 	// can read (potRatesOf: the shared part of his rate), so how fast each part of his game grows stays hidden
 	rates?: DevRates,
+	// The development breakdown: filled with each part's rating points (same random numbers, nothing else changes)
+	parts?: DevPartsRatings,
 ) => {
 	// In young players, height can sometimes increase
 	if (age <= 21) {
@@ -436,6 +452,24 @@ const developSeason = (
 		change += bust * u;
 		// Coaching Staff Depth: a fixed shift of this rating's change (development plan, shooting coach, strength & conditioning)
 		const delta = traitDev?.ratingDelta?.[key];
+		if (parts) {
+			// The same change from another base change (same u)
+			const changeFor = (b: number) => {
+				let c = helpers.bound((b + ageModifier) * u, lo, hi);
+				if (useRates && c > 0) {
+					c *= rateFor(rates, key);
+				}
+				return c + bust * u;
+			};
+			const noCoach = changeFor(baseNoCoach);
+			const aging = traitDev?.careerDelta?.[key] ?? 0;
+			const minutes = traitDev?.minutesDelta?.[key] ?? 0;
+			parts.traits[key] = noCoach - changeFor(baseNoTraits);
+			// Coaching Staff Depth's fixed shifts count as coaching
+			parts.coach[key] = change - noCoach + (delta ?? 0) - aging - minutes;
+			parts.aging[key] = aging;
+			parts.minutes[key] = minutes;
+		}
 		ratings[key] = limitRating(
 			ratings[key] + (delta === undefined ? change : change + delta),
 		);

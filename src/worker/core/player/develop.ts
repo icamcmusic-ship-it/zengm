@@ -40,6 +40,12 @@ import {
 	type GenVariety,
 } from "../../../common/prospectVariety.ts";
 import {
+	emptyDevPartsRatings,
+	makeDevParts,
+	ovrPointsBetween,
+} from "./devParts.ts";
+import type { DevPartsRatings } from "./developSeason.basketball.ts";
+import {
 	basesBefore,
 	developRowSubs,
 	ensureSubs,
@@ -221,6 +227,18 @@ const develop = async (
 			? devRatesOf(genVar)
 			: undefined;
 
+	// Development breakdown (basketball): one season of a player's development (preseason), not new players or debug runs
+	const devParts: DevPartsRatings | undefined =
+		__SPORT === "basketball" &&
+		years === 1 &&
+		!newPlayer &&
+		!skipPot &&
+		!ratings.locked
+			? emptyDevPartsRatings()
+			: undefined;
+	const devBefore = devParts ? { ...ratings } : undefined;
+	let mentorOvr = 0;
+
 	for (let i = 0; i < years; i++) {
 		// (CONFUSING!) Don't increment age for existing players developing one season (i.e. newPhasePreseason) because the season is already incremented before this function is called. But in other scenarios (new league and draft picks), the season is not changing, so age should be incremented every iteration of this loop.
 		if (newPlayer || years > 1) {
@@ -237,6 +255,7 @@ const develop = async (
 				false,
 				__SPORT === "basketball" && years === 1 ? traitDev : undefined,
 				rates,
+				devParts,
 			);
 			if (before) {
 				developRowSubs(p as any, ratings, before, age);
@@ -266,6 +285,7 @@ const develop = async (
 		mentor.bonus !== 0 &&
 		!ratings.locked
 	) {
+		const beforeMentor = devParts ? { ...ratings } : undefined;
 		applyMentorBonus(
 			ratings as any,
 			mentor.bonus,
@@ -273,6 +293,9 @@ const develop = async (
 			MENTOR_RATING_KEYS,
 		);
 		syncExpandedToCompat(ratings as any);
+		if (beforeMentor) {
+			mentorOvr = ovrPointsBetween(beforeMentor, ratings);
+		}
 	}
 
 	if (subsOn) {
@@ -378,6 +401,15 @@ const develop = async (
 				}
 			}
 		}
+	}
+
+	if (devParts && devBefore) {
+		(ratings as any).devParts = makeDevParts({
+			before: devBefore,
+			parts: devParts,
+			mentor: mentorOvr,
+			ovrChange: ratings.ovr - devBefore.ovr,
+		});
 	}
 
 	refreshSkills(p, ratings, p.tid === PLAYER.UNDRAFTED);

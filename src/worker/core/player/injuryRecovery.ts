@@ -26,6 +26,7 @@ import addRatingsRow from "./addRatingsRow.ts";
 import develop from "./develop.ts";
 import limitRating from "./limitRating.ts";
 import { refreshTieredBadgesFor } from "./tieredBadges.ts";
+import { addInjuryToDevParts } from "./devParts.ts";
 
 const seed = () => g.get("playerTraitsSeed") ?? 0;
 
@@ -172,6 +173,8 @@ export const applyCareerInjuryLoss = async (
 	const prevRatings = p.ratings.at(-2)!;
 	setPotAfterInjury(prevRatings, newRatings);
 	rec.ovrDrop = prevRatings.ovr - newRatings.ovr;
+	// Development breakdown: the season's injury losses
+	addInjuryToDevParts(newRatings as any, newRatings.ovr - prevRatings.ovr);
 	rec.potDrop = prevRatings.pot - newRatings.pot;
 	return true;
 };

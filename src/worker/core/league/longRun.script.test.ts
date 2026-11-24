@@ -6,7 +6,8 @@
 //   LONG_RUN=1 LONG_RUN_CONFIG=defaults|all|off|random LONG_RUN_SEASONS=20 LONG_RUN_SEED=1 LONG_RUN_OUT=/tmp/run.jsonl \
 //     node_modules/.bin/vitest run --project basketball src/worker/core/league/longRun.script.test.ts
 //
-// LONG_RUN_SETTINGS='{"elam":true}' adds settings on top of the config.
+// LONG_RUN_SETTINGS='{"elam":true}' adds settings on top of the config. LONG_RUN_YOUNG_MINUTES='{"amount":0}' turns Career Aging's
+// young players' minutes term off.
 import "fake-indexeddb/auto";
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { appendFileSync } from "node:fs";
@@ -36,6 +37,7 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
 import { agingCurveForPlayer } from "../../../common/playerTraits/development.ts";
 import { getLeagueTraitSeed } from "../player/traits.ts";
+import { YOUNG_MINUTES } from "../player/careerAging.ts";
 import {
 	advStat,
 	playTypeProfile,
@@ -51,6 +53,10 @@ if (env.LONG_RUN_PLAYTYPES) {
 // LONG_RUN_MOVE='{"offs":1.7}' changes the classifier's movement-shooter weights (advTracking.ts MOVE_SCALE_REALISTIC)
 if (env.LONG_RUN_MOVE) {
 	Object.assign(MOVE_SCALE_REALISTIC, JSON.parse(env.LONG_RUN_MOVE));
+}
+// LONG_RUN_YOUNG_MINUTES='{"amount":0}' changes Career Aging's young players' minutes term (careerAging.ts YOUNG_MINUTES)
+if (env.LONG_RUN_YOUNG_MINUTES) {
+	Object.assign(YOUNG_MINUTES, JSON.parse(env.LONG_RUN_YOUNG_MINUTES));
 }
 const ENABLED = !!env.LONG_RUN;
 const SEASONS = Number(env.LONG_RUN_SEASONS ?? 3);
@@ -526,7 +532,45 @@ const ratingsInfo = async (s: number) => {
 		counts[k] = (counts[k] ?? 0) + 1;
 	}
 	const avgAge = mean(active.map((p) => s - p.born.year));
+	// Development breakdown (ratings row devParts): mean of each part this season over the rostered players, by age group
+	const devParts: Record<string, Record<string, number>> = {};
+	for (const [group, from, to] of [
+		["all", 0, 99],
+		["<=23", 0, 23],
+		["24-30", 24, 30],
+		["31+", 31, 99],
+	] as const) {
+		const rows = active
+			.filter((p) => s - p.born.year >= from && s - p.born.year <= to)
+			// (his last row of season s: the end-of-season call runs after the next preseason)
+			.map((p) => (p.ratings as any[]).findLast((row) => row.season === s))
+			.filter((row) => row?.devParts);
+		if (rows.length > 0) {
+			const sums: Record<string, number> = {};
+			for (const row of rows) {
+				for (const [k, v] of Object.entries(row.devParts)) {
+					sums[k] = (sums[k] ?? 0) + (v as number);
+				}
+			}
+			devParts[group] = Object.fromEntries(
+				Object.entries(sums).map(([k, v]) => [k, r(v / rows.length, 2)]),
+			);
+		}
+	}
+	// Injuries this season that took ratings (all players): count, and total ovr lost
+	let injLossN = 0;
+	let injLossOvr = 0;
+	for (const p of players) {
+		for (const inj of p.injuries) {
+			if (inj.season === s && inj.ovrDrop !== undefined) {
+				injLossN += 1;
+				injLossOvr += inj.ovrDrop;
+			}
+		}
+	}
 	return {
+		devParts,
+		injLoss: { n: injLossN, ovr: injLossOvr },
 		ovrMean: r(mean(ovrs)),
 		ovrTop10: r(mean(ovrs.slice(0, 10))),
 		ovrTop1: ovrs[0],
@@ -1678,6 +1722,9 @@ describe.skipIf(!ENABLED)("long run", () => {
 					...box,
 					...avgs,
 					ratings: preseason,
+					// The season's development breakdown at its end (with injuries), and the injuries that took ratings
+					devPartsEnd: afterDraft.devParts,
+					injLoss: afterDraft.injLoss,
 					rookies: {
 						top5: afterDraft.rookiesTop5Ovr,
 						r1Ovr: afterDraft.rookiesR1Ovr,

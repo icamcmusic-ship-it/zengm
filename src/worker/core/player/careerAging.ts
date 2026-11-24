@@ -220,8 +220,97 @@ export const oldAgeMinutesCap = (age: number, rank: number) => {
 };
 
 export type CareerAgingDev = {
+	// Wear and tear, style, reinvention, past 39
 	ratingDelta: Record<string, number>;
 	tilt?: { keys: string[]; amount: number };
+	// Young players' minutes-driven development (youngMinutesDelta), kept apart for the development breakdown
+	minutesDelta?: Record<string, number>;
+};
+
+// --- Young players' minutes ---
+
+// Players this young (in the new season) who played last season develop a little faster the more they played and a little slower the less
+// (game experience), centered over all of them, so it moves who develops, not how much the league develops
+export const YOUNG_MINUTES = {
+	maxAge: 23,
+	// Last season's minutes (playoffs x1.5, like mileage) at which he's neutral before centering, and the unit (bounded to [-1, 1])
+	ref: 1200,
+	unit: 1200,
+	// Yearly rating points at one unit, before the per-rating scale below (0 = off; longRun.script.test.ts LONG_RUN_YOUNG_MINUTES)
+	amount: 0.6,
+};
+// Game experience is mostly skill and feel, a little body
+const YOUNG_MINUTES_KEY_SCALE: Record<string, number> = {
+	stre: 0.5,
+	spd: 0.25,
+	jmp: 0.25,
+	endu: 0.5,
+	ins: 1,
+	dnk: 1,
+	ft: 1,
+	fg: 1,
+	tp: 1,
+	oiq: 1.5,
+	diq: 1.5,
+	drb: 1,
+	pss: 1,
+	reb: 1,
+};
+
+// Last season's minutes (playoffs weighted like mileage), undefined if he wasn't in the league (no regular season row on a team)
+export const lastSeasonMinutes = (
+	p: CareerAgingPlayer,
+	newSeason: number,
+): number | undefined => {
+	let played = false;
+	let miles = 0;
+	for (const row of statRows(p)) {
+		if (row.season === newSeason - 1 && (row.tid ?? 0) >= 0) {
+			if (!row.playoffs) {
+				played = true;
+			}
+			miles +=
+				(row.min ?? 0) * (row.playoffs ? CAREER_AGING.playoffMileage : 1);
+		}
+	}
+	return played ? miles : undefined;
+};
+
+export const youngMinutesUnits = (miles: number) =>
+	clamp((miles - YOUNG_MINUTES.ref) / YOUNG_MINUTES.unit, -1, 1);
+
+/** Every eligible young player's minutes-driven yearly rating shift (rating points per rating), centered over them. */
+export const youngMinutesDelta = (
+	players: CareerAgingPlayer[],
+	newSeason: number,
+): Map<number, Record<string, number>> => {
+	const units: { pid: number; x: number }[] = [];
+	for (const p of players) {
+		const age = newSeason - p.born.year;
+		const r = p.ratings.at(-1);
+		if (age > YOUNG_MINUTES.maxAge || !r || r.locked) {
+			continue;
+		}
+		const miles = lastSeasonMinutes(p, newSeason);
+		if (miles === undefined) {
+			continue;
+		}
+		units.push({ pid: p.pid, x: youngMinutesUnits(miles) });
+	}
+	const output = new Map<number, Record<string, number>>();
+	if (units.length === 0) {
+		return output;
+	}
+	const m = mean(units.map((u) => u.x));
+	for (const { pid, x } of units) {
+		const delta: Record<string, number> = {};
+		for (const key of DEVELOPED_KEYS) {
+			delta[key] =
+				YOUNG_MINUTES.amount * (x - m) * YOUNG_MINUTES_KEY_SCALE[key]!;
+		}
+		output.set(pid, delta);
+	}
+	return output;
 };
 
 /**
@@ -289,6 +378,7 @@ export const getCareerAgingDevelopment = (
 		}
 	}
 	const byPid = new Map(rows.map((row) => [row.pid, row.centered]));
+	const minutes = youngMinutesDelta(players, newSeason);
 
 	for (const p of players) {
 		const age = newSeason - p.born.year;
@@ -312,8 +402,9 @@ export const getCareerAgingDevelopment = (
 			}
 			delta.endu = (delta.endu ?? 0) + old * OLD_AGE.enduranceMult;
 		}
-		if (Object.keys(delta).length > 0 || tilt) {
-			output.set(p.pid, { ratingDelta: delta, tilt });
+		const minutesDelta = minutes.get(p.pid);
+		if (Object.keys(delta).length > 0 || tilt || minutesDelta) {
+			output.set(p.pid, { ratingDelta: delta, tilt, minutesDelta });
 		}
 	}
 	return output;
@@ -329,10 +420,19 @@ export const mergeCareerAging = (
 	}
 	const base = traitDev ?? { baseChangeDelta: 0, dropScale: 1 };
 	const ratingDelta: Record<string, number> = { ...base.ratingDelta };
-	for (const [key, d] of Object.entries(career.ratingDelta)) {
-		ratingDelta[key] = (ratingDelta[key] ?? 0) + d;
+	for (const part of [career.ratingDelta, career.minutesDelta]) {
+		for (const [key, d] of Object.entries(part ?? {})) {
+			ratingDelta[key] = (ratingDelta[key] ?? 0) + d;
+		}
 	}
-	return { ...base, ratingDelta, careerTilt: career.tilt };
+	// The parts, for the development breakdown (develop.ts, devParts)
+	return {
+		...base,
+		ratingDelta,
+		careerTilt: career.tilt,
+		careerDelta: career.ratingDelta,
+		minutesDelta: career.minutesDelta,
+	};
 };
 
 // --- Major injuries ---

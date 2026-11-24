@@ -23,6 +23,9 @@ const addRatingsRow = (
 
 	if (injuryIndex !== undefined) {
 		newRatings.injuryIndex = injuryIndex;
+	} else {
+		// Development breakdown: a new season's row gets its own (develop), an injury's row keeps the season's
+		delete (newRatings as { devParts?: unknown }).devParts;
 	}
 
 	p.ratings.push(newRatings);

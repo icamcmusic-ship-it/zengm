@@ -48,6 +48,7 @@ import { ShotDiet } from "./ShotDiet.tsx";
 import { ShotZones } from "./ShotZones.tsx";
 import { Rankings } from "./Rankings.tsx";
 import { HofLine } from "./HofLine.tsx";
+import { DevPartsOvr } from "./DevParts.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
@@ -262,7 +263,7 @@ const Player2 = ({
 								r.pos,
 								showRatings ? (
 									<MaybeBold bold={leaders[r.season]?.ratings.has("ovr")}>
-										{r.ovr}
+										<DevPartsOvr devParts={r.devParts}>{r.ovr}</DevPartsOvr>
 									</MaybeBold>
 								) : null,
 								showRatings ? (

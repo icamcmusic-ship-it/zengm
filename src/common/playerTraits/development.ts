@@ -219,6 +219,10 @@ export type TraitDevelopment = {
 	};
 	// Career Aging (worker/core/player/careerAging.ts): late-career reinvention, sub-rating points moved onto these subs inside their bases
 	careerTilt?: { keys: string[]; amount: number };
+	// Career Aging: the parts of ratingDelta that are Career Aging's (wear, style, reinvention, past 39) and young players' minutes, for the
+	// development breakdown (ratings row devParts). Already included in ratingDelta
+	careerDelta?: Record<string, number>;
+	minutesDelta?: Record<string, number>;
 };
 
 export const NEUTRAL_TRAIT_DEVELOPMENT: TraitDevelopment = Object.freeze({
