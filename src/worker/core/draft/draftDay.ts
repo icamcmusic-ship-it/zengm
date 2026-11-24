@@ -2,7 +2,7 @@ import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { last } from "../../../common/utils.ts";
 import type { Player, TradeTeams } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, local } from "../../util/index.ts";
 import { player, trade } from "../index.ts";
 import { canBeDrafted } from "./canBeDrafted.ts";
 import { perceivedProspect } from "./mockDraftData.ts";
@@ -37,10 +37,17 @@ const getAvailableProspects = async () => {
 
 const BOARD_SIZE = 5;
 
+// In spectator mode or during auto play the AI runs the user's teams too (runPicks), so they have a board like any AI team
+export const aiRunsUserTeams = () =>
+	g.get("spectator") || local.autoPlayUntil !== undefined;
+
+const isUserTid = (tid: number) => g.get("userTids").includes(tid);
+
 export const getAITeamBoards = async () => {
 	const prospects = await getAvailableProspects();
+	const withUser = aiRunsUserTeams();
 	const teams = (await idb.cache.teams.getAll()).filter(
-		(t) => !t.disabled && !g.get("userTids").includes(t.tid),
+		(t) => !t.disabled && (withUser || !isUserTid(t.tid)),
 	);
 	const picks = await idb.cache.draftPicks.getAll();
 	const output = [];
@@ -77,6 +84,8 @@ export const getAITeamBoards = async () => {
 			.map((dp) => (dp.pick > 0 ? `${dp.round}-${dp.pick}` : `R${dp.round}`));
 		output.push({
 			tid: t.tid,
+			// One of the user's teams (spectator mode, auto play): a board to read, never a trade partner
+			user: isUserTid(t.tid),
 			abbrev: t.abbrev,
 			name: `${t.region} ${t.name}`,
 			strategy: t.strategy,
@@ -128,7 +137,12 @@ const getAssets = async (tid: number) => {
 	};
 };
 
+// A quick trade with another team. undefined for one of the user's own teams: its board is listed in spectator mode and auto
+// play, but it can't be a trade partner
 export const getDraftDayTrade = async (otherTid: number) => {
+	if (isUserTid(otherTid)) {
+		return undefined;
+	}
 	const { teams } = await trade.get();
 	const userTid = g.get("userTid");
 	let tradeTeams: TradeTeams = teams;

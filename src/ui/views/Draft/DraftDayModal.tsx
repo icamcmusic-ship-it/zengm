@@ -135,6 +135,7 @@ export const DraftDayModal = ({
 								{info.boards.map((b) => (
 									<option key={b.tid} value={b.tid}>
 										{b.abbrev} - {b.name}
+										{b.user ? " (your team, run by the AI)" : ""}
 										{b.currentPicks.length > 0
 											? ` (picks ${b.currentPicks.join(", ")})`
 											: ""}
