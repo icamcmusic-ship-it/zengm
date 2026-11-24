@@ -40,6 +40,35 @@ const DERIVED_MAX_STATS = bySport({
 
 const gameOrWeek = bySport({ default: "game", football: "week" });
 
+// After an injury's ratings loss: pot goes down by what ovr lost, not by a new (noisy) estimate, so it can't go up and stays the same
+// when ovr didn't drop
+type PotRatings = {
+	ovr: number;
+	pot: number;
+	ovrs?: Record<string, number>;
+	pots?: Record<string, number>;
+};
+export const setPotAfterInjury = (
+	prevRatings: PotRatings,
+	newRatings: PotRatings,
+) => {
+	newRatings.pot =
+		prevRatings.pot - Math.max(0, prevRatings.ovr - newRatings.ovr);
+	if (newRatings.pots && prevRatings.pots) {
+		for (const pos of Object.keys(newRatings.pots)) {
+			const prevPot = prevRatings.pots[pos];
+			if (prevPot !== undefined) {
+				newRatings.pots[pos] =
+					prevPot -
+					Math.max(
+						0,
+						(prevRatings.ovrs?.[pos] ?? 0) - (newRatings.ovrs?.[pos] ?? 0),
+					);
+			}
+		}
+	}
+};
+
 const doInjury = async (
 	p: any,
 	p2: Player,
@@ -296,18 +325,7 @@ const doInjury = async (
 
 		const prevRatings = p2.ratings.at(-2)!;
 
-		// Bound pot - can't go up after injury!
-		if (newRatings.pot > prevRatings.pot) {
-			newRatings.pot = prevRatings.pot;
-		}
-		if (newRatings.pots && prevRatings.pots) {
-			for (const [pos, pot] of Object.entries(newRatings.pots)) {
-				const prevPot = prevRatings.pots[pos];
-				if (prevPot !== undefined && pot > prevPot) {
-					newRatings.pots[pos] = prevPot;
-				}
-			}
-		}
+		setPotAfterInjury(prevRatings, newRatings);
 
 		p2.injuries.at(-1)!.ovrDrop = prevRatings.ovr - newRatings.ovr;
 		p2.injuries.at(-1)!.potDrop = prevRatings.pot - newRatings.pot;
