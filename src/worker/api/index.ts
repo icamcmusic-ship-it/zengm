@@ -20,6 +20,7 @@ import {
 	REAL_PLAYERS_INFO,
 	getPlayerStatsTableStats,
 	DEFAULT_REAL_DRAFT_RATINGS,
+	PHASES_WHERE_TEAMS_CAN_BE_DISABLED,
 } from "../../common/constants.ts";
 import { isGoldActive } from "../../common/isGoldActive.ts";
 import actions from "./actions.ts";
@@ -5789,6 +5790,18 @@ const updateTeamInfo = async ({
 	const teams = await idb.cache.teams.getAll();
 
 	const newTeamsByTid = groupByUnique(newTeams, "tid");
+
+	// Like the UI: a team's status can't change during the regular season, playoffs or draft (its games and picks are already set)
+	if (!PHASES_WHERE_TEAMS_CAN_BE_DISABLED.has(g.get("phase"))) {
+		for (const t of teams) {
+			const newTeam = newTeamsByTid[t.tid];
+			if (newTeam && !!newTeam.disabled !== !!t.disabled) {
+				throw new Error(
+					"Teams can only be enabled or disabled during the preseason, draft lottery, after the draft, re-signing players, or free agency.",
+				);
+			}
+		}
+	}
 
 	for (const t of teams) {
 		const newTeam = newTeamsByTid[t.tid];
