@@ -20,7 +20,12 @@ import type { ArchetypeRatings, Pos } from "../types.ts";
 import { SUB_INDEX } from "../../subRatings.ts";
 import { GATE_REF } from "./gateScale.data.ts";
 import { NOUN_GROUP_REF } from "./nounGroups.data.ts";
-import { percentileIn, RQ_POINTS, type RatingQuantiles } from "./gateScale.ts";
+import {
+	percentileIn,
+	rimDValue,
+	RQ_POINTS,
+	type RatingQuantiles,
+} from "./gateScale.ts";
 import { ELITE_RE, hasUpside } from "./honest.ts";
 import {
 	composeName,
@@ -223,13 +228,11 @@ const NOUN_VALUE: Record<
 	post: { value: (r) => r.ins, table: () => "ins" },
 	finish: { value: (r) => r.dnk, table: () => "dnk" },
 	rimD: {
-		// (without interior defense or the block sub-rating, defensive IQ alone would make every smart defender a rim
-		// protector: his size and leaping then count too)
-		value: (r) =>
-			r.idef === undefined && sub(r, "blk") === undefined
-				? mean([r.diq, r.hgt, r.jmp])
-				: mean([sub(r, "blk"), r.idef ?? r.diq]),
-		table: (r) => (r.idef !== undefined ? "idef" : "diq"),
+		// (defensive IQ alone would make every smart defender a rim protector, and the block sub-rating a small guard who
+		// blocks well: without the expanded interior-defense rating, his size and leaping count too, sub-ratings or not.
+		// Read against its own table: gateScale.ts rimDValue)
+		value: rimDValue,
+		table: () => "rimD",
 	},
 	perimD: {
 		value: (r) => mean([r.pdef, sub(r, "pdf"), r.diq]),
@@ -451,7 +454,9 @@ export type NounScore = {
 
 const tableOf = (k: string, rq?: RatingQuantiles) =>
 	(rq as Record<string, number[] | undefined> | undefined)?.[k] ??
-	(GATE_REF as Record<string, number[] | undefined>)[k];
+	(GATE_REF as Record<string, number[] | undefined>)[k] ??
+	// (rim protection's reference table: its values among the reference leagues' players, nounGroups.data.ts)
+	(k === "rimD" ? NOUN_GROUP_REF.all?.rimD : undefined);
 
 export const pctOf = (k: string, v: number, rq?: RatingQuantiles): number => {
 	const t = tableOf(k, rq);
@@ -678,11 +683,48 @@ const TRAIT_WORDS: [RegExp, string, number][] = [
 	[/Iron|Durable/, "durability", 55],
 	[/Versatile|Switchable/, "defensiveVersatility", 55],
 ];
+// archaudit: words a position (his size band) rules out, whatever his ratings say: rim protection on a guard, post
+// scoring on a point or combo guard, and on a center (FC/C) the primary ball handler's words unless his handle stands
+// at BIG_HANDLE_PCT or more (a center with no handle is no "Playmaker" or "Floor General", however well he passes)
+const SMALL_GUARD_POS: ReadonlySet<Pos> = new Set(["PG", "G"]);
+const CENTER_POS: ReadonlySet<Pos> = new Set(["FC", "C"]);
+export const RIM_WORDS_RE =
+	/Rim-Protect|Rim Protector|Paint Protector|Paint-Protecting|Shot-Eras|Shot Eraser|Shot-Blocking|Shot Blocker|Backline/;
+export const POST_WORDS_RE = /\bPost\b|\bPost-|-Post\b/;
+export const HANDLER_WORDS_RE =
+	/Ball-Handling|Ball Handler|\bHandler\b|Floor General|\bPoint\b|Point Guard|Playmak|Dimer|Diming|Distributor/;
+export const BIG_HANDLE_PCT = 0.4;
+// The same gates for a skill (the noun his plain skill name would say)
+export const nounFitsPos = (k: NounKey, pos: Pos, handle?: number) =>
+	!(
+		(k === "rimD" && GUARD_POS.has(pos)) ||
+		(k === "post" && SMALL_GUARD_POS.has(pos)) ||
+		(k === "handle" &&
+			CENTER_POS.has(pos) &&
+			handle !== undefined &&
+			handle < BIG_HANDLE_PCT)
+	);
 export const wordsFit = (
 	name: string,
 	pos: Pos,
 	traits?: Record<string, number>,
+	// his ball handling's standing (0..1); undefined: not checked (the regenerator's aim)
+	handle?: number,
 ): boolean => {
+	if (RIM_WORDS_RE.test(name) && GUARD_POS.has(pos)) {
+		return false;
+	}
+	if (POST_WORDS_RE.test(name) && SMALL_GUARD_POS.has(pos)) {
+		return false;
+	}
+	if (
+		handle !== undefined &&
+		handle < BIG_HANDLE_PCT &&
+		CENTER_POS.has(pos) &&
+		HANDLER_WORDS_RE.test(name)
+	) {
+		return false;
+	}
 	if (/Stretch/.test(name) && !BIG_POS.has(pos)) {
 		return false;
 	}
