@@ -16,6 +16,7 @@ import {
 	yearNoise,
 } from "../../../common/hofBallot.ts";
 import { COACH_RETIRED } from "../../../common/staff.ts";
+import { legacyTidOf as legacyTidOfStats } from "../../../common/legacyTid.ts";
 import { COACH_OF_THE_YEAR } from "../../../common/coachExecAwards.ts";
 import type {
 	Awards,
@@ -68,24 +69,9 @@ const playerName = (p: { firstName: string; lastName: string }) =>
 const playerLink = (p: Player) =>
 	`<a href="${helpers.leagueUrl(["player", p.pid])}">${playerName(p)}</a>`;
 
-// The team he played the most regular season games for
-export const legacyTidOf = (p: Pick<Player, "stats" | "tid">) => {
-	const gp = new Map<number, number>();
-	for (const row of p.stats) {
-		if (row.tid >= 0 && !row.playoffs) {
-			gp.set(row.tid, (gp.get(row.tid) ?? 0) + (row.gp ?? 0));
-		}
-	}
-	let best = -1;
-	let bestGp = -1;
-	for (const [tid, n] of gp) {
-		if (n > bestGp) {
-			best = tid;
-			bestGp = n;
-		}
-	}
-	return best;
-};
+// His legacy team, the same one the Hall of Fame page shows (common/legacyTid.ts)
+export const legacyTidOf = (p: Pick<Player, "stats">) =>
+	legacyTidOfStats(p.stats);
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
