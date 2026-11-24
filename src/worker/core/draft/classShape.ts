@@ -336,11 +336,14 @@ export const getClassShape = (
 	return { key: best[0], version };
 };
 
+// A prospect as the user's scouts see him (fuzzed ovr/pot and valueFuzz), so the storylines and the lottery headline ("the consensus No. 1") never give away true ratings. A drafted player's ratings are no longer fuzzed
 export const toStoryProspect = (
 	p: Player,
 	draftYear: number,
 ): StoryProspect => {
 	const ratings = p.ratings.at(-1)!;
+	const undrafted = p.tid === PLAYER.UNDRAFTED;
+	const fuzz = undrafted ? (ratings.fuzz ?? 0) : 0;
 	return {
 		pid: p.pid,
 		name: `${p.firstName} ${p.lastName}`.trim(),
@@ -348,9 +351,9 @@ export const toStoryProspect = (
 		pos: ratings.pos,
 		country: helpers.getCountry(p.born.loc),
 		college: p.college ?? "",
-		ovr: ratings.ovr,
-		pot: ratings.pot,
-		value: p.value,
+		ovr: fuzz ? player.fuzzRating(ratings.ovr, fuzz) : ratings.ovr,
+		pot: fuzz ? player.fuzzRating(ratings.pot, fuzz) : ratings.pot,
+		value: undrafted ? p.valueFuzz : p.value,
 		...(p.draftClassShapeInjury ? { injury: true } : {}),
 	};
 };
