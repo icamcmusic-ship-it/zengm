@@ -165,11 +165,17 @@ export type TierCandidate = {
 	depth: number;
 };
 
-/** Each badge's tier from the score alone (gates, hysteresis), before the cap. */
+// Highest tier a badge may take (a badge left out has no limit; 0: none). Used when a duplicate Legend is lowered to Hall of Fame, or a
+// refresh must not raise a tier, so the cap is applied to the lowered tiers and the points they free go to the next badges under the
+// same rules
+export type TierLimits = Partial<Record<string, Tier>>;
+
+/** Each badge's tier from the score alone (gates, hysteresis), before the cap (and within limits, if any). */
 export const tierCandidates = (
 	r: Row,
 	cutoffs: TieredBadgeCutoffs,
 	prev?: Partial<Record<string, Tier>>,
+	limits?: TierLimits,
 ): TierCandidate[] => {
 	const out: TierCandidate[] = [];
 	for (const def of TIERED_BADGES) {
@@ -187,6 +193,10 @@ export const tierCandidates = (
 			score >= cuts[before - 1]! - keepBuffer(before, cuts)
 		) {
 			tier = before;
+		}
+		const limit = limits?.[def.key];
+		if (limit !== undefined && tier > limit) {
+			tier = limit;
 		}
 		if (tier > 0) {
 			out.push({
@@ -212,8 +222,9 @@ export const assignTiers = (
 	ovr: number,
 	cutoffs: TieredBadgeCutoffs,
 	prev?: Partial<Record<string, Tier>>,
+	limits?: TierLimits,
 ): { t: Record<string, Tier>; capped: string[] } => {
-	const candidates = tierCandidates(r, cutoffs, prev).sort(
+	const candidates = tierCandidates(r, cutoffs, prev, limits).sort(
 		(a, b) =>
 			b.tier - a.tier ||
 			simRelevant(b.key) - simRelevant(a.key) ||
@@ -251,7 +262,7 @@ export const assignTiers = (
 			);
 		for (const [key, before] of floors) {
 			const now = t[key] ?? 0;
-			const floor = Math.min(before! - 1, now + left);
+			const floor = Math.min(before! - 1, now + left, limits?.[key] ?? 5);
 			if (floor > now) {
 				t[key] = floor as Tier;
 				left -= floor - now;
@@ -354,15 +365,19 @@ export const badgePoints = (t: Partial<Record<string, Tier>>) => {
 
 /**
  * Legend is at most one per badge in the league: among everyone given a Legend, the highest score keeps it (ties: the lower pid) and
- * the others are Hall of Fame. Mutates the entries.
+ * the others are Hall of Fame. Mutates the entries; returns the ones it lowered (their freed point is given back by legendReassignLimits
+ * and assignTiers, see updateTieredBadges).
  */
-export const enforceLegendLimit = (
-	players: {
+export const enforceLegendLimit = <
+	P extends {
 		pid: number;
 		t: Record<string, Tier>;
 		scores: Record<string, number>;
-	}[],
-) => {
+	},
+>(
+	players: P[],
+): P[] => {
+	const lowered = new Set<P>();
 	for (const def of TIERED_BADGES) {
 		let best: (typeof players)[number] | undefined;
 		for (const p of players) {
@@ -379,9 +394,96 @@ export const enforceLegendLimit = (
 		for (const p of players) {
 			if (p !== best && p.t[def.key] === 5) {
 				p.t[def.key] = 4;
+				lowered.add(p);
 			}
 		}
 	}
+	return [...lowered];
+};
+
+/**
+ * The limits to re-assign a player whose duplicate Legend was lowered to Hall of Fame, so the point it frees goes to his next badge under
+ * the same rules (the cap order, the one-tier floor, the best 6) and "capped" is recomputed, as refreshTieredBadgesFor does mid-season:
+ * Hall of Fame at most where someone else holds the Legend, and no badge above what it had before the lowering when something other than
+ * the cap lowered it (the re-centering: before, his tiers as assigned; after, as they are now). A Legend nobody holds stays open to him.
+ */
+export const legendReassignLimits = (
+	before: Partial<Record<string, Tier>>,
+	after: Partial<Record<string, Tier>>,
+	heldByOthers: ReadonlySet<string>,
+): TierLimits => {
+	const limits: TierLimits = {};
+	for (const def of TIERED_BADGES) {
+		const key = def.key;
+		const now = after[key] ?? 0;
+		let limit: Tier = heldByOthers.has(key) ? 4 : 5;
+		if (now < (before[key] ?? 0) && now < limit) {
+			limit = now;
+		}
+		limits[key] = limit;
+	}
+	return limits;
+};
+
+/**
+ * enforceLegendLimit, then each player it lowered re-assigned with legendReassignLimits (in order, so a Legend one of them takes is held
+ * for the next). assign: his tiers under limits (assignTiers with his row, cutoffs and last season's tiers). Mutates the entries.
+ */
+export const enforceLegendLimitAndReassign = <
+	P extends {
+		pid: number;
+		t: Record<string, Tier>;
+		capped: string[];
+		scores: Record<string, number>;
+		// His tiers before the re-centering (as assigned)
+		assigned: Partial<Record<string, Tier>>;
+	},
+>(
+	players: P[],
+	assign: (
+		p: P,
+		limits: TierLimits,
+	) => { t: Record<string, Tier>; capped: string[] },
+	scoresOf: (p: P) => Record<string, number>,
+) => {
+	const lowered = enforceLegendLimit(players);
+	if (lowered.length === 0) {
+		return lowered;
+	}
+	const holder = new Map<string, number>();
+	for (const p of players) {
+		for (const [key, tier] of Object.entries(p.t)) {
+			if (tier === 5) {
+				holder.set(key, p.pid);
+			}
+		}
+	}
+	for (const p of lowered) {
+		const heldByOthers = new Set<string>();
+		for (const [key, pid] of holder) {
+			if (pid !== p.pid) {
+				heldByOthers.add(key);
+			}
+		}
+		const { t, capped } = assign(
+			p,
+			legendReassignLimits(p.assigned, p.t, heldByOthers),
+		);
+		for (const [key, pid] of [...holder]) {
+			if (pid === p.pid && t[key] !== 5) {
+				holder.delete(key);
+			}
+		}
+		for (const [key, tier] of Object.entries(t)) {
+			if (tier === 5) {
+				holder.set(key, p.pid);
+			}
+		}
+		p.t = t;
+		p.capped = capped;
+		p.scores = scoresOf(p);
+	}
+	return lowered;
 };
 
 /** The entry of a season, or the latest one before it. */

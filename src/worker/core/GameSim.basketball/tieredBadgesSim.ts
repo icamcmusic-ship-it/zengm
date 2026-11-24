@@ -6,9 +6,11 @@
 // stay the same: since tiers are league percentiles, the average badge effect per event is the same in every league. Off (or no player
 // with badges): nothing here is used, no random numbers are drawn either way.
 import { TIERED_BADGE_INDEX } from "../../../common/tieredBadges/definitions.ts";
+import { BADGE_CAL, TIER_SCALE } from "../../../common/tieredBadges/effects.ts";
 
-// Effect scale of a tier: Bronze ... Legend (Hall of Fame = 1)
-export const TIER_SCALE = [0, 0.3, 0.55, 0.8, 1, 1.15] as const;
+// The tier scale and the league calibration live with the popup's effect texts (common/tieredBadges/effects.ts), so the UI can show
+// the effects net of calibration; re-exported here for the sim and its scripts
+export { BADGE_CAL, TIER_SCALE };
 
 const I = TIERED_BADGE_INDEX as Record<string, number>;
 export const BI = {
@@ -46,6 +48,14 @@ export const BI = {
 	challenger: I.challenger!,
 	anchor: I.anchor!,
 	hustleRebounder: I.hustleRebounder!,
+	// The third set (badges that had no sim effect)
+	chargeTaker: I.chargeTaker!,
+	whistleProof: I.whistleProof!,
+	clutchGene: I.clutchGene!,
+	ironLungs: I.ironLungs!,
+	workhorse: I.workhorse!,
+	worm: I.worm!,
+	paintPatroller: I.paintPatroller!,
 };
 
 // Effects at Hall of Fame tier (make probability points unless noted)
@@ -114,25 +124,22 @@ export const BADGE_SIM = {
 	anchor: 0.006,
 	// Defensive rebound probability: the offense's best Hustle Rebounder
 	hustleRebounder: 0.006,
+	// The third set
+	// Relative: the chance that a drive or post-up by the man he guards is an offensive foul (a charge he draws)
+	chargeTaker: 0.25,
+	// Relative: who commits a defensive foul (pick weight, fewer: only who, not how many)
+	whistleProof: 0.3,
+	// His make probability in clutch time (scaled by the clutch weight of the moment, playerTraits clutchSituationWeight; not in the cap)
+	clutchGene: 0.02,
+	// Relative: his energy drain on the court (fewer)
+	ironLungs: 0.06,
+	workhorse: 0.04,
+	// Relative: who gets an offensive rebound (pick weight)
+	worm: 0.2,
+	// Relative: who gets a block, and who is the name dunked on at the rim (pick weight)
+	paintPatroller: 0.25,
 	// A shot's total badge make effect is at most this, either way
 	cap: 0.045,
-};
-
-// League calibration (subtracted from every event, see above). Measured: the mean raw effect per event, pooled over new random
-// leagues with the 2026 preset (threeGradient.script.test.ts with BADGE_DIAG; re-measured with the 68 badges, at most 6 a player:
-// seeds 1-8, 2 seasons)
-export const BADGE_CAL = {
-	threePointer: 0.0003,
-	midRange: 0.0001,
-	atRim: -0.001,
-	lowPost: 0.001,
-	putBack: 0.0001,
-	ft: 0.001,
-	blk: 1.0056,
-	drb: -0.0004,
-	stl: 1.0142,
-	tov: 0.9981,
-	andOne: 1.0075,
 };
 
 // Diagnostics: sums and counts of the raw effects (calibration)

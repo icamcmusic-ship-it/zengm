@@ -9,6 +9,7 @@ import {
 	badgeWhyLine,
 	computeCutoffs,
 	enforceLegendLimit,
+	enforceLegendLimitAndReassign,
 	keepBest,
 	MAX_BADGES,
 	parseBadgeToken,
@@ -291,6 +292,82 @@ describe("2K Badges tiers", () => {
 			players.map((p) => p.t.clamps),
 			[4, 4, 5],
 		);
+	});
+
+	test("a duplicate Legend lowered to Hall of Fame gives its point back under the same rules", () => {
+		// Two identical stars at the badge-point cap: the second (higher pid) loses his Legends
+		const star: Record<string, any> = {
+			...rows[0],
+			sub: rows[0]!.sub.map(() => 100),
+		};
+		for (const k of BASE) {
+			star[k] = 100;
+		}
+		const ovr = 75;
+		const cap = badgePointCap(ovr);
+		const scoresOf = (t: Record<string, Tier>) =>
+			Object.fromEntries(
+				Object.keys(t).map((key) => [
+					key,
+					tieredBadgeScore(
+						star,
+						TIERED_BADGES.find((d) => d.key === key)!,
+					),
+				]),
+			);
+		const players = [1, 2].map((pid) => {
+			const { t, capped } = assignTiers(star, ovr, cutoffs);
+			return { pid, t, capped, assigned: { ...t }, scores: scoresOf(t) };
+		});
+		const first = { ...players[0]!.t };
+		assert.strictEqual(badgePoints(first), cap);
+		const legends = Object.keys(first).filter((key) => first[key] === 5);
+		assert.isAbove(legends.length, 0);
+
+		const lowered = enforceLegendLimitAndReassign(
+			players,
+			(p, limits) => assignTiers(star, ovr, cutoffs, undefined, limits),
+			(p) => scoresOf(p.t),
+		);
+		assert.deepEqual(
+			lowered.map((p) => p.pid),
+			[2],
+		);
+		assert.deepEqual(players[0]!.t, first);
+		const second = players[1]!;
+		// No second Legend of a badge, and the freed points are used (he is at the cap again, within 6)
+		for (const key of legends) {
+			assert.isAtMost(second.t[key] ?? 0, 4, key);
+		}
+		assert.strictEqual(badgePoints(second.t), cap);
+		assert.isAtMost(Object.keys(second.t).length, MAX_BADGES);
+		// Every Legend in the league is held once
+		const count: Record<string, number> = {};
+		for (const p of players) {
+			for (const [key, tier] of Object.entries(p.t)) {
+				if (tier === 5) {
+					count[key] = (count[key] ?? 0) + 1;
+				}
+			}
+		}
+		for (const n of Object.values(count)) {
+			assert.strictEqual(n, 1);
+		}
+		// "capped" is recomputed: a lowered Legend is not capped (the limit, not the cap, lowered it)
+		for (const key of legends) {
+			if (second.t[key] === 4) {
+				assert.notInclude(second.capped, key);
+			}
+		}
+
+		// Before (the plain lowering): 1 point a Legend left unused
+		const plain = [1, 2].map((pid) => ({
+			pid,
+			t: assignTiers(star, ovr, cutoffs).t,
+			scores: scoresOf(first),
+		}));
+		enforceLegendLimit(plain);
+		assert.strictEqual(badgePoints(plain[1]!.t), cap - legends.length);
 	});
 
 	test("a fresh league's tiers fill the pyramid", () => {

@@ -25,6 +25,7 @@ import { syncLatestSubs, tiltRowSubKeys } from "./subRatings.ts";
 import addRatingsRow from "./addRatingsRow.ts";
 import develop from "./develop.ts";
 import limitRating from "./limitRating.ts";
+import { refreshTieredBadgesFor } from "./tieredBadges.ts";
 
 const seed = () => g.get("playerTraitsSeed") ?? 0;
 
@@ -204,11 +205,15 @@ export const settleTreatment = async (
 	if (rec) {
 		rec.treatment = treatment;
 		if (careerAging) {
-			await applyCareerInjuryLoss(
+			const lost = await applyCareerInjuryLoss(
 				p,
 				p.injuries.indexOf(rec),
 				TREATMENT[treatment].loss,
 			);
+			if (lost) {
+				// 2K Badges: his tiers from the new ratings, as when the loss is taken at the injury (game/writePlayerStats.ts)
+				await refreshTieredBadgesFor(p as any, { noRaise: true });
+			}
 		}
 	}
 	return true;

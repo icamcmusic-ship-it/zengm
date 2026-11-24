@@ -16,6 +16,7 @@ import {
 	updateTieredBadges,
 } from "./tieredBadges.ts";
 import {
+	badgePoints,
 	displayTiersOf,
 	entryForSeason,
 } from "../../../common/tieredBadges/index.ts";
@@ -102,12 +103,22 @@ describe("2K badges for a player added mid-season", () => {
 		const entry = entryForSeason(p.badges2k, SEASON);
 		assert.isDefined(entry);
 		assert.isDefined(simTiers(p));
-		// His badges are the holder's, with Hall of Fame where the holder has Legend
+		// No Legend the holder (or anyone) has: Hall of Fame at most there, before the cap, so the points that frees go to his next badges
+		// under the same rules (he uses as many badge points as the holder, who has the same ratings and ovr)
 		const holderTiers = entryForSeason(holder.badges2k, SEASON)!.t;
 		for (const [key, tier] of Object.entries(holderTiers)) {
-			assert.strictEqual(entry!.t[key], tier === 5 ? 4 : tier, key);
+			if (tier === 5) {
+				assert.isAtMost(entry!.t[key] ?? 0, 4, key);
+			}
 		}
-		assert.deepEqual(await legendCounts(false), before);
+		assert.strictEqual(badgePoints(entry!.t), badgePoints(holderTiers));
+		const after = await legendCounts(false);
+		for (const [key, n] of Object.entries(before)) {
+			assert.strictEqual(after[key], n, key);
+		}
+		for (const n of Object.values(after)) {
+			assert.strictEqual(n, 1);
+		}
 		for (const n of Object.values(await legendCounts(true))) {
 			assert.strictEqual(n, 1);
 		}
@@ -116,6 +127,31 @@ describe("2K badges for a player added mid-season", () => {
 		const view = await tieredBadgesForPlayer(p, false);
 		assert.isFalse(view!.live);
 		assert.isAbove(view!.earned.length, 0);
+	});
+
+	test("a ratings loss (injury) refreshes his tiers, never above this season's", async () => {
+		const p = (await idb.cache.players.getAll()).find(
+			(p) =>
+				p.tid >= 0 &&
+				Object.keys(entryForSeason(p.badges2k, SEASON)?.t ?? {}).length >= 3,
+		)!;
+		const before = { ...entryForSeason(p.badges2k, SEASON)!.t };
+		const shownBefore = {
+			...displayTiersOf(entryForSeason(p.badges2k, SEASON)!),
+		};
+		const r = p.ratings.at(-1)! as any;
+		for (const key of ["spd", "jmp", "endu"]) {
+			r[key] = Math.max(0, r[key] - 40);
+		}
+		await player.develop(p, 0);
+		assert.isTrue(await refreshTieredBadgesFor(p, { noRaise: true }));
+		const e = entryForSeason(p.badges2k, SEASON)!;
+		for (const [key, tier] of Object.entries(e.t)) {
+			assert.isAtMost(tier, before[key] ?? 0, key);
+		}
+		for (const [key, tier] of Object.entries(displayTiersOf(e))) {
+			assert.isAtMost(tier, shownBefore[key] ?? 0, key);
+		}
 	});
 
 	test("no entry for draft prospects or retired players, nor without cutoffs", async () => {
