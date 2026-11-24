@@ -48,6 +48,7 @@ import {
 	isHoldingOut,
 	shouldHoldOut,
 	shouldRequestTrade,
+	shouldWithdrawTradeRequest,
 	startHoldouts,
 	updateHoldouts,
 	unrestRandom,
@@ -647,6 +648,28 @@ describe("trade requests and holdouts", () => {
 				minContract: 750,
 			}),
 		);
+	});
+
+	test("the withdraw line moves with ego like the asking line", () => {
+		assert.isTrue(shouldWithdrawTradeRequest({ moodSum: -1.9 }));
+		assert.isFalse(shouldWithdrawTradeRequest({ moodSum: -2 }));
+		// A diva (shift +1.5) asks at -3.5 and is won back above -0.5; a team-first player (-1.5) asks at -6.5, withdraws above -3.5
+		for (const moodShift of [1.5, -1.5]) {
+			assert.isTrue(
+				shouldRequestTrade({
+					moodSum: -5 + moodShift,
+					isStar: true,
+					signedThisSeason: false,
+					moodShift,
+				}),
+			);
+			assert.isFalse(
+				shouldWithdrawTradeRequest({ moodSum: -2 + moodShift, moodShift }),
+			);
+			assert.isTrue(
+				shouldWithdrawTradeRequest({ moodSum: -1.9 + moodShift, moodShift }),
+			);
+		}
 	});
 
 	test("re-signing settles a trade request and a holdout", async () => {
