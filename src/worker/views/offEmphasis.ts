@@ -49,6 +49,8 @@ export default defineView({
 			...page,
 			season: g.get("season"),
 			defScheme: await defSchemeInfo(g.get("userTid")),
+			// Spectator mode: the coach sets the dials and the scheme (ensureTeamEmphasis, game/loadTeams.ts), so the page is read-only
+			aiControls: g.get("spectator"),
 		};
 	},
 });

@@ -3151,6 +3151,10 @@ const staffDepthAction = async (
 const offEmphasisAction = async (
 	action: Parameters<typeof offEmphasis.setOffEmphasis>[0],
 ) => {
+	// (the coach sets the dials while the AI runs the team, ensureTeamEmphasis)
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	await offEmphasis.setOffEmphasis(action);
 	// (a setting the user just chose: kept even if the tab closes right away)
 	await idb.cache.flush();
@@ -5605,6 +5609,10 @@ const updateShotPlan = async ({
 	if (!g.get("userTids").includes(p.tid)) {
 		throw new Error("Not on your team");
 	}
+	// (the sim ignores it while the AI runs the team, game/loadTeams.ts)
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	if (shotPlan === 1 || shotPlan === -1) {
 		p.shotPlan = shotPlan;
 	} else {
@@ -5630,6 +5638,9 @@ const updateShotProfile = async ({
 	if (!g.get("userTids").includes(p.tid)) {
 		throw new Error("Not on your team");
 	}
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	if (SHOT_PROFILES.includes(shotProfile as any)) {
 		p.shotProfile = shotProfile as ShotProfile;
 	} else {
@@ -5642,6 +5653,9 @@ const updateShotProfile = async ({
 
 // Shot Profiles & Defensive Schemes: the user's team's defensive scheme (undefined: the coach picks)
 const updateDefScheme = async ({ defScheme }: { defScheme?: string }) => {
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	const t = await idb.cache.teams.get(g.get("userTid"));
 	if (!t) {
 		return;
