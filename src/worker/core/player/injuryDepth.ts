@@ -269,7 +269,9 @@ export const shouldRest = ({
 	// 0 for the best player on the team by value
 	rank: number;
 }) => {
-	if (g.get("phase") !== PHASE.REGULAR_SEASON) {
+	// The whole regular season, after the trade deadline too (when real teams rest the most)
+	const phase = g.get("phase");
+	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
 		return false;
 	}
 

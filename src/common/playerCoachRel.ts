@@ -55,7 +55,8 @@ export const relSeasonDelta = ({
 	d += 0.12 * clamp(dev, -1, 1);
 	d += 0.07 * personality;
 	if (ego !== undefined && personality < 0) {
-		d += 0.12 * personality * clamp((ego - 50) / 30, 0, 1);
+		// (ego 0-100, high = team-first, low = diva; divas clash with disciplinarians)
+		d += 0.12 * personality * clamp((50 - ego) / 30, 0, 1);
 	}
 	d += (winner ? 0.3 : 0.15) * (winp - 0.5);
 	if (loyal) {

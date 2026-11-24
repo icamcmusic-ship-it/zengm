@@ -83,7 +83,8 @@ export const dunkTalent = (p: Player) => {
 	}
 	const traits = traitsOf(p, r);
 	if (traits) {
-		score += 0.05 * (traits.ego - 50);
+		// The showman's ego: divas (low ego score) want the spotlight
+		score += 0.05 * (50 - traits.ego);
 	}
 	return score;
 };

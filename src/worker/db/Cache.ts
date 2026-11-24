@@ -1061,7 +1061,13 @@ class Cache {
 				!!local.autoPlayUntil;
 
 			if (!skipFlush) {
-				await this.flush();
+				// A failed flush (e.g. a temporary quota error) keeps its writes for a retry; it must not stop the automatic
+				// flushes for the rest of the session
+				try {
+					await this.flush();
+				} catch (error) {
+					console.error(error);
+				}
 			}
 		}
 

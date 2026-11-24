@@ -1124,13 +1124,13 @@ export const planCoachDecisions = (
 				}
 			}
 		}
-		// High-ego stars push for minutes (a strong player manager holds the line)
+		// Diva stars push for minutes (a strong player manager holds the line). Ego score: high = team-first, low = diva
 		for (const p of byValue.slice(0, 3)) {
-			if (p.ego !== undefined && p.ego > 60) {
+			if (p.ego !== undefined && p.ego < 40) {
 				mult(
 					plan.minutesMult,
 					p.id,
-					1 + DECISIONS.ego * clamp((p.ego - 60) / 40, 0, 1) * (1.2 - pm),
+					1 + DECISIONS.ego * clamp((40 - p.ego) / 40, 0, 1) * (1.2 - pm),
 				);
 			}
 		}

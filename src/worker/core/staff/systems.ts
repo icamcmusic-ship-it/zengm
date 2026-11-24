@@ -1228,8 +1228,8 @@ export const coachMood = async (
 	const { fit } = playerSystemFit(p, profile);
 	let x = 0.35 * fit + 0.35 * profile.personality;
 	if (ego !== undefined && profile.personality < 0) {
-		// (ego 0-100; big egos and disciplinarians)
-		x += 0.6 * profile.personality * clamp((ego - 50) / 30, 0, 1);
+		// (ego 0-100, high = team-first, low = diva; divas and disciplinarians clash)
+		x += 0.6 * profile.personality * clamp((50 - ego) / 30, 0, 1);
 	}
 	x += (coachReputation(head) - 50) / 60;
 	return helpers.bound(x, -1.5, 1.5);

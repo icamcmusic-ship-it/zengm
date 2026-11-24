@@ -47,7 +47,13 @@ export const smallGuardPolish = (p: PlayerWithoutKey) => {
 	if (__SPORT !== "basketball" || !featureOn("ovrV2")) {
 		return;
 	}
-	const inches = p.hgt;
+	// His generated height, before the league's height factor and the women's league scale (player.generate applies
+	// both to p.hgt), so the polish reaches the same share of every class
+	let inches = p.hgt / g.get("heightFactor");
+	if (g.get("gender") === "female") {
+		inches /= 0.92;
+	}
+	inches = Math.round(inches);
 	if (inches > SMALL_GUARD_MAX_INCHES) {
 		return;
 	}

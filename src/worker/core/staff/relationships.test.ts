@@ -77,10 +77,10 @@ describe("player–coach relationships", () => {
 		);
 		assert.isBelow(relSeasonDelta({ ...base, minutes: -1 }), 0);
 		assert.isAbove(relSeasonDelta({ ...base, dev: 1 }), relSeasonDelta(base));
-		// Disciplinarians clash with big egos
+		// Disciplinarians clash with divas (ego score: high = team-first, low = diva)
 		assert.isBelow(
-			relSeasonDelta({ ...base, personality: -1, ego: 90 }),
-			relSeasonDelta({ ...base, personality: -1, ego: 30 }),
+			relSeasonDelta({ ...base, personality: -1, ego: 10 }),
+			relSeasonDelta({ ...base, personality: -1, ego: 70 }),
 		);
 		// Fame players care more about minutes
 		assert.isBelow(

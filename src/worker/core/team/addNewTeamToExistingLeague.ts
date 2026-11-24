@@ -1,4 +1,5 @@
 import { g, logEvent, helpers } from "../../util/index.ts";
+import { getRequiredDraftYears } from "../draft/topUpDraftClasses.ts";
 import type { Team } from "../../../common/types.ts";
 import generate from "./generate.ts";
 import genSeasonRow from "./genSeasonRow.ts";
@@ -92,11 +93,8 @@ const addNewTeamToExistingLeague = async (
 
 	await draft.genPicks();
 
-	// Add new draft prospects to draft classes
-	const dpOffset = g.get("phase") > PHASE.DRAFT ? 1 : 0;
-	for (let i = 0; i < 3; i++) {
-		const draftYear = g.get("season") + dpOffset + i;
-
+	// Add new draft prospects to every upcoming draft class (numDraftClasses of them)
+	for (const draftYear of getRequiredDraftYears()) {
 		// Generate scrubs only!
 		await draft.genPlayers(draftYear, undefined, true);
 	}
