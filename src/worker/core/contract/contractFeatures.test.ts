@@ -50,12 +50,14 @@ import {
 	shouldRequestTrade,
 	startHoldouts,
 	updateHoldouts,
+	unrestRandom,
 	updateTradeRequests,
 } from "./unrest.ts";
 import { combineMarket, getFreeAgentMarket } from "../freeAgents/market.ts";
 import { getPlayerContractPanel } from "./playerPanel.ts";
 import moodInfo from "../player/moodInfo.ts";
 import { getNeedInfo, needAttempt } from "../trade/betweenAiTeams.ts";
+import { setSimDay } from "../player/injuryDepth.ts";
 
 const setup = async () => {
 	resetG();
@@ -648,7 +650,8 @@ describe("trade requests and holdouts", () => {
 	});
 
 	test("an unhappy star requests a trade, and withdraws it when happy", async () => {
-		vi.spyOn(Math, "random").mockReturnValue(0);
+		// The chance is seeded by player, season and day, not Math.random
+		vi.spyOn(Math, "random").mockReturnValue(0.99);
 		const p = await getTeamPlayer(1);
 		p.value = 100;
 		p.gamesUntilTradable = 0;
@@ -656,8 +659,28 @@ describe("trade requests and holdouts", () => {
 		p.customMoodItems = [{ amount: -20, text: "test" }];
 		await idb.cache.players.put(p);
 
-		await updateTradeRequests();
-		assert.isTrue(hasActiveTradeRequest(p));
+		let requestDay;
+		for (let day = 0; day < 100; day++) {
+			setSimDay(day);
+			await updateTradeRequests();
+			if (hasActiveTradeRequest(p)) {
+				requestDay = day;
+				break;
+			}
+		}
+		setSimDay(undefined);
+		assert.isDefined(requestDay);
+		// The same day always gives the same answer, the day before didn't ask
+		const key = (day: number) =>
+			`tradeRequest|${p.pid}|${g.get("season")}|${g.get("phase")}|${day}`;
+		assert.strictEqual(
+			unrestRandom(key(requestDay!))(),
+			unrestRandom(key(requestDay!))(),
+		);
+		assert.isBelow(unrestRandom(key(requestDay!))(), 0.25);
+		if (requestDay! > 0) {
+			assert.isAtLeast(unrestRandom(key(requestDay! - 1))(), 0.25);
+		}
 		const events = await idb.cache.events.getAll();
 		assert.isTrue(events.some((event) => event.type === "tradeRequest"));
 
@@ -717,7 +740,9 @@ describe("trade requests and holdouts", () => {
 	});
 
 	test("holdouts start before the season, count down, and end", async () => {
-		vi.spyOn(Math, "random").mockReturnValue(0);
+		// Seeded, not Math.random: a high frequency makes the chance 1
+		vi.spyOn(Math, "random").mockReturnValue(0.99);
+		g.setWithoutSavingToDB("holdoutFrequency", 5);
 		const p = await getTeamPlayer(2);
 		await setContract(p, {
 			start: 2015,
