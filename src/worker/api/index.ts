@@ -331,7 +331,7 @@ import {
 	setLinkedCollege,
 } from "../core/draft/linkedCollege.ts";
 import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
-import { faceAgingOnCustomize } from "../util/faceAging.ts";
+import { agePlayerFace, faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
 import { getSidebarCounts } from "../util/sidebarCounts.ts";
 import * as offEmphasis from "../core/offEmphasis/index.ts";
@@ -2004,11 +2004,17 @@ const exportDraftClass = async ({
 	};
 };
 
-const generateFace2 = async (country: string | undefined) => {
+// Customize Player's "Randomize" passes his age, for age-appropriate styles (the face is then aged to his age on save, see
+// faceAgingOnCustomize)
+const generateFace2 = async (
+	input: string | undefined | { country: string | undefined; age?: number },
+) => {
+	const { country, age } =
+		typeof input === "object" ? input : { country: input, age: undefined };
 	const { race } = await player.name(
 		country ? helpers.getCountry(country) : undefined,
 	);
-	return generateFace({ race });
+	return generateFace({ race, age });
 };
 
 const getAutoPos = (ratings: any) => {
@@ -6217,7 +6223,11 @@ const upsertCustomizedPlayer = async (
 	updateOwedByTids(p);
 
 	// League Extras "Face Aging": an edited face is locked from aging unless "Allow aging" is ticked
-	faceAgingOnCustomize(p as any, prevPlayer as any, g.get("season"));
+	const ageFreshFace = faceAgingOnCustomize(
+		p as any,
+		prevPlayer as any,
+		g.get("season"),
+	);
 
 	// Handle making player a FA
 	if (p.tid === PLAYER.FREE_AGENT && originalTid !== PLAYER.FREE_AGENT) {
@@ -6466,6 +6476,13 @@ const upsertCustomizedPlayer = async (
 
 	// Save to database, adding pid if it doesn't already exist
 	await idb.cache.players.put(p);
+
+	// A generated face nobody edited is aged to his age, now that he has a pid (its seed)
+	if (ageFreshFace && featureOn("faceAging") && typeof p.pid === "number") {
+		if (agePlayerFace(p as any, g.get("season"))) {
+			await idb.cache.players.put(p);
+		}
+	}
 
 	// Basketball player traits: new players get seeds from the league seed and pid now that the pid is known, edited ones keep (and repair) theirs
 	if (__SPORT === "basketball" && typeof p.pid === "number") {

@@ -682,7 +682,7 @@ and at 40 px.
 - **Setting:** _Always on in every league (core; see Core features). Before:_ League Extras _Face Aging_ (`featureFaceAging`, on for new leagues, off for existing ones), with _Face Aging Speed_
   (`faceAgingSpeed`: subtle / normal / strong), _Allow Hair Loss_ (`faceAgingHairLoss`, on), _Allow Graying_ (`faceAgingGraying`,
   on), _Age Retired Players_ (`faceAgingRetired`, off: on, every living retired player is aged each preseason too, which reads
-  them all from the database) and _Style Events_ (`faceAgingStyleEvents`, on: see below).
+  them all from the database; only those whose face or snapshots changed are written back) and _Style Events_ (`faceAgingStyleEvents`, on: see below).
 - **When:** once a season at the preseason (after development), and to catch faces up when a league is created and when a draft
   class is generated (so prospects start young). Real-player image URLs are untouched; only generated faces age.
 - **How:** a pure function of the face as generated (his "adult" look), a per-player seed (pid) and his age; per-year draws are
@@ -704,7 +704,11 @@ and at 40 px.
      and fuller (up to +0.12 fatness), and glasses become likelier (below).
 - **Edited faces:** a face changed in Customize Player (God Mode or a new player) is locked from aging. Ticking _Allow aging_ under
   the face lets it age on from the edited face: hairline, grey, lines and fullness move from there; the hair and beard style,
-  headband and glasses stay the user's (no style events). Stored as `p.faceAging.e` / `.a`.
+  headband and glasses stay the user's (no style events). Stored as `p.faceAging.e` / `.a`. A generated face nobody edited
+  isn't locked: a new player's face as the form made it, or one from _Randomize_ (made for his age), gets a clean aging state
+  (`faceAging.b` from the face, no snapshots; for a randomized face any old snapshots go with the old face) and is aged to his
+  age when saved (`freshFaceAging`, `faceAgingOnCustomize` in `worker/util/faceAging.ts`). Editing its hair, beard, lines,
+  fullness, headband or glasses before saving locks it as above.
 - **Relatives:** a new son or brother takes after his relative's face as generated (`faceAging.b` applied), not his aged one, so
   he doesn't inherit a father's grey hair, lines or hairline (`player/addRelatives.ts`).
 

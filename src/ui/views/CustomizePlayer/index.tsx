@@ -37,6 +37,7 @@ import type {
 	PlayerWithoutKey,
 } from "../../../common/types.ts";
 import { posRatings } from "../../../common/posRatings.ts";
+import { extractAgingFields } from "../../../common/faceAging.ts";
 import { last, orderBy } from "../../../common/utils.ts";
 import CustomMoodItemsForm from "./CustomMoodItemsForm.tsx";
 import { roundContract } from "../../../common/roundContract.ts";
@@ -266,6 +267,12 @@ const copyValidValues = (
 
 	// @ts-expect-error
 	target.face = JSON.parse(source.face);
+	// Face Aging: the "Allow aging" checkbox, and the clean state of a new or randomized face
+	if ((source as any).faceAging) {
+		(target as any).faceAging = (source as any).faceAging;
+	} else {
+		delete (target as any).faceAging;
+	}
 
 	target.relatives = source.relatives
 		.map((rel) => {
@@ -653,11 +660,20 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 	};
 
 	const randomizeFace = async () => {
-		const face = await toWorker("main", "generateFace", p.born.loc);
+		const age = Number.parseInt((p as any).age);
+		const face = await toWorker("main", "generateFace", {
+			country: p.born.loc,
+			age: Number.isNaN(age) ? undefined : age,
+		});
 
 		setState((prevState) => {
 			// @ts-expect-error
 			prevState.p.face = JSON.stringify(face, null, 2);
+			// A generated face: not locked from aging, aged to his age on save (unless edited before then)
+			(prevState.p as any).faceAging = {
+				b: extractAgingFields(face),
+				h: {},
+			};
 			return {
 				...prevState,
 				p: prevState.p,
