@@ -192,10 +192,15 @@ export type ClassCombine = {
 };
 
 const classPlayersOf = async (draftYear: number) => {
+	// The whole class, drafted or not: once the draft is over its picks are on teams (only reading the undrafted left the Combine page
+	// with the invitees who went undrafted, as few as ten)
 	const players =
 		draftYear >= g.get("season")
 			? (
-					await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+					await idb.cache.players.indexGetAll("playersByDraftYearRetiredYear", [
+						[draftYear],
+						[draftYear, Infinity],
+					])
 				).filter((p) => p.draft.year === draftYear)
 			: (await idb.merged.players.getAll({ draftYear })).filter(
 					(p) => p.draft.year === draftYear,
