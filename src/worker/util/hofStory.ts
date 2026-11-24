@@ -185,6 +185,17 @@ export const careerFacts = async (
 		retiredYear: p.retiredYear,
 	};
 
+	// Posthumous: he had died by his induction (or, being inducted now, has died)
+	const inducted = p.awards.find(
+		(a) => a.type === "Inducted into the Hall of Fame",
+	)?.season;
+	if (
+		typeof p.diedYear === "number" &&
+		(inducted === undefined || p.diedYear <= inducted)
+	) {
+		facts.posthumous = true;
+	}
+
 	if (p.draft && p.draft.year !== undefined) {
 		const dtid = p.draft.originalTid ?? p.draft.tid;
 		facts.draft = {

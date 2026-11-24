@@ -188,6 +188,44 @@ describe("ballot", () => {
 		);
 	});
 
+	test("the threshold is recomputed every year: a lower Hall of Fame factor applies to candidates already on the ballot", async () => {
+		const borderline = makePlayer(30, 9, 12);
+		await resetCache({ players: [borderline] });
+		await idb.cache.awards.put(awardsRow(2019));
+		await runHallOfFame({});
+		const first = (await idb.cache.players.get(30))!.hofBallot!;
+		assert.isUndefined(first.status);
+
+		g.setWithoutSavingToDB("hofFactor", 0.5);
+		g.setWithoutSavingToDB("season", 2020);
+		await idb.cache.awards.put(awardsRow(2020));
+		await runHallOfFame({});
+		g.setWithoutSavingToDB("hofFactor", 1);
+		const second = (await idb.cache.players.get(30))!.hofBallot!;
+		assert.closeTo(second.threshold, first.threshold / 2, 0.11);
+		const row = (await idb.cache.awards.get(2020))!.hof!.ballot![0]!;
+		assert.strictEqual(row.threshold, second.threshold);
+		// Twice his old ratio: in
+		assert.strictEqual(second.status, "inducted");
+	});
+
+	test("posthumous: a player who died is screened at the next ballot, the waiting period waived", async () => {
+		const died = makePlayer(40, 15, 12, 2018);
+		died.diedYear = 2018;
+		const alive = makePlayer(41, 15, 12, 2018);
+		await resetCache({ players: [died, alive] });
+		await idb.cache.awards.put(awardsRow(2019));
+		await runHallOfFame({});
+		const p = (await idb.cache.players.get(40))!;
+		assert.strictEqual(p.hofBallot?.first, 2019);
+		assert.isTrue(p.hofBallot?.posthumous);
+		assert.strictEqual(p.hof, 1);
+		assert.include(p.hofStory?.plaque ?? "", "Inducted posthumously.");
+		assert.notInclude(p.hofStory?.speech.join(" ") ?? "", "I'm not much");
+		// Still waiting
+		assert.isUndefined((await idb.cache.players.get(41))!.hofBallot);
+	});
+
 	test("retirement: inducted at once with the ballot off, not with it on", async () => {
 		const ballotOn = makePlayer(10, 15, 12, 2019);
 		const ballotOff = makePlayer(11, 15, 12, 2019);

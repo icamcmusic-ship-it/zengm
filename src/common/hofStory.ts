@@ -63,6 +63,8 @@ export type CareerFacts = {
 	};
 	prime?: { season: number; team?: string };
 	retiredYear?: number;
+	// He had died by his induction: the plaque says so, and his family accepts for him
+	posthumous?: boolean;
 };
 
 const ord = (n: number) => {
@@ -135,6 +137,9 @@ export const plaqueText = (f: CareerFacts): string => {
 			]),
 		);
 	}
+	if (f.posthumous) {
+		parts.push("Inducted posthumously.");
+	}
 	if (f.prime) {
 		parts.push(plaquePrimeLine(f.prime));
 	}
@@ -150,6 +155,9 @@ export const plaquePrimeLine = (prime: { season: number; team?: string }) =>
 
 // His speech at the induction, in his own voice: a few short paragraphs picked from what his career actually had.
 export const inductionSpeech = (f: CareerFacts): string[] => {
+	if (f.posthumous) {
+		return posthumousSpeech(f);
+	}
 	const rng = new Rng(f.pid, 7303);
 	const out: string[] = [];
 
@@ -274,6 +282,29 @@ export const inductionSpeech = (f: CareerFacts): string[] => {
 			`${f.career.seasons} seasons, ${f.career.pts.toLocaleString("en-US")} points, and I'd do every one of them again. Thank you.`,
 			`To my family, who sat through every game: this is your plaque too. Thank you.`,
 		]),
+	);
+	return out;
+};
+
+// Inducted after he died: his family accepts for him and speaks about him
+const posthumousSpeech = (f: CareerFacts): string[] => {
+	const rng = new Rng(f.pid, 7304);
+	const out = [
+		rng.pick([
+			`He should be the one standing here. Our family accepts this on his behalf, and we know exactly what he would have said: that he'd rather be on the floor.`,
+			`We wish more than anything that ${f.firstName} could have been here for this. On behalf of our family, thank you for remembering him.`,
+		]),
+	];
+	const main = f.teams[0];
+	if (main) {
+		out.push(
+			f.titles.length > 0
+				? `He talked about ${f.titles.at(-1)!.season} with the ${f.titles.at(-1)!.team ?? main.name} for the rest of his life. To the ${main.name} fans: he never forgot you, and you never forgot him.`
+				: `The ${main.name} fans gave him ${main.seasons} seasons he never stopped talking about. Thank you for loving him the way he loved playing for you.`,
+		);
+	}
+	out.push(
+		`${f.career.seasons} seasons, ${f.career.pts.toLocaleString("en-US")} points. He earned every one of them, and now he has this too. Thank you.`,
 	);
 	return out;
 };

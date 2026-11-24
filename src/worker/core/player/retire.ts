@@ -101,6 +101,10 @@ const retire = async (
 
 	// His plaque text and induction speech, written once now (with his career complete) and stored on him
 	if (inducted) {
+		// Inducted because he died (killOne sets diedYear right after this, to the same season): the words say it was posthumous
+		if (died && p.diedYear === undefined) {
+			p.diedYear = g.get("season");
+		}
 		await storeHofStoryAtInduction(p);
 	}
 };
