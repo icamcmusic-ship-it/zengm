@@ -3007,6 +3007,34 @@ of 4 leagues (5 seasons in all) with `simDeterminism.script.test.ts` (see Testin
 - Cache: array index keys parsed once (range queries parsed every key each time), rows appended in place instead of `concat`.
 - Play-by-play career numbers: the single-game high keys made once.
 
+**League creation and draft class speed (perf5).** League creation and new draft classes had about doubled in time since
+the archetype label steering (reading 29). Nearly all of it was the steering's archetype readings (`fuzzedArchetypeLabel`, up to
+330 a class, about 6 ms each), and in each of them nearly everything the reading worked out (the earlier reading's scores, the
+neighbours, the candidates) was thrown away: with the nouns on, a special, composed or trait name from the noun reading
+(`pickNouns`) is the label whatever the rest chose. `classifyV2Label` (`common/archetypes/v2/engine.ts`) runs only the noun
+reading and builds the label with the same code, and falls back to the whole reading for an honest name (none came up in the
+measured classes). Stored readings (`classifyPlayer`: confidence, runner-up, tier) still take the whole reading. Also kept, with
+the same answers: the concepts a name says (`conceptsOf`, read against every concept's pattern each time) and a role's and a
+concept's word groups (`compatible`).
+
+- Measured on a shared 4-core machine (other jobs running), CPU time, base and change alternately, median of 3: a new league
+  (random players, 30 teams, new league defaults) 59.7 s → 21.3 s (−64%; the sim benchmark's `create` 58.9 → 23.1 s);
+  6 new draft classes (`classBench.script.test.ts`: genPlayers with the class steps, steering, college stats) 12.7 s → 2.5 s
+  (−80%); the move to re-signing (draft classes made after the draft) 4.2 → 2.0 s (−53%). A regular season day (15 games,
+  0.9-1.1 s), the season (about 47 s), the playoffs, the draft, free agency with the preseason (development, badges, archetypes:
+  10.7-10.8 s) and the heavy pages' first loads are unchanged within noise (±10%; Draft Scouting's first load is still 7-9 s
+  in node, its prospects' full readings, which the app warms in the background).
+- Same results: the class benchmark's hash of every stored prospect of 6 seeded classes, the sim benchmark's `hash` (3 runs
+  each), every database store at every stage of 2 seeds with `simDeterminism.script.test.ts`, `labelFast.test.ts` (the label
+  against the whole reading's on 500 readings, with and without last season's label) and the outcome-invariance fixture.
+- The determinism check now runs the league achievements check at each stage (like the Records Book): two runs of the same
+  code differed there (and in the events and players it writes), since the debounced check landed in another stage.
+- `SIM_BENCH_CREATE_ONLY=1` times only the new league; `SIM_BENCH_VIEWS=1` also times Mock Draft, Big Boards and Roster.
+- Left: the full readings (`initArchetypesForNewLeague` about 7 s of a new league, the preseason update about 6 s, Draft
+  Scouting's first load), spread over the earlier reading's scoring of every build with no single hot spot; potential's
+  Monte Carlo (`monteCarloPot`, about a third of a class now) draws random numbers, so it can't be skipped or cached without
+  changing classes; GameSim is as perf4 left it.
+
 Wrapped and Storylines read the whole league into a snapshot. Converted pieces that can't change any more (retired players, finished seasons' box scores and team seasons) are cached in a separate IndexedDB database (`wrapped-cache`), versioned by the converter code and invalidated through the league's change log, so later sessions only read what changed. Idle snapshots are evicted from memory. `tools/perf/wrapped/` holds the Playwright benchmark scripts (see the header of `bench.cjs`).
 
 ## Testing
