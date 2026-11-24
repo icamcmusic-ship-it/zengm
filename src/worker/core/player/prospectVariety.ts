@@ -1,10 +1,7 @@
 // Prospect variety, worker side (see common/prospectVariety.ts): ovr-neutral reshaping of a ratings row, and the class-level steps of a new
 // draft class (senior polish, near-duplicates, archetype mix), all from seeded streams.
-import { g, helpers } from "../../util/index.ts";
-import {
-	agingCurveDelta,
-	agingCurveForPlayer,
-} from "../../../common/playerTraits/development.ts";
+import { helpers } from "../../util/index.ts";
+import { agingCurveDelta } from "../../../common/playerTraits/development.ts";
 import { ovrRaw } from "./ovr.basketball.ts";
 import {
 	expandedRatingsApply,
@@ -20,6 +17,7 @@ import {
 	type GenVariety,
 } from "../../../common/prospectVariety.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
+import { agingCurveOf } from "./trajectory.ts";
 import {
 	NOUN_RATING,
 	nounScores,
@@ -341,6 +339,7 @@ export const steerArchetypeLabels = (
  */
 export const applyPreDraftTrajectory = (p: {
 	pid: number;
+	trajectorySeed?: number;
 	genVar?: GenVariety;
 	ratings: any[];
 }) => {
@@ -350,13 +349,7 @@ export const applyPreDraftTrajectory = (p: {
 	}
 	const ages = gv.pre;
 	delete gv.pre;
-	let seed: number | string = 0;
-	try {
-		seed = g.get("playerTraitsSeed") ?? 0;
-	} catch {
-		seed = 0;
-	}
-	const curve = agingCurveForPlayer(seed, p.pid);
+	const curve = agingCurveOf(p);
 	let delta = 0;
 	for (const age of ages) {
 		delta += agingCurveDelta(curve, age);

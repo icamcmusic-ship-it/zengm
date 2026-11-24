@@ -23,6 +23,7 @@ import {
 	PHASES_WHERE_TEAMS_CAN_BE_DISABLED,
 } from "../../common/constants.ts";
 import { isGoldActive } from "../../common/isGoldActive.ts";
+import { isTrajectorySeed } from "../../common/playerTraits/development.ts";
 import actions from "./actions.ts";
 import { getStretchHardCapSeason } from "../core/player/release.ts";
 import hype from "./hype.ts";
@@ -3330,6 +3331,10 @@ const importPlayers = async ({
 		if (p.traits && typeof p.traits === "object") {
 			(p2 as any).traits = p.traits;
 		}
+		// and his hidden trajectory (aging curve), which would otherwise come from his new pid
+		if (isTrajectorySeed(p.trajectorySeed)) {
+			(p2 as any).trajectorySeed = p.trajectorySeed;
+		}
 		if (p.ratingsBuild && typeof p.ratingsBuild === "object") {
 			(p2 as any).ratingsBuild = p.ratingsBuild;
 		}
@@ -6257,6 +6262,12 @@ const upsertCustomizedPlayer = async (
 		} else {
 			delete p.traits;
 		}
+	}
+	// His trajectory seed (secret aging curve) never goes to the UI either
+	if (prevPlayer?.trajectorySeed !== undefined) {
+		p.trajectorySeed = prevPlayer.trajectorySeed;
+	} else {
+		delete p.trajectorySeed;
 	}
 	// Sub-ratings: the UI never gets his seed and hidden growth profile
 	if (prevPlayer?.subP) {

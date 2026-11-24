@@ -25,7 +25,6 @@ import {
 	residualTraitZs,
 	scoreOne,
 	agingCurveDelta,
-	agingCurveForPlayer,
 	centerDevelopment,
 	egoTradeRequestMoodShift,
 	egoTradeRequestProbMult,
@@ -45,10 +44,12 @@ import {
 import { PLAYER } from "../../../common/constants.ts";
 import type { NonEmptyArray } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
+import { agingCurveOf, ensureTrajectorySeed } from "./trajectory.ts";
 
 type TraitPlayer = {
 	pid?: number;
 	traits?: PlayerTraits;
+	trajectorySeed?: number;
 	born: { year: number };
 	draft: { year: number; tid?: number };
 	tid?: number;
@@ -118,8 +119,9 @@ export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
 	const same = TRAIT_KEYS.every(
 		(key) => p.traits?.[seedKey(key)] === next[seedKey(key)],
 	);
+	const trajectoryChanged = ensureTrajectorySeed(p);
 	if (same) {
-		return false;
+		return trajectoryChanged;
 	}
 	p.traits = next;
 	return true;
@@ -132,6 +134,7 @@ export const initTraits = (p: TraitPlayer & { pid: number }) => {
 		return;
 	}
 	p.traits = generateTraitSeeds(getPersonalityTraitSeed(), p.pid);
+	ensureTrajectorySeed(p);
 };
 
 export const getPlayerTraitScores = (
@@ -212,6 +215,8 @@ export const developTraits = (
 		p.pid,
 		season,
 	);
+	// (players from before it was stored get it here, the value they already had)
+	ensureTrajectorySeed(p);
 };
 
 export type PlayerTraitsForUI = {
@@ -280,9 +285,10 @@ export const getPlayerTraitsForUI = (
 	};
 };
 
-// The aging curve, for the worker only (development). Never send this to the UI: use getRevealedAgingCurve
-const getAgingCurve = (p: { pid?: number }) =>
-	agingCurveForPlayer(getLeagueTraitSeed(), p.pid ?? 0);
+// The aging curve, for the worker only (development). Never send this to the UI: use getRevealedAgingCurve. From his stored trajectory
+// seed, so it follows him to another league; without one, from the league seed and his pid as always (the same value)
+const getAgingCurve = (p: { pid?: number; trajectorySeed?: number }) =>
+	agingCurveOf({ pid: p.pid ?? 0, trajectorySeed: p.trajectorySeed });
 
 // The aging curve as the user may see it: only once he has retired (otherwise undefined, also in God Mode)
 export const getRevealedAgingCurve = (p: TraitPlayer & { pid: number }) => {

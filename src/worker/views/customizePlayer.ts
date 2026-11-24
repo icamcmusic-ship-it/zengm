@@ -235,9 +235,10 @@ export default defineView({
 			if (!g.get("godMode") && p) {
 				delete p.traits;
 			}
-			// Sub-ratings: his seed and hidden growth profile stay in the worker (saving restores them)
+			// Sub-ratings: his seed and hidden growth profile stay in the worker (saving restores them), and so does his trajectory seed
 			if (p) {
 				delete p.subP;
+				delete p.trajectorySeed;
 			}
 
 			return {

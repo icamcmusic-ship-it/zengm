@@ -1919,6 +1919,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Basketball only: the stored random components of the player traits (see common/playerTraits). Created at player generation and lazily; scores are derived from these plus ratings.
 	traits?: PlayerTraits;
+	// Basketball: the seed of his hidden trajectory (aging curve, growth profile), stored with his trait seeds so it follows him to
+	// another league. Missing in older players: derived from the league's trait seed and his pid, which gives the same value
+	trajectorySeed?: number;
 
 	// Set by "Regenerate ratings": the build (archetype) the player's ratings were rebuilt around, plus the ratings from before the first regeneration so another regeneration never compounds on the last
 	ratingsBuild?: StoredRatingsBuild;
