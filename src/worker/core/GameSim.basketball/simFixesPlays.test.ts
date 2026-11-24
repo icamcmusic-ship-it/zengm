@@ -123,6 +123,10 @@ test("knocks: players shaken up leave, most come back later in the game, none of
 				});
 				for (const t of sim.team) {
 					for (const p of t.player) {
+						// (a real injury stands: no knock evaluation clears it)
+						if (p.newInjury) {
+							assert.isTrue(p.injured);
+						}
 						// (a knock is never an injury after the game, and a player cleared to return is healthy)
 						if (p.knock && !p.newInjury) {
 							const ev = events.findLast(
@@ -160,5 +164,39 @@ test("knocks: none without Game Sim Fixes", async () => {
 			assert.isTrue(events.some((e) => e.type === "injury"));
 		},
 		{ baseInjuryRate: 0.005, doPlayByPlay: true },
+	);
+});
+
+test("knocks: never to a player already injured, and an evaluation doesn't clear a real injury", async () => {
+	await scenario(
+		7,
+		{ simFixes: true },
+		(sim) => {
+			// Injured this game but not subbed out yet: the injury checks keep running on him
+			const hurt = sim.playersOnCourt[0][0];
+			hurt.injured = true;
+			hurt.newInjury = true;
+			for (let i = 0; i < 2000; i++) {
+				sim.injuries();
+				hurt.injured = true;
+			}
+			assert.isUndefined(hurt.knock);
+
+			// Knocked, then really injured before he got to the bench: cleared to return leaves the injury
+			const other = sim.playersOnCourt[1][0];
+			other.injured = true;
+			other.newInjury = true;
+			other.knock = { evalAt: -1 };
+			sim.knocked = [other];
+			const random = Math.random;
+			Math.random = () => 0;
+			try {
+				sim.evaluateKnocks();
+			} finally {
+				Math.random = random;
+			}
+			assert.isTrue(other.injured);
+		},
+		{ baseInjuryRate: 0.01 },
 	);
 });

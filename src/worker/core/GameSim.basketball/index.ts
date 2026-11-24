@@ -5075,9 +5075,11 @@ class GameSim extends GameSimBase {
 					} else if (
 						this.simFixes &&
 						r < injuryRate * (1 + SIM_FIX_KNOCK.rate) &&
-						!p.knock
+						!p.knock &&
+						!p.injured
 					) {
-						// Game Sim Fixes: a knock (same random number, so the real injuries are unchanged)
+						// Game Sim Fixes: a knock (same random number, so the real injuries are unchanged), never to a player already
+						// out (injured this game and not subbed out yet), whose evaluation would clear the injury
 						p.injured = true;
 						p.knock = {
 							evalAt:
@@ -5112,8 +5114,8 @@ class GameSim extends GameSimBase {
 			}
 			this.knocked.splice(i, 1);
 			const back = Math.random() < SIM_FIX_KNOCK.returnProb;
-			// (a real injury while he was out can't happen, he was on the bench)
-			if (back) {
+			// (not if he was really injured before he got to the bench: that injury stands)
+			if (back && !p.newInjury) {
 				p.injured = false;
 			}
 			if (FLOW_DIAG.on && back) {
