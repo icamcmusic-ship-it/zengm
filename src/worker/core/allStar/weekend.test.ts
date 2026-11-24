@@ -11,7 +11,7 @@ import create from "./create.ts";
 import prepareGame, { simContests } from "./prepareGame.ts";
 import { castVotes, selectFromVotes, slotsFor } from "./vote.ts";
 import { rankRuns, runCourse } from "./skills.ts";
-import { courtOf } from "./weekend.ts";
+import { courtOf, traitsOf } from "./weekend.ts";
 import {
 	allStarFacts,
 	allStarWeekendStory,
@@ -354,5 +354,24 @@ describe("All-Star weekend", () => {
 		assert.include(text, "Rip Rook");
 		assert.include(text, "Sophomores 160, Rookies 150");
 		assert.notMatch(text, /\bovr\b|rating/i);
+	});
+	test("contest traits follow the Player Traits setting and fill in missing seeds", () => {
+		resetG();
+		const p = player.generate(0, 25, g.get("season") - 4, true, 50);
+		p.pid = 12;
+		const r = p.ratings.at(-1)!;
+
+		// Setting off: no traits, even with stored seeds
+		g.setWithoutSavingToDB("playerTraits", false);
+		p.traits = { egoSeed: 2 };
+		assert.isUndefined(traitsOf(p, r));
+
+		// Setting on: scores even without stored seeds (derived from league seed + pid, like the rest of the game)
+		g.setWithoutSavingToDB("playerTraits", true);
+		delete p.traits;
+		const scores = traitsOf(p, r);
+		assert.isDefined(scores);
+		assert.strictEqual(typeof scores!.ego, "number");
+		assert.deepEqual(traitsOf(p, r), scores);
 	});
 });

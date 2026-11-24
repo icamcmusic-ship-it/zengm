@@ -4,7 +4,7 @@
 import { makeSeededRandom } from "../../../common/random.ts";
 import { saltedSeed } from "../../../common/leagueSalt.ts";
 import { SUB_INDEX } from "../../../common/subRatings.ts";
-import { traitScores } from "../../../common/playerTraits/index.ts";
+import { getPlayerTraitScores, traitsEnabled } from "../player/traits.ts";
 import type { PlayerRatings } from "../../../common/types.basketball.ts";
 import type { Player } from "../../../common/types.ts";
 import { entryForSeason } from "../../../common/tieredBadges/compute.ts";
@@ -46,12 +46,13 @@ export const badgesOf = (
 	return t ? Object.keys(t).filter((key) => t[key]) : [];
 };
 
-// Player traits (0-100) when the player has them, else undefined
+// Player traits (0-100) when the Player Traits setting is on (missing seeds filled in from the league seed and pid, like
+// everywhere else), else undefined
 export const traitsOf = (p: Player, r: PlayerRatings) => {
-	if (!p.traits) {
+	if (!traitsEnabled()) {
 		return undefined;
 	}
-	return traitScores(r, p.traits);
+	return getPlayerTraitScores(p, r.season);
 };
 
 const mean = (xs: (number | undefined)[], fallback: number) => {
