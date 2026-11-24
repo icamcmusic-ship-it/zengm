@@ -220,6 +220,16 @@ const setGameAttributes = async (
 		await draft.genPicks();
 	}
 
+	// More draft rounds mid-league (settings, a scheduled event): every upcoming class gets the prospects it is now short of, once.
+	// (A new team does the same in addNewTeamToExistingLeague; fewer rounds or teams leave the classes as they are)
+	if (
+		!skipDraftGenPicks &&
+		toUpdate.has("numDraftRounds") &&
+		g.get("numDraftRounds") > 0
+	) {
+		await draft.topUpDraftClasses(undefined, undefined, { undersized: true });
+	}
+
 	// Reset playerBioInfo caches
 	if (toUpdate.has("playerBioInfo")) {
 		local.playerBioInfo = undefined;
