@@ -124,13 +124,17 @@ export default defineView({
 									countTitles += 1;
 								}
 							}
+							const inducted = pRaw.awards.find(
+								(a) => a.type === HOF_AWARD,
+							)?.season;
 							return {
 								...p,
 								countMvp,
 								countTitles,
-								inducted: pRaw.awards.find((a) => a.type === HOF_AWARD)?.season,
-								// "first ballot, 93.5%" (Hall of Fame Ballot), undefined when inducted when he retired
-								ballot: ballotLine(pRaw.hofBallot),
+								inducted,
+								// "first ballot, 93.5%" (Hall of Fame Ballot), undefined when inducted when he retired. His year as of
+								// his induction, the ballot's vote
+								ballot: ballotLine(pRaw.hofBallot, inducted),
 								firstBallot:
 									pRaw.hofBallot?.status === "inducted" &&
 									pRaw.hofBallot.votes.length === 1,

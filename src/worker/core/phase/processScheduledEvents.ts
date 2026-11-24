@@ -26,6 +26,7 @@ import { formatList } from "../../../common/formatList.ts";
 import { getTeamInfoCache } from "../team/getTeamInfoCache.ts";
 import { getMetaAttribute } from "../../db/metaAttributes.ts";
 import { fanReaction } from "../../../common/franchiseStory.ts";
+import { clearHofBallotOnUnretire } from "../hallOfFame/index.ts";
 
 // After the playoffs, the TeamSeason row of the current season is for a season that is already completed, so scheduled events should not change it. The TeamSeason row for the next season is created from the Team in the preseason, before scheduled events are processed.
 const isSeasonCompleted = (phase: number) => {
@@ -621,6 +622,7 @@ const processUnretirePlayer = async (pid: number) => {
 	}
 
 	p.retiredYear = Infinity;
+	clearHofBallotOnUnretire(p);
 	player.addToFreeAgents(p, await getNumPlayersTradedAwayNormalizedAll());
 	await idb.cache.players.put(p);
 

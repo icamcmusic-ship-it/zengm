@@ -15,7 +15,13 @@ import type { Coach, Player } from "../../../common/types.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
-import { HOF_AWARD, coachHofCase, runHallOfFame } from "./index.ts";
+import {
+	HOF_AWARD,
+	ballotLine,
+	clearHofBallotOnUnretire,
+	coachHofCase,
+	runHallOfFame,
+} from "./index.ts";
 import { hofWatchFor, projectHofScore } from "./watch.ts";
 import retire from "../player/retire.ts";
 import { hofScoreBasketball } from "../player/madeHof.basketball.ts";
@@ -289,5 +295,99 @@ describe("watch", () => {
 		assert.isAtMost(w.chance, 1);
 		// Deterministic
 		assert.deepEqual(hofWatchFor(active, fracs), w);
+	});
+
+	test("the window agrees with the ballot: eligible in the last 10 ballots, the next ballot this season or next", async () => {
+		await resetCache({ players: [], awards: [] });
+		const fracs = { fracs: new Map<number, number>(), default: 1 };
+		// Wait 3, season 2019. After this season's ballot (draft lottery), the next one is 2020: eligible 2011 (retired 2008) is
+		// screened then, eligible 2010 (retired 2007) is not
+		assert.strictEqual(
+			hofWatchFor(makePlayer(40, 15, 12, 2008), fracs)?.status,
+			"waiting",
+		);
+		assert.strictEqual(
+			hofWatchFor(makePlayer(41, 15, 12, 2007), fracs)?.status,
+			"notWorthy",
+		);
+		// Before this season's ballot: eligible 2010 is still screened this season, and one eligible now is eligible this season
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		assert.strictEqual(
+			hofWatchFor(makePlayer(41, 15, 12, 2007), fracs)?.status,
+			"waiting",
+		);
+		assert.strictEqual(
+			hofWatchFor(makePlayer(42, 15, 12, 2006), fracs)?.status,
+			"notWorthy",
+		);
+		assert.strictEqual(
+			hofWatchFor(makePlayer(43, 15, 12, 2016), fracs)?.eligible,
+			2019,
+		);
+		// And the ballot itself screens exactly that window
+		await resetCache({
+			players: [makePlayer(41, 15, 12, 2007), makePlayer(42, 15, 12, 2006)],
+		});
+		await idb.cache.awards.put(awardsRow(2019));
+		g.setWithoutSavingToDB("startingSeason", 2000);
+		await runHallOfFame({});
+		assert.isDefined((await idb.cache.players.get(41))!.hofBallot);
+		assert.isUndefined((await idb.cache.players.get(42))!.hofBallot);
+	});
+});
+
+describe("un-retirement", () => {
+	test("a candidate who comes back loses his ballot and is screened afresh when he retires again; a Hall of Famer keeps his", () => {
+		const candidate = makePlayer(50, 9, 12);
+		candidate.hofBallot = {
+			first: 2010,
+			votes: [40, 45],
+			score: 1,
+			threshold: 1,
+		};
+		clearHofBallotOnUnretire(candidate);
+		assert.isUndefined(candidate.hofBallot);
+
+		const dropped = makePlayer(51, 9, 12);
+		dropped.hofBallot = {
+			first: 2010,
+			votes: [3],
+			score: 1,
+			threshold: 1,
+			status: "dropped",
+		};
+		clearHofBallotOnUnretire(dropped);
+		assert.isUndefined(dropped.hofBallot);
+
+		for (const status of ["inducted", "veterans"] as const) {
+			const hof = makePlayer(52, 15, 12);
+			const ballot = {
+				first: 2010,
+				votes: [90],
+				score: 1,
+				threshold: 1,
+				status,
+			};
+			hof.hofBallot = ballot;
+			clearHofBallotOnUnretire(hof);
+			assert.strictEqual(hof.hofBallot, ballot);
+		}
+	});
+
+	test("ballot line: the year as the ballot counts it, also after seasons with the ballot off", () => {
+		const hofBallot = {
+			first: 2010,
+			votes: [60, 80],
+			score: 1,
+			threshold: 1,
+			status: "inducted" as const,
+		};
+		// Voted in 2010 and (the ballot off in between) 2014: his 5th year, as the ballot's news and rows say
+		assert.strictEqual(ballotLine(hofBallot, 2014), "5th year, 80.0%");
+		assert.strictEqual(ballotLine(hofBallot, 2011), "2nd year, 80.0%");
+		assert.strictEqual(
+			ballotLine({ ...hofBallot, votes: [80] }, 2010),
+			"first ballot, 80.0%",
+		);
 	});
 });
