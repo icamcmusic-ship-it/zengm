@@ -10,6 +10,8 @@ import { orderBy } from "../../common/utils.ts";
 import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import { defineView } from "../util/defineView.ts";
 import { getStashedPlayers } from "../core/draftStash/index.ts";
+import { needsByPid } from "../core/player/archetypeNeeds.ts";
+import type { Need } from "../../common/archetypeFit.ts";
 
 const getSummaryTeam = (summary: TradeSummary, i: 0 | 1) => {
 	return {
@@ -146,6 +148,7 @@ export default defineView({
 			stashed: isStashed(userRosterAll, p.pid),
 			included: teams[0].pids.includes(p.pid),
 			excluded: teams[0].pidsExcluded.includes(p.pid),
+			fillsNeeds: undefined as Need[] | undefined,
 		}));
 
 		const userPicks2 = await Promise.all(
@@ -194,11 +197,14 @@ export default defineView({
 			}),
 		);
 
+		// Archetypes: the user's roster needs each of his players fills ("Fills a need")
+		const needs = await needsByPid(otherRosterAll);
 		const otherRosterWithIncluded = otherRoster.map((p) => ({
 			...p,
 			stashed: isStashed(otherRosterAll, p.pid),
 			included: teams[1].pids.includes(p.pid),
 			excluded: teams[1].pidsExcluded.includes(p.pid),
+			fillsNeeds: needs[p.pid] as Need[] | undefined,
 		}));
 
 		const otherPicks2 = await Promise.all(

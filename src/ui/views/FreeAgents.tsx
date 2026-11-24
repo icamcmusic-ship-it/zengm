@@ -28,6 +28,10 @@ import {
 	type DataTableRow,
 } from "../components/DataTable/index.tsx";
 import { NegotiateButtons } from "../components/NegotiateButtons.tsx";
+import {
+	FillsNeedToggle,
+	withFillsNeed,
+} from "../components/Archetype/FillsNeed.tsx";
 import { RosterComposition } from "../components/RosterComposition.tsx";
 import { RosterSalarySummary } from "../components/RosterSalarySummary.tsx";
 import {
@@ -117,6 +121,7 @@ const FreeAgents = ({
 	analytics,
 	capSpace,
 	market,
+	needs,
 	signingAdvice,
 	challengeNoFreeAgents,
 	freeAgencySeason,
@@ -166,6 +171,9 @@ const FreeAgents = ({
 		useState<DataTableHandle | null>(null);
 
 	const negotiationModal = useNegotiaionModal();
+
+	// Archetypes: only the free agents who fill a roster need
+	const [onlyNeeds, setOnlyNeeds] = useState(false);
 
 	// Scouting Reports, with the "Scouting Summaries on Lists" option on: a short blurb under each of the first free agents shown
 	const scoutBlurbs = useScoutingBlurbs(players.slice(0, 40).map((p) => p.pid));
@@ -277,19 +285,27 @@ const FreeAgents = ({
 		freeAgencySeason +
 		(season === "current" && phase < PHASE.FREE_AGENCY ? 1 : 0);
 
-	const rows: DataTableRow<"player">[] = players.map((p) => {
-		const nameLabels = wrappedPlayerNameLabels({
-			pid: p.pid,
-			injury: p.injury,
-			jerseyNumber: p.jerseyNumber,
-			skills: p.ratings.skills,
-			badges: p.ratings.badges,
-			defaultWatch: p.watch,
-			firstName: p.firstName,
-			firstNameShort: p.firstNameShort,
-			lastName: p.lastName,
-			season: playerInfoSeason,
-		});
+	const numNeeds = players.filter((p) => needs[p.pid]).length;
+	const shownPlayers = onlyNeeds
+		? players.filter((p) => needs[p.pid])
+		: players;
+
+	const rows: DataTableRow<"player">[] = shownPlayers.map((p) => {
+		const nameLabels = withFillsNeed(
+			wrappedPlayerNameLabels({
+				pid: p.pid,
+				injury: p.injury,
+				jerseyNumber: p.jerseyNumber,
+				skills: p.ratings.skills,
+				badges: p.ratings.badges,
+				defaultWatch: p.watch,
+				firstName: p.firstName,
+				firstNameShort: p.firstNameShort,
+				lastName: p.lastName,
+				season: playerInfoSeason,
+			}),
+			needs[p.pid],
+		);
 		const blurb = scoutBlurbs[p.pid];
 		const advice = signingAdvice[p.pid];
 		return {
@@ -418,6 +434,17 @@ const FreeAgents = ({
 						</button>
 					) : null}
 				</>
+			) : null}
+
+			{season === "current" ? (
+				<div>
+					<FillsNeedToggle
+						className="mb-3"
+						count={numNeeds}
+						on={onlyNeeds}
+						onChange={setOnlyNeeds}
+					/>
+				</div>
 			) : null}
 
 			{gameSimInProgress && !spectator ? (

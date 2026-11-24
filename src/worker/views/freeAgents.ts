@@ -25,6 +25,7 @@ import {
 	frontOfficeEnabled,
 	getNewDeptLevelLastThree,
 } from "../core/frontOffice/index.ts";
+import { needsByPid } from "../core/player/archetypeNeeds.ts";
 
 const processInputs = (params: RouteParams<"freeAgents">) => {
 	if (g.get("phase") === PHASE.RESIGN_PLAYERS) {
@@ -372,6 +373,9 @@ export default defineView({
 						? await getCapExceptionsSummary(userTid, payroll)
 						: undefined,
 				market,
+				// Archetypes: the user's roster needs each available free agent fills (basketball; empty when off)
+				needs:
+					season === "current" ? await needsByPid(playersByType.available) : {},
 				signingAdvice,
 				challengeNoFreeAgents: g.get("challengeNoFreeAgents"),
 				freeAgencySeason,
