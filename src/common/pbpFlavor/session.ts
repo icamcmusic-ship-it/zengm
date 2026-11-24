@@ -1061,6 +1061,8 @@ export class FlavorSession {
 					);
 				} else if (e.type === "tov") {
 					res = this.onTov(rng, ev, score);
+				} else if (e.type === "offFoul") {
+					res = this.onTov(rng, ev, score, true);
 				} else if (e.type === "stl") {
 					res = this.onSteal(rng, ev, score);
 				} else if (e.type === "orb" || e.type === "drb") {
@@ -2298,16 +2300,28 @@ export class FlavorSession {
 	}
 
 	// ---- turnovers, steals ----
-	private onTov(rng: Rng, ev: any, score: [number, number]): FlavorResult {
+	// charge: a real offensive foul from the sim (an offFoul event: the turnover and the personal foul on the ball handler, drawn by
+	// pidDefense). A plain turnover is never worded as an offensive foul, since it has no foul in the box score
+	private onTov(
+		rng: Rng,
+		ev: any,
+		score: [number, number],
+		charge = false,
+	): FlavorResult {
 		const t: 0 | 1 = ev.t;
 		const o: 0 | 1 = t === 0 ? 1 : 0;
 		const p = this.pl(ev.pid);
 		const ctx = this.baseCtx(rng, t, ev.poss, p, ev);
 		const play: any = { k: "tov", p, ti: t };
+		if (charge) {
+			this.checkFoulTrouble(p, this.host.stat(p.pid)?.pf ?? 0);
+		}
 		// a turnover after a very long possession is a shot-clock violation, if the shot clock was on (not at the end of a period, when the game
 		// clock was under 24 seconds as the possession started). The realistic possession model says which turnovers were violations (shotClock
 		// true/false); otherwise it is a guess from the possession length
-		if (typeof ev.shotClock === "boolean") {
+		if (charge) {
+			// (not a violation)
+		} else if (typeof ev.shotClock === "boolean") {
 			play.shotClock = ev.shotClock;
 		} else if (
 			!ev.outOfBounds &&
@@ -2317,19 +2331,24 @@ export class FlavorSession {
 		) {
 			play.shotClock = true;
 		}
-		const ds = this.floor(o);
-		ctx.drawer =
-			ds.length > 0 ? weighted(rng, ds, (q) => 0.5 + q.R.diq / 100) : null;
-		ctx.offFoul = !ev.outOfBounds;
-		ctx.offFoulW = 0.7;
-		ctx.oob = !!ev.outOfBounds;
+		if (charge) {
+			ctx.drawer = ev.pidDefense !== undefined ? this.pl(ev.pidDefense) : null;
+		} else {
+			const ds = this.floor(o);
+			ctx.drawer =
+				ds.length > 0 ? weighted(rng, ds, (q) => 0.5 + q.R.diq / 100) : null;
+		}
+		ctx.offFoul = charge;
+		ctx.chargeOnly = charge;
+		ctx.offFoulW = 1;
+		ctx.oob = !charge && !!ev.outOfBounds;
 		ctx.trans = false;
 		const s = tovText(rng, play, ctx);
 		let text = `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
 		if (ctx.chargeTaken && rng.random() < 0.12) {
 			text += ` ${ctx.chargeTaken.name} takes a moment to get up after the contact.`;
 		}
-		this.afterPlay(ev.outOfBounds ? "dead" : "tov", t, ctx);
+		this.afterPlay(ev.outOfBounds || charge ? "dead" : "tov", t, ctx);
 		this.lastShot = undefined;
 		void score;
 		const res: FlavorResult = {
@@ -3581,6 +3600,12 @@ export class FlavorSession {
 			const ps = stat(o.p);
 			if (ps) {
 				s = lastOf(s, o.p.name, `${ps.tov} ${TALLY_LABEL.TOV}`);
+			}
+		} else if (type === "offFoul" && o.p) {
+			// a charge: his personal fouls too (the sim records the foul before the event)
+			const ps = stat(o.p);
+			if (ps) {
+				s = lastOf(s, o.p.name, `P${ps.pf}, ${ps.tov} ${TALLY_LABEL.TOV}`);
 			}
 		} else if (type === "stl") {
 			if (o.stl) {

@@ -2485,6 +2485,12 @@ export function tovText(rng: any, e: any, ctx: any) {
 			t,
 		);
 	let ok = rows.filter((r) => (ctx.oob ? isOob(r[1]) : !isOob(r[1])));
+	// a real charge from the sim (an offFoul event): only the charge wordings (or any offensive foul, if no defender is known)
+	if (ctx.chargeOnly) {
+		const charges = ok.filter((r) => r[2].charge);
+		const fouls = ok.filter((r) => r[2].foul);
+		ok = charges.length ? charges : fouls.length ? fouls : ok;
+	}
 	if (!ok.length) {
 		ok = ctx.oob
 			? [[1, n + " loses the ball out of bounds", {}]]

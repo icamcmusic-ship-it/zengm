@@ -23,7 +23,10 @@ const games = async () => {
 	if (!cache) {
 		cache = [];
 		for (const seed of SEEDS) {
-			const { lines, boxScore, result } = await simulateLiveGame(seed);
+			// (Game Sim Fixes on, as in every league: the charges come from there)
+			const { lines, boxScore, result } = await simulateLiveGame(seed, {
+				simFixes: true,
+			});
 			cache.push({ seed, lines, box: boxScore, result });
 		}
 	}

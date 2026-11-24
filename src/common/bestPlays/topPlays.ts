@@ -441,7 +441,7 @@ export const playsFromPbp = (
 		}
 		// A charge taken: the play belongs to the defender who drew it
 		if (
-			e.type === "tov" &&
+			e.type === "offFoul" &&
 			action === "charge-taken" &&
 			fr &&
 			fr !== "silent" &&

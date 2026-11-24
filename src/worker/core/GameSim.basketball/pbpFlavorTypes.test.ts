@@ -113,7 +113,8 @@ const games = async () => {
 	if (!cache) {
 		cache = [];
 		for (const seed of SEEDS) {
-			const { events, result } = await simulateGame(seed);
+			// (Game Sim Fixes on, as in every league: the charges come from there)
+			const { events, result } = await simulateGame(seed, { simFixes: true });
 			cache.push({
 				seed,
 				events,
@@ -397,7 +398,8 @@ test("the new kinds of plays reach the top plays", async () => {
 			if (p.kind === "charge") {
 				// (the play belongs to the defender who drew the charge)
 				const ev = g.events.find(
-					(e: any) => e.type === "tov" && e.t !== p.t && p.clock !== undefined,
+					(e: any) =>
+						e.type === "offFoul" && e.t !== p.t && p.clock !== undefined,
 				);
 				assert.isDefined(ev);
 				assert.isDefined(p.pid);

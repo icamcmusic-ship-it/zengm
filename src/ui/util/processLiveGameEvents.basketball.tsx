@@ -368,16 +368,14 @@ const getText = (
 		texts = ["The shot rims out", "No good", `${getPronoun("He")} bricks it`];
 		weights = [1, 4, 1];
 	} else if (event.type === "orb") {
-		const trb =
-			(playersByPid[event.pid] as any).drb +
-			(playersByPid[event.pid] as any).orb;
+		const rp = playersByPid[event.pid] as any;
+		const trb = rp ? rp.drb + rp.orb : undefined;
 		texts = [
 			`${getName(event.pid)} grabbed the offensive rebound${formatLiveGameStat(trb, "trb")}`,
 		];
 	} else if (event.type === "drb") {
-		const trb =
-			(playersByPid[event.pid] as any).drb +
-			(playersByPid[event.pid] as any).orb;
+		const rp = playersByPid[event.pid] as any;
+		const trb = rp ? rp.drb + rp.orb : undefined;
 
 		texts = [
 			`${getName(event.pid)} grabbed the defensive rebound${formatLiveGameStat(trb, "trb")}`,
@@ -523,7 +521,8 @@ const getText = (
 
 		if (eAny.pidFoul !== undefined) {
 			// Hack! eed to add 1 because the pf stat is not logged until after this event, and it's tricky to fix that
-			const pf = (playersByPid[eAny.pidFoul]!.pf as number) + 1;
+			const pfBefore = playersByPid[eAny.pidFoul]?.pf as number | undefined;
+			const pf = pfBefore === undefined ? undefined : pfBefore + 1;
 			text = (
 				<>
 					{text}
@@ -577,20 +576,57 @@ const newPossessionTypes: Record<string, boolean> = {
 	timeout: true,
 	endOfPeriod: true,
 	flagrantFoul: false,
+	// a charge (logged by the offense's team): the ball goes to the defense
+	offFoul: false,
 };
 
-// Mutates boxScore!!!
-const processLiveGameEvents = ({
-	events,
-	boxScore,
-	overtimes,
-	quarters,
-}: {
+type ProcessArgs = {
 	events: PlayByPlayEvent<PlayByPlayEventOutput>[];
 	boxScore: any;
 	overtimes: number;
 	quarters: string[];
-}) => {
+};
+
+// The state above (players, flavor session, starters line) belongs to one caller: it is kept per box score object, so building a stored
+// game's play-by-play (BoxScorePlayByPlay) doesn't reset the live game's, and the other way around. The module variables hold the state of
+// the call in progress (processing is synchronous)
+type CallerState = {
+	gid: number | undefined;
+	playersByPid: typeof playersByPid;
+	flavor: FlavorSession | undefined;
+	startersListed: boolean;
+};
+const callerStates = new WeakMap<object, CallerState>();
+
+// Mutates boxScore!!!
+const processLiveGameEvents = (args: ProcessArgs) => {
+	const key = args.boxScore;
+	const saved =
+		key && typeof key === "object" ? callerStates.get(key) : undefined;
+	playersByPidGid = saved?.gid;
+	playersByPid = saved?.playersByPid;
+	flavor = saved?.flavor;
+	startersListed = saved?.startersListed ?? false;
+	try {
+		return processLiveGameEventsInner(args);
+	} finally {
+		if (key && typeof key === "object") {
+			callerStates.set(key, {
+				gid: playersByPidGid,
+				playersByPid,
+				flavor,
+				startersListed,
+			});
+		}
+	}
+};
+
+const processLiveGameEventsInner = ({
+	events,
+	boxScore,
+	overtimes,
+	quarters,
+}: ProcessArgs) => {
 	if (
 		!playersByPid ||
 		boxScore.gid !== playersByPidGid ||
@@ -694,7 +730,9 @@ const processLiveGameEvents = ({
 				e.s === "pts"
 			) {
 				const p = playersByPid[e.pid!];
-				(p as any)[e.s] += e.amt;
+				if (p) {
+					(p as any)[e.s] += e.amt;
+				}
 				boxScore.teams[eventT!][e.s] += e.amt;
 
 				if (e.s === "pts") {
@@ -708,8 +746,10 @@ const processLiveGameEvents = ({
 					}
 				}
 			} else if (e.s === "gs") {
-				const p = playersByPid[e.pid!]!;
-				p.inGame = true;
+				const p = playersByPid[e.pid!];
+				if (p) {
+					p.inGame = true;
+				}
 			} else if (e.s === "sPts" || e.s === "sAtt") {
 				// Shootout
 				boxScore.teams[eventT!][e.s] += e.amt;
@@ -792,11 +832,18 @@ const processLiveGameEvents = ({
 			}
 
 			if (e.type === "sub") {
+				// (a pid missing from the box score is skipped, not thrown on: that would stop the whole feed)
 				for (const pid of e.pids) {
-					playersByPid[pid]!.inGame = true;
+					const p = playersByPid[pid];
+					if (p) {
+						p.inGame = true;
+					}
 				}
 				for (const pid of e.pidsOff) {
-					playersByPid[pid]!.inGame = false;
+					const p = playersByPid[pid];
+					if (p) {
+						p.inGame = false;
+					}
 				}
 			} else if (e.type === "elamActive") {
 				boxScore.elamTarget = e.target;
