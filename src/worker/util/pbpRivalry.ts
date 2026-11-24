@@ -8,6 +8,7 @@
 import { PHASE } from "../../common/constants.ts";
 import { rivalryLevelOfTier } from "../../common/pbpFlavor/trashTalk.ts";
 import g from "./g.ts";
+import { featureOn } from "./nativeFeatures.ts";
 import { loadRivalries, pairKey } from "./rivalries.ts";
 
 const NONE = new Map<string, number>();
@@ -21,8 +22,12 @@ export const getPbpRivalryLevels = async (
 		opts: { storedGames: boolean },
 	) => Promise<{ key: string; score: { tier: string } }[]> = loadRivalries,
 ): Promise<Map<string, number>> => {
-	// (only the trash talk uses it, and nobody talks without the Temper trait)
-	if (__SPORT !== "basketball" || !g.get("playerTraits")) {
+	// (only the trash talk uses it, and nobody talks without the Temper trait; and no rivalries without the Rivalries extra)
+	if (
+		__SPORT !== "basketball" ||
+		!g.get("playerTraits") ||
+		!featureOn("rivalries")
+	) {
 		return NONE;
 	}
 	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase") >= PHASE.PLAYOFFS ? 1 : 0}`;
