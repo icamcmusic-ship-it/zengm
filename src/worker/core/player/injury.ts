@@ -6,7 +6,21 @@ import { uniform } from "../../../common/random.ts";
 
 let prevInjuries: InjuriesSetting | undefined;
 
+// The list drawn from: the league's, or defaultInjuries when it has nothing to draw (empty, or no positive frequency, as a league file
+// can have)
+let drawInjuries: InjuriesSetting = defaultInjuries;
 let cumSums: number[] = [];
+
+const getCumSums = (injuries: InjuriesSetting) => {
+	const sums: number[] = [];
+	for (const [i, injury] of injuries.entries()) {
+		sums[i] = injury.frequency;
+		if (i > 0) {
+			sums[i] += sums[i - 1]!;
+		}
+	}
+	return sums;
+};
 
 // extraFactor: Front Office Budget's Medical recovery for older players (1 when off). onNeutral gets the duration the same draws give at
 // a league-average health budget, for the season review
@@ -17,20 +31,19 @@ const injury = (
 		onNeutral?: (gamesRemaining: number) => void;
 	},
 ): PlayerInjury => {
-	const injuries = g.get("injuries") ?? defaultInjuries;
+	const leagueInjuries = g.get("injuries") ?? defaultInjuries;
 
-	if (injuries !== prevInjuries) {
-		cumSums = [];
-
-		for (const [i, injury] of injuries.entries()) {
-			cumSums[i] = injury.frequency;
-			if (i > 0) {
-				cumSums[i] += cumSums[i - 1]!;
-			}
+	if (leagueInjuries !== prevInjuries) {
+		drawInjuries = leagueInjuries;
+		cumSums = getCumSums(leagueInjuries);
+		if (!((cumSums.at(-1) ?? 0) > 0)) {
+			drawInjuries = defaultInjuries;
+			cumSums = getCumSums(defaultInjuries);
 		}
 
-		prevInjuries = injuries;
+		prevInjuries = leagueInjuries;
 	}
+	const injuries = drawInjuries;
 
 	const rand = uniform(0, cumSums.at(-1)!);
 	const i = cumSums.findIndex((cs) => cs >= rand);
@@ -43,13 +56,14 @@ const injury = (
 					injuries[i]!.games
 			: (1 + healthEffect(healthLevel)) * draw * injuries[i]!.games,
 	);
+	// At least 1 game: a 0-game injury would go into his history as a 0-game record (and he's out for the rest of this game anyway)
 	opts?.onNeutral?.(
-		helpers.bound(Math.round(draw * injuries[i]!.games), 0, Infinity),
+		helpers.bound(Math.round(draw * injuries[i]!.games), 1, Infinity),
 	);
 
 	return {
 		type: injuries[i]!.name,
-		gamesRemaining: helpers.bound(gamesRemaining, 0, Infinity),
+		gamesRemaining: helpers.bound(gamesRemaining, 1, Infinity),
 	};
 };
 
