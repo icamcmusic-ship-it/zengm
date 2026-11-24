@@ -1,4 +1,4 @@
-import getSchedule from "./getSchedule.ts";
+import getSchedule, { countScheduleBatches } from "./getSchedule.ts";
 
 /**
  * Get the number of days left in the regular season schedule.
@@ -12,62 +12,42 @@ const getDaysLeftSchedule = async (
 	const schedule = await getSchedule();
 
 	if (target !== undefined) {
-		if (schedule[0]) {
-			const today = schedule[0].day;
+		let index = -1;
+		if (typeof target === "number") {
+			index = schedule.findIndex((game) => game.gid === target);
+		} else if (target === "allStarGame") {
+			index = schedule.findIndex(
+				(game) => game.awayTid === -2 && game.homeTid === -1,
+			);
+		} else if (target === "tradeDeadline") {
+			index = schedule.findIndex(
+				(game) => game.awayTid === -3 && game.homeTid === -3,
+			);
+		}
 
-			let game;
-			if (typeof target === "number") {
-				game = schedule.find((game) => game.gid === target);
-			} else if (target === "allStarGame") {
-				game = schedule.find(
-					(game) => game.awayTid === -2 && game.homeTid === -1,
-				);
-			} else if (target === "tradeDeadline") {
-				game = schedule.find(
-					(game) => game.awayTid === -3 && game.homeTid === -3,
-				);
-			}
-
-			if (game) {
-				// Days with games before the target, which is what game.play counts. The same as the difference in day
-				// numbers, unless some days have no games (the All-Star break with realistic schedule length)
-				const days = new Set<number>();
-				for (const game2 of schedule) {
-					if (game2.day >= today && game2.day < game.day) {
-						days.add(game2.day);
-					}
-				}
-				return days.size;
-			}
+		if (index >= 0) {
+			// Days game.play takes before the target (getSchedule(true) batches: the days with games, unless a day has a team
+			// twice). Day numbers would count the All-Star break's empty days too (realistic schedule length).
+			return countScheduleBatches(schedule, index);
 		}
 
 		throw new Error(`getDaysLeftSchedule did not find target "${target}"`);
 	}
 
-	if (!schedule[0]) {
-		return 0;
-	}
-
-	// Days with games (see above)
-	return new Set(schedule.map((game) => game.day)).size;
+	return countScheduleBatches(schedule);
 };
 
 export default getDaysLeftSchedule;
 
-// Number of days with games in the next numCalendarDays calendar days (starting today), for "play one week" etc. The
-// same as numCalendarDays (if the schedule is that long) unless some days have no games, like the All-Star break with
-// realistic schedule length.
+// Number of days with games in the next numCalendarDays calendar days (starting today), for "play one week" etc., counted
+// like game.play plays them (getSchedule(true)). The same as numCalendarDays (if the schedule is that long) unless some days
+// have no games, like the All-Star break with realistic schedule length.
 export const getNumGameDaysInCalendarDays = async (numCalendarDays: number) => {
 	const schedule = await getSchedule();
 	if (!schedule[0]) {
 		return 0;
 	}
 	const today = schedule[0].day;
-	const days = new Set<number>();
-	for (const game of schedule) {
-		if (game.day < today + numCalendarDays) {
-			days.add(game.day);
-		}
-	}
-	return days.size;
+	const end = schedule.findIndex((game) => game.day >= today + numCalendarDays);
+	return countScheduleBatches(schedule, end < 0 ? schedule.length : end);
 };

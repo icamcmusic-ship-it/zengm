@@ -6,6 +6,7 @@ import newScheduleGood from "./newScheduleGood.ts";
 import groupScheduleRealistic, {
 	getAllStarBreakLength,
 	getScheduleRestStats,
+	getTargetNumPlayDays,
 } from "./groupScheduleRealistic.ts";
 import { newScheduleWithDays } from "./newSchedule.ts";
 import addDaysToSchedule from "./addDaysToSchedule.ts";
@@ -299,6 +300,39 @@ describe("newSchedule with realistic schedule length", options, () => {
 		);
 		// The same scale can be found from the schedule itself (schedule editor)
 		assert.approximately(getScheduleDayScale(schedule), output.dayScale, 0.05);
+	});
+
+	test("season length and All-Star break settings", () => {
+		assert.strictEqual(getAllStarBreakLength(82, 0), 3);
+		assert.strictEqual(getAllStarBreakLength(82, 7), 7);
+		assert.strictEqual(getAllStarBreakLength(20, 5), 5);
+		assert.strictEqual(getAllStarBreakLength(82, 100), 9);
+		assert.strictEqual(getTargetNumPlayDays(82, 2.5), 205);
+		// Out of range: bounded
+		assert.strictEqual(getTargetNumPlayDays(82, 10), 246);
+		assert.strictEqual(getTargetNumPlayDays(82, 0), 152);
+
+		Math.random = makeSeededRandom(3);
+		g.setWithoutSavingToDB("realisticSchedule", true);
+		g.setWithoutSavingToDB("realisticScheduleDaysPerGame", 2.5);
+		g.setWithoutSavingToDB("realisticScheduleAllStarBreak", 5);
+		const output = newScheduleWithDays(getTeams(30));
+		const days = output.days!;
+		const lastDay = Math.max(...days);
+		assert.isAtLeast(lastDay, 195);
+		assert.isAtMost(lastDay, 220);
+		for (const s of getScheduleRestStats(output.tids, days).values()) {
+			assert.strictEqual(s.sameDay, 0);
+			assert.isAtMost(s.maxConsecutive, 2);
+		}
+
+		// 5 days without other games, the All-Star Game in the middle
+		const asgDay = days[output.tids.findIndex(([home]) => home === -1)]!;
+		const daySet = new Set(days);
+		for (let day = asgDay - 2; day <= asgDay + 2; day++) {
+			assert.strictEqual(daySet.has(day), day === asgDay, `day ${day}`);
+		}
+		assert.isTrue(daySet.has(asgDay - 3) && daySet.has(asgDay + 3));
 	});
 
 	test("on, but grouped into series: old schedule", () => {

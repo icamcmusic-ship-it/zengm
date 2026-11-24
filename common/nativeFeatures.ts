@@ -390,6 +390,28 @@ export const NATIVE_FEATURES = [
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
+		options: [
+			{
+				key: "realisticScheduleDaysPerGame",
+				name: "Schedule Days per Game",
+				description:
+					"Calendar days per game per team the regular season is spread over, All-Star break and trade deadline included (2: 82 games in about 172 days). From 1.85 (about 165 days, more back-to-backs and about 4 3-in-4s per team) to 3 (about 245 days, more days off). Takes effect with the next schedule.",
+				type: "float",
+				default: 2,
+				min: 1.85,
+				max: 3,
+			},
+			{
+				key: "realisticScheduleAllStarBreak",
+				name: "All-Star Break Length",
+				description:
+					'Days with no other games around the All-Star Game, its own day included. 0: by season length (3 days for 50+ games, 1-2 for shorter seasons). Takes effect with the next schedule, and in the schedule editor\'s "Place All-Star Game in default position".',
+				type: "int",
+				default: 0,
+				min: 0,
+				max: 9,
+			},
+		],
 	},
 	{
 		id: "marqueeGames",

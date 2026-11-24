@@ -17,6 +17,7 @@ import { getAllGmWeights } from "../gm/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import create from "./create.ts";
 import propose from "./propose.ts";
+import { countScheduleBatches } from "../season/getSchedule.ts";
 
 // AI teams sending trade offers to the user (Trade Offers page). Offers arrive during the regular season (until the
 // trade deadline) and in the offseason trading phases, for players on the user's trading block or players/picks AI
@@ -486,6 +487,11 @@ export const addAiOffer = async (
 
 // Leagues/seasons for which the user was already told the trade deadline is coming up this session
 const deadlineNoticeSeasons = new Set<string>();
+
+// "N days", and "(M game days)" when some of those days have no games
+export const formatDaysLeft = (days: number, gameDays: number) =>
+	`${days} day${days === 1 ? "" : "s"}${gameDays !== days ? ` (${gameDays} game day${gameDays === 1 ? "" : "s"})` : ""}`;
+
 export const DEADLINE_NOTICE_DAYS = 7;
 
 const deadlineNotice = async () => {
@@ -499,12 +505,15 @@ const deadlineNotice = async () => {
 		return;
 	}
 	const today = Math.min(...schedule.map((game) => game.day));
-	const deadline = schedule.find(
+	const deadlineIndex = schedule.findIndex(
 		(game) => game.awayTid === -3 && game.homeTid === -3,
 	);
+	const deadline = schedule[deadlineIndex];
 	if (!deadline) {
 		return;
 	}
+	// Calendar days. With realistic schedule length some have no games, so the days with games (what "One day" plays) are
+	// shown too
 	const daysLeft = deadline.day - today;
 	if (daysLeft > DEADLINE_NOTICE_DAYS) {
 		return;
@@ -528,10 +537,11 @@ const deadlineNotice = async () => {
 		}
 	}
 	deadlineNoticeSeasons.add(noticeKey);
+	const gameDaysLeft = countScheduleBatches(schedule, deadlineIndex);
 	await logEvent({
 		type: "info",
 		category: "trades",
-		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${daysLeft} days`}. ${featureOn("tradeMarket") ? `See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.` : ""}`.trim(),
+		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${formatDaysLeft(daysLeft, gameDaysLeft)}`}. ${featureOn("tradeMarket") ? `See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.` : ""}`.trim(),
 		saveToDb: false,
 		tids: [g.get("userTid")],
 	});

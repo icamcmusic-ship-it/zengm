@@ -14,6 +14,12 @@ import type { Option } from "../../common/types.ts";
 import { idb } from "../db/index.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { isCollege } from "../core/college/isCollege.ts";
+import { MARQUEE_LABELS } from "../../common/marquee.ts";
+import {
+	getNextHolidaySlate,
+	getRoadTripEndDay,
+} from "../core/season/getPlayUntilDays.ts";
+import { featureOn } from "./nativeFeatures.ts";
 
 const updatePlayMenu = async () => {
 	if (__NODE_ENV === "test") {
@@ -53,6 +59,15 @@ const updatePlayMenu = async () => {
 				ALL_STAR_GAME_ONLY ? ["all_star", "teams"] : ["all_star"],
 			),
 			label: `All-Star ${ALL_STAR_GAME_ONLY ? "teams" : "events"}`,
+		},
+		untilHoliday: {
+			label: "Until holiday games",
+		},
+		untilEndOfRoadTrip: {
+			label: "Until end of road trip",
+		},
+		untilDay: {
+			label: `Until ${TIME_BETWEEN_GAMES}...`,
 		},
 		untilPlayoffs: {
 			label: "Until playoffs",
@@ -172,6 +187,7 @@ const updatePlayMenu = async () => {
 	>;
 
 	let keys: (keyof typeof allOptions)[] = [];
+	let holidayLabel: string | undefined;
 
 	if (
 		g.get("phase") === PHASE.DRAFT ||
@@ -221,6 +237,22 @@ const updatePlayMenu = async () => {
 		} else if (allStarIndex > 0) {
 			untilMore.push("untilAllStarGame");
 		}
+
+		// Marquee Games' next holiday slate (Christmas, MLK Day), the user's next home game if on a road trip, and any day
+		const holiday = featureOn("marqueeGames")
+			? getNextHolidaySlate(schedule)
+			: undefined;
+		if (holiday) {
+			untilMore.push("untilHoliday");
+			holidayLabel = `Until ${MARQUEE_LABELS[holiday.marquee]}`;
+		}
+		if (
+			!g.get("spectator") &&
+			getRoadTripEndDay(schedule, g.get("userTid")) !== undefined
+		) {
+			untilMore.push("untilEndOfRoadTrip");
+		}
+		untilMore.push("untilDay");
 
 		// Regular season - pre trading deadline
 		keys = bySport<typeof keys>({
@@ -324,29 +356,32 @@ const updatePlayMenu = async () => {
 		keys = ["day", "week", "untilPreseason"];
 	}
 
-	// College mode: the same phases under other names, and no free agency days
-	const collegeLabels: Partial<Record<keyof typeof allOptions, string>> = {};
+	// Labels that depend on the state: the next holiday, and college mode (the same phases under other names, and no free agency days)
+	const labels: Partial<Record<keyof typeof allOptions, string>> = {};
+	if (holidayLabel !== undefined) {
+		labels.untilHoliday = holidayLabel;
+	}
 	if (isCollege()) {
 		const phase = g.get("phase");
 		if (phase === PHASE.REGULAR_SEASON) {
-			collegeLabels.untilPlayoffs = "Until conference tournaments";
+			labels.untilPlayoffs = "Until conference tournaments";
 		} else if (phase === PHASE.AFTER_TRADE_DEADLINE) {
 			keys = ["day", "dayLive", "untilPlayoffs"];
-			collegeLabels.untilPlayoffs = "Until national tournament";
+			labels.untilPlayoffs = "Until national tournament";
 		} else if (phase === PHASE.PLAYOFFS) {
-			collegeLabels.throughPlayoffs = "Through national tournament";
+			labels.throughPlayoffs = "Through national tournament";
 		} else if (phase === PHASE.DRAFT_LOTTERY || phase === PHASE.DRAFT) {
 			keys = ["untilResignPlayers"];
-			collegeLabels.untilResignPlayers = "Until transfer portal (departures)";
+			labels.untilResignPlayers = "Until transfer portal (departures)";
 		} else if (phase === PHASE.AFTER_DRAFT) {
 			keys = ["collegePortal", "untilResignPlayers"];
-			collegeLabels.untilResignPlayers = "Until recruiting (closes the portal)";
+			labels.untilResignPlayers = "Until recruiting (closes the portal)";
 		} else if (phase === PHASE.RESIGN_PLAYERS) {
 			keys = ["collegeRecruiting", "untilFreeAgency"];
-			collegeLabels.untilFreeAgency = "Until signing day";
+			labels.untilFreeAgency = "Until signing day";
 		} else if (phase === PHASE.FREE_AGENCY) {
 			keys = ["untilPreseason"];
-			collegeLabels.untilPreseason = "Until next season";
+			labels.untilPreseason = "Until next season";
 		}
 	}
 
@@ -390,7 +425,7 @@ const updatePlayMenu = async () => {
 	}
 
 	const someOptions: Option[] = keys.map((id) => {
-		const label = collegeLabels[id];
+		const label = labels[id];
 		return {
 			...allOptions[id],
 			...(label !== undefined ? { label } : {}),

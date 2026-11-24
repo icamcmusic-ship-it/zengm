@@ -1,5 +1,5 @@
 import { assert, test } from "vitest";
-import { validateEditedSchedule } from "./validateEditedSchedule.ts";
+import { validateEditedSchedule } from "../../../common/validateEditedSchedule.ts";
 import { getEditedScheduleSpread } from "./scheduleDayScale.ts";
 
 const options = {

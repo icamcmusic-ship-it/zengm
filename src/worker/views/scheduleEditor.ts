@@ -11,6 +11,8 @@ import { isCollege } from "../core/college/isCollege.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
+import { getAllStarBreakLength } from "../core/season/groupScheduleRealistic.ts";
+import { getRealisticScheduleSettings } from "../core/season/newSchedule.ts";
 
 export const formatScheduleForEditor = (
 	scheduleRaw: ScheduleGameWithoutKey[],
@@ -126,7 +128,17 @@ export default defineView({
 				});
 			}
 
+			// Realistic schedule length: "Place All-Star Game in default position" makes the All-Star break, as the schedule
+			// builder does (the realisticScheduleAllStarBreak setting)
+			const allStarBreakLength = season.realisticScheduleOn()
+				? getAllStarBreakLength(
+						g.get("numGames"),
+						getRealisticScheduleSettings().allStarBreakLength,
+					)
+				: 1;
+
 			return {
+				allStarBreakLength,
 				allStarGame: g.get("allStarGame"),
 				allStarGameAlreadyHappened,
 				canRegenerateSchedule,
