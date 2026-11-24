@@ -193,6 +193,7 @@ const Leaders = ({
 											firstNameShort={p.firstNameShort}
 											lastName={p.lastName}
 											alwaysUseFirstNameShort
+											maxBadges={1}
 										/>
 										<a href={helpers.leagueUrl(teamUrlParts)} className="mx-2">
 											{p.abbrev}

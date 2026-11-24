@@ -44,6 +44,10 @@ type Props = {
 	// Allow overriding settings, for places where we're sure there is always room
 	fullNames?: boolean;
 
+	// Most badges shown next to the name (the rest behind the "+N" toggle), so long names with many badges don't push the
+	// table's values off narrow tables (League Leaders) or overlap the next columns (roster). Default 3
+	maxBadges?: number;
+
 	// Maybe this is confusing along with fullNames, which does more than affect names...
 	alwaysUseFirstNameShort?: boolean;
 
@@ -203,6 +207,17 @@ export const PlayerNameLabels = (props: Props) => {
 					0,
 					targetLength - firstNameShort.length - 4 - injuryLength,
 				) + "...";
+		}
+	}
+
+	// Badge cap everywhere (basketball badges are wide pills)
+	if (__SPORT === "basketball" && !fullNames && labels) {
+		const maxBadges = props.maxBadges ?? 3;
+		if (labels.length > maxBadges) {
+			numSkillsBeforeTruncate = Math.min(
+				numSkillsBeforeTruncate ?? Infinity,
+				maxBadges,
+			);
 		}
 	}
 
