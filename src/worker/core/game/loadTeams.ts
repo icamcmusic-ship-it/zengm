@@ -8,7 +8,8 @@ import { gameTimeDecisionPlays } from "../player/injuryRecovery.ts";
 import { idb } from "../../db/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { isRedshirting } from "../college/redshirt.ts";
-import { g, helpers, local } from "../../util/index.ts";
+import { g, helpers } from "../../util/index.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 import type { Player, Conditions, TeamSeason } from "../../../common/types.ts";
 import {
 	COMPOSITE_WEIGHTS,
@@ -144,11 +145,12 @@ let teamStats: Record<string, number | number[]>;
 export const getActualPlayThroughInjuries = (
 	t: { tid: number; playThroughInjuries: [number, number] } | "default",
 ) => {
-	if (t === "default" || g.get("spectator")) {
+	if (t === "default") {
 		return DEFAULT_PLAY_THROUGH_INJURIES;
 	}
 
-	if (g.get("userTids").includes(t.tid)) {
+	// The AI's setting when it runs the team (spectator mode, auto play)
+	if (userRunsTeam(t.tid)) {
 		return t.playThroughInjuries;
 	}
 
@@ -529,8 +531,8 @@ export const processTeam = async (
 			}
 		}
 
-		// Reset ptModifier for AI teams. This should not be necessary since it should always be 1, but let's be safe.
-		if (!g.get("userTids").includes(t.id) || g.get("spectator")) {
+		// Reset ptModifier for AI teams (and the user's while the AI runs it: spectator mode, auto play). For AI teams this should not be necessary since it should always be 1, but let's be safe.
+		if (!userRunsTeam(t.id)) {
 			p2.ptModifier = 1;
 		}
 		const seasonStats: Record<string, number> = {};
@@ -701,7 +703,7 @@ export const processTeam = async (
 			!allStarGame &&
 			nativeFeatureEnabled("shotShareModel", (key) => g.get(key as any))
 		) {
-			const userTeam = g.get("userTids").includes(t.id) && !g.get("spectator");
+			const userTeam = userRunsTeam(t.id);
 			const playersByPid = new Map(players.map((p) => [p.pid, p]));
 			const season = g.get("season");
 			const rows = t.player.map((p2: any) => {
@@ -737,7 +739,7 @@ export const processTeam = async (
 			!allStarGame &&
 			nativeFeatureEnabled("shotProfiles", (key) => g.get(key as any))
 		) {
-			const userTeam = g.get("userTids").includes(t.id) && !g.get("spectator");
+			const userTeam = userRunsTeam(t.id);
 			const playersByPid = new Map(players.map((p) => [p.pid, p]));
 			for (const p2 of t.player) {
 				const c = p2.compositeRating;
@@ -821,21 +823,13 @@ export const processTeam = async (
 			t.backToBack = isBackToBack(teamSeason.lastGameDay) || threeInFour;
 			// The user's own team: the plan follows his roster order (his starters get a minutes floor) and playing time buttons. Not with
 			// the AI running it (spectator, auto play)
-			if (
-				g.get("userTids").includes(t.id) &&
-				!g.get("spectator") &&
-				local.autoPlayUntil === undefined
-			) {
+			if (userRunsTeam(t.id)) {
 				t.userRotation = true;
 			}
 			// No Visible Ratings challenge: the user's own minutes plan ranks his players by the fuzzed value he sees (the one auto sort
 			// uses), so the box score's minutes order doesn't give away the true value order. Only the plan's order: the substitutions
 			// themselves still use the true value
-			if (
-				g.get("challengeNoRatings") &&
-				g.get("userTids").includes(t.id) &&
-				!g.get("spectator")
-			) {
+			if (g.get("challengeNoRatings") && userRunsTeam(t.id)) {
 				const playersByPid = new Map(players.map((p) => [p.pid, p]));
 				for (const p2 of t.player) {
 					const p = playersByPid.get(p2.id);
@@ -860,12 +854,8 @@ export const processTeam = async (
 		}
 
 		// Career Aging: AI coaches cap the minutes of their 39+ year olds (by his rank on the team), through the Realistic Rotations plan when
-		// it's on, otherwise by playing him a little less in the substitution order. Never on the user's own team
-		if (
-			!allStarGame &&
-			careerAgingOn() &&
-			(!g.get("userTids").includes(t.id) || g.get("spectator"))
-		) {
+		// it's on, otherwise by playing him a little less in the substitution order. Never on a team the user runs (his own, unless spectator mode or auto play)
+		if (!allStarGame && careerAgingOn() && !userRunsTeam(t.id)) {
 			const ranked = t.player
 				.filter((p2: any) => !p2.injured)
 				.toSorted((a: any, b: any) => b.valueNoPot - a.valueNoPot);

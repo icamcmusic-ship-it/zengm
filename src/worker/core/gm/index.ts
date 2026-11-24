@@ -55,15 +55,13 @@ import {
 } from "./finance.ts";
 import { getSeasonOdds } from "../seasonOdds/index.ts";
 import { winProb } from "../seasonOdds/simSeason.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 export const gmEnabled = () =>
 	__SPORT === "basketball" && featureOn("gmPersonalities");
 
 // The user makes this team's decisions right now
-export const userControlsTeam = (tid: number) =>
-	g.get("userTids").includes(tid) &&
-	!local.autoPlayUntil &&
-	!g.get("spectator");
+export const userControlsTeam = userRunsTeam;
 
 // The team is the user's, even while auto play runs it for him: it has no AI GM, and none is hired or fired there
 export const userOwnsTeam = (tid: number) =>

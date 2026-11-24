@@ -28,7 +28,7 @@ import type {
 	Team,
 } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { g, helpers, logEvent } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
 import { getAllGmWeights } from "../gm/index.ts";
@@ -83,6 +83,7 @@ import {
 	profileForNewCoach,
 	type HiringContext,
 } from "./systems.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 export const staffEnabled = () =>
 	__SPORT === "basketball" && !!g.get("coachingStaff");
@@ -322,10 +323,7 @@ export const syncAllBudgets = async (alsoInitial?: boolean) => {
 	}
 };
 
-const userControlsTeam = (tid: number) =>
-	g.get("userTids").includes(tid) &&
-	!local.autoPlayUntil &&
-	!g.get("spectator");
+const userControlsTeam = userRunsTeam;
 
 // notifyUser: shown as a notification when it's the user's head coach leaving on his own (retired, contract ran out), like assistants
 const logHeadCoachEvent = async (

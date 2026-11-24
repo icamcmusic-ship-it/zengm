@@ -342,7 +342,8 @@ import {
 	getEditedScheduleSpread,
 	getScheduleDayScale,
 } from "../core/season/scheduleDayScale.ts";
-import { validateEditedSchedule } from "../core/season/validateEditedSchedule.ts";
+import { validateEditedSchedule } from "../../common/validateEditedSchedule.ts";
+import { getEditedScheduleRules } from "../core/season/editedScheduleRules.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { agePlayerFace, faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
@@ -3171,6 +3172,10 @@ const staffDepthAction = async (
 const offEmphasisAction = async (
 	action: Parameters<typeof offEmphasis.setOffEmphasis>[0],
 ) => {
+	// (the coach sets the dials while the AI runs the team, ensureTeamEmphasis)
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	await offEmphasis.setOffEmphasis(action);
 	// (a setting the user just chose: kept even if the tab closes right away)
 	await idb.cache.flush();
@@ -5648,6 +5653,10 @@ const updateShotPlan = async ({
 	if (!g.get("userTids").includes(p.tid)) {
 		throw new Error("Not on your team");
 	}
+	// (the sim ignores it while the AI runs the team, game/loadTeams.ts)
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	if (shotPlan === 1 || shotPlan === -1) {
 		p.shotPlan = shotPlan;
 	} else {
@@ -5673,6 +5682,9 @@ const updateShotProfile = async ({
 	if (!g.get("userTids").includes(p.tid)) {
 		throw new Error("Not on your team");
 	}
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	if (SHOT_PROFILES.includes(shotProfile as any)) {
 		p.shotProfile = shotProfile as ShotProfile;
 	} else {
@@ -5685,6 +5697,9 @@ const updateShotProfile = async ({
 
 // Shot Profiles & Defensive Schemes: the user's team's defensive scheme (undefined: the coach picks)
 const updateDefScheme = async ({ defScheme }: { defScheme?: string }) => {
+	if (g.get("spectator")) {
+		throw new Error("The AI controls your team in spectator mode");
+	}
 	const t = await idb.cache.teams.get(g.get("userTid"));
 	if (!t) {
 		return;
@@ -6868,12 +6883,7 @@ const setScheduleFromEditor = async ({
 	// Check the edited schedule before saving anything: the game loop assumes each team plays at most once a day and the
 	// All-Star Game and trade deadline are alone on their days
 	const scheduleBefore = await idb.cache.schedule.getAll();
-	const allStarGameSetting = g.get("allStarGame");
-	const allStarGameAllowed =
-		scheduleBefore.some((game) => game.homeTid === -1 && game.awayTid === -2) ||
-		(allStarGameSetting !== null &&
-			allStarGameSetting >= 0 &&
-			!(await idb.cache.allStars.get(g.get("season"))));
+	const rules = await getEditedScheduleRules();
 	const activeTids = new Set(
 		(await idb.cache.teams.getAll())
 			.filter((t) => !t.disabled)
@@ -6883,9 +6893,7 @@ const setScheduleFromEditor = async ({
 		schedule.filter((game) => game.type !== "placeholder"),
 		{
 			activeTids,
-			allStarGameAllowed,
-			// Another one would start the AFTER_TRADE_DEADLINE phase again (play.ts)
-			tradeDeadlineAllowed: g.get("phase") < PHASE.AFTER_TRADE_DEADLINE,
+			...rules,
 		},
 	);
 	if (errorMessage !== undefined) {

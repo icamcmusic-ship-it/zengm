@@ -1,5 +1,5 @@
 import { PHASE } from "../../../common/constants.ts";
-import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { g, helpers, logEvent } from "../../util/index.ts";
 import { pickAiContractTerms } from "../contract/options.ts";
 import type { Phase, Player, FlatContractInfo } from "../../../common/types.ts";
 import genJerseyNumber from "./genJerseyNumber.ts";
@@ -13,6 +13,7 @@ import {
 	coachDecisionsOn,
 	newPromise,
 } from "../staff/rolePromise.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 const sign = async (
 	p: Player,
@@ -58,10 +59,7 @@ const sign = async (
 		contractSummary.rookie = true;
 	}
 	if (featureOn("contractOptions") && !contractSummary.rookie) {
-		const aiTeam =
-			!g.get("userTids").includes(tid) ||
-			!!local.autoPlayUntil ||
-			g.get("spectator");
+		const aiTeam = !userRunsTeam(tid);
 		const terms =
 			contractInput.terms ??
 			(aiTeam ? pickAiContractTerms(p, contractSummary) : undefined);

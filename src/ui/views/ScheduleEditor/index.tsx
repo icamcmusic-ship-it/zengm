@@ -23,10 +23,15 @@ import clsx from "clsx";
 import { useBlocker } from "../../hooks/useBlocker.ts";
 import { StickyBottomButtons } from "../../components/StickyBottomButtons.tsx";
 import { confirm } from "../../util/confirm.tsx";
-import { csvFormatRows, csvParse } from "d3-dsv";
+import { csvFormatRows } from "d3-dsv";
 import { downloadFile } from "../../util/downloadFile.ts";
 import { resetFileInput } from "../../util/resetFileInput.ts";
 import { IMPORT_FILE_STYLE } from "../../components/ImportFileButton.tsx";
+import {
+	ALL_STAR_GAME_LABEL,
+	TRADE_DEADLINE_LABEL,
+	validateAndParseScheduleCSV,
+} from "./scheduleCsv.ts";
 
 type Schedule = View<"scheduleEditor">["schedule"];
 
@@ -41,10 +46,6 @@ type ScheduleDay = {
 };
 
 type Team = View<"scheduleEditor">["teams"][number];
-
-// If these are ever changed it will break any previous CSV schedules on import, so be careful!
-const ALL_STAR_GAME_LABEL = "All-Star Game";
-const TRADE_DEADLINE_LABEL = "Trade Deadline";
 
 const deleteSpecial = (
 	schedule: Schedule,
@@ -117,146 +118,6 @@ const notifyPlaceSpecial = (
 			text: `Placed the ${type === "allStarGame" ? ALL_STAR_GAME_LABEL : TRADE_DEADLINE_LABEL} on day ${day}`,
 		});
 	});
-};
-
-const findDuplicates = (strings: string[]) => {
-	const seen = new Set<string>();
-	const duplicates = new Set<string>();
-
-	for (const string of strings) {
-		if (seen.has(string)) {
-			duplicates.add(string);
-		} else {
-			seen.add(string);
-		}
-	}
-
-	return duplicates;
-};
-
-const validateAndParseScheduleCSV = (
-	csvText: string,
-	teams: Team[],
-	maxDayAlreadyPlayed: number,
-): Schedule => {
-	const parsed = csvParse(csvText);
-
-	const teamsByAbbrev = groupByUnique(teams, (t) => t.seasonAttrs.abbrev);
-
-	const teamColumns = parsed.columns.slice(1).map((abbrev) => abbrev.trim());
-	if (!teamColumns[0]) {
-		throw new Error("No team columns found");
-	}
-	for (const abbrev of teamColumns) {
-		if (!teamsByAbbrev[abbrev]) {
-			throw new Error(
-				`Unknown abbrev in header: "${abbrev}". Available teams: ${teams.map((t) => t.seasonAttrs.abbrev).join(", ")}`,
-			);
-		}
-	}
-	const duplicateAbbrevs = findDuplicates(teamColumns);
-	if (duplicateAbbrevs.size > 0) {
-		const array = Array.from(duplicateAbbrevs);
-		throw new Error(`Duplicate abbrevs in header: ${array.join(", ")}`);
-	}
-
-	const gamesByDay = new Map<number, { away: Team; home: Team }[]>();
-	const teamsByDay = new Map<number, Set<number>>();
-	const specials: Extract<
-		Schedule[number],
-		{ type: "allStarGame" | "tradeDeadline" }
-	>[] = [];
-
-	for (const row of parsed) {
-		if (!parsed.columns[0]) {
-			continue;
-		}
-		const dayStr = row[parsed.columns[0]];
-		if (!dayStr) {
-			continue;
-		}
-
-		const day = Number.parseInt(dayStr);
-		if (Number.isNaN(day)) {
-			throw new Error(`Invalid day "${dayStr}". Must be a number.`);
-		}
-		if (day <= maxDayAlreadyPlayed) {
-			throw new Error(
-				`Day ${day} has already been played. Cannot upload schedules for days <= ${maxDayAlreadyPlayed}.`,
-			);
-		}
-
-		const firstCell = row[teamColumns[0]]?.trim();
-		if (
-			firstCell === ALL_STAR_GAME_LABEL ||
-			firstCell === TRADE_DEADLINE_LABEL
-		) {
-			for (const abbrev of teamColumns.slice(1)) {
-				if (row[abbrev]?.trim()) {
-					throw new Error(`${firstCell} must be the only entry on day ${day}`);
-				}
-			}
-			specials.push(
-				firstCell === ALL_STAR_GAME_LABEL
-					? { type: "allStarGame", day, homeTid: -1, awayTid: -2 }
-					: { type: "tradeDeadline", day, homeTid: -3, awayTid: -3 },
-			);
-			continue;
-		}
-
-		const dayGames = gamesByDay.getOrInsertComputed(day, () => []);
-		const teamsOnDay = teamsByDay.getOrInsertComputed(day, () => new Set());
-
-		for (const colAbbrev of teamColumns) {
-			const cellAbbrev = row[colAbbrev]?.trim();
-			if (!cellAbbrev) {
-				continue;
-			}
-
-			const colTeam = teamsByAbbrev[colAbbrev]!;
-
-			const cellTeam = teamsByAbbrev[cellAbbrev];
-			if (!cellTeam) {
-				throw new Error(
-					`Unknown opponent "${cellAbbrev}" for ${colAbbrev} on day ${day}`,
-				);
-			}
-			if (colTeam.tid === cellTeam.tid) {
-				throw new Error(`${colAbbrev} cannot play itself on day ${day}`);
-			}
-			// Both teams of the game: the column team hosts, the cell team visits
-			if (teamsOnDay.has(cellTeam.tid)) {
-				throw new Error(`${cellAbbrev} has multiple games on day ${day}`);
-			}
-			if (teamsOnDay.has(colTeam.tid)) {
-				throw new Error(`${colAbbrev} has multiple games on day ${day}`);
-			}
-
-			teamsOnDay.add(cellTeam.tid);
-			teamsOnDay.add(colTeam.tid);
-
-			dayGames.push({
-				away: cellTeam,
-				home: colTeam,
-			});
-		}
-	}
-
-	const newSchedule: Schedule = [...specials];
-	for (const [day, dayGames] of gamesByDay) {
-		for (const { away, home } of dayGames.values()) {
-			newSchedule.push({
-				type: "game",
-				day,
-				awayTid: away.tid,
-				awayAbbrev: away.seasonAttrs.abbrev,
-				homeTid: home.tid,
-				homeAbbrev: home.seasonAttrs.abbrev,
-			});
-		}
-	}
-
-	return orderBy(newSchedule, ["day"]);
 };
 
 const exportScheduleCSV = (schedule: Schedule, teams: Team[]) => {
@@ -575,11 +436,13 @@ const reducer = (
 const ScheduleEditor = ({
 	allStarGame,
 	allStarGameAlreadyHappened,
+	allStarGameAllowed,
 	canRegenerateSchedule,
 	maxDayAlreadyPlayed,
 	schedule: scheduleProp,
 	teams,
 	tradeDeadline,
+	tradeDeadlineAllowed,
 }: View<"scheduleEditor">) => {
 	useTitleBar({ title: "Schedule Editor" });
 	const { phase, userTid } = useLocal(["phase", "userTid"]);
@@ -630,12 +493,14 @@ const ScheduleEditor = ({
 			reader.onload = (e) => {
 				try {
 					const csvText = e.target?.result as string;
+					const completed = schedule.filter((g) => g.type === "completed");
 					const uploaded = validateAndParseScheduleCSV(
 						csvText,
 						teams,
 						maxDayAlreadyPlayed,
+						completed,
+						{ allStarGameAllowed, tradeDeadlineAllowed },
 					);
-					const completed = schedule.filter((g) => g.type === "completed");
 					dispatch({
 						type: "resetSchedule",
 						schedule: [...completed, ...uploaded],
@@ -660,7 +525,14 @@ const ScheduleEditor = ({
 				});
 			};
 		},
-		[dispatch, maxDayAlreadyPlayed, schedule, teams],
+		[
+			allStarGameAllowed,
+			dispatch,
+			maxDayAlreadyPlayed,
+			schedule,
+			teams,
+			tradeDeadlineAllowed,
+		],
 	);
 
 	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
