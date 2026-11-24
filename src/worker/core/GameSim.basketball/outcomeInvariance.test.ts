@@ -62,6 +62,14 @@ const stableStringify = (x: unknown): string =>
 		return value;
 	});
 
+// Technical and flagrant fouls (tf, ff) became box score stats after the fixture was recorded: left out, they are only counted, and
+// the rest of the stat line must still match
+const withoutNewStats = <T extends Record<string, any>>(stat: T): T => {
+	return Object.fromEntries(
+		Object.entries(stat).filter(([key]) => key !== "tf" && key !== "ff"),
+	) as T;
+};
+
 // The result of one game, as the rest of BBGM sees it: team and player stat lines, minus anything the play-by-play layer may add
 const boxScoreOf = (result: ReturnType<GameSim["run"]>) => {
 	return {
@@ -72,11 +80,11 @@ const boxScoreOf = (result: ReturnType<GameSim["run"]>) => {
 			.map((c) => c.text),
 		teams: result.team.map((t) => ({
 			id: t.id,
-			stat: t.stat,
+			stat: withoutNewStats(t.stat),
 			players: t.player.map((p) => ({
 				id: p.id,
 				name: p.name,
-				stat: p.stat,
+				stat: withoutNewStats(p.stat),
 				skills: p.skills,
 				injured: p.injured,
 				newInjury: p.newInjury,
@@ -149,4 +157,43 @@ test("a game's text events can be produced twice without touching the sim's rand
 			(e: any) => `${e.type}:${e.pid ?? ""}:${e.clock ?? ""}`,
 		);
 	assert.deepStrictEqual(types(a), types(b));
+});
+
+test("a game whose play-by-play is not stored logs nothing and plays the same", async () => {
+	const run = (seed: number, storePbp: boolean) =>
+		withSeededRandom(seed, async () => {
+			await genTwoTeams();
+			// (game/play.ts: when nobody reads a game's text, loadTeams leaves out what only the text reads)
+			const teams = await loadTeams(
+				[0, 1],
+				{},
+				storePbp ? undefined : new Set(),
+			);
+			return new GameSim({
+				gid: seed,
+				teams: [teams[0]!, teams[1]!],
+				baseInjuryRate: g.get("injuryRate"),
+				doPlayByPlay: false,
+				storePbp,
+				homeCourtFactor: 1,
+				allStarGame: false,
+				neutralSite: false,
+			}).run();
+		});
+	for (const seed of SEEDS.slice(0, 3)) {
+		const stored = await run(seed, true);
+		const notStored = await run(seed, false);
+		assert.isDefined(stored.playByPlay);
+		assert.isUndefined(notStored.playByPlay);
+		assert.strictEqual(
+			hashOf(boxScoreOf(notStored)),
+			hashOf(boxScoreOf(stored)),
+			`seed ${seed}`,
+		);
+		// (rivalry stories count technicals and ejections from the sim, not from the events)
+		assert.deepStrictEqual(
+			(notStored as any).techCounts,
+			(stored as any).techCounts,
+		);
+	}
 });

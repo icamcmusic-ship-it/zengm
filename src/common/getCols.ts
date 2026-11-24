@@ -1245,6 +1245,18 @@ const sportSpecificCols = bySport<{
 			sortType: "number",
 			title: "TRB%",
 		},
+		"stat:tf": {
+			desc: "Technical Fouls",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "TF",
+		},
+		"stat:ff": {
+			desc: "Flagrant Fouls",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "FF",
+		},
 		"stat:tsp": {
 			desc: "True Shooting Percentage",
 			sortSequence: ["desc", "asc"],

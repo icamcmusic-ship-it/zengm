@@ -263,6 +263,28 @@ test("with the setting on, box scores, the live text and the stored play-by-play
 				assert.strictEqual(sum, t.stat[s], s);
 			}
 		}
+		// Technical and flagrant fouls are box score stats: each player's are his events, the team's add the bench and coach technicals
+		for (const tt of [0, 1] as const) {
+			const t = result.team[tt];
+			for (const p of t.player) {
+				assert.strictEqual(
+					p.stat.tf,
+					count(events, "techFoul", (e) => e.t === tt && e.pid === p.id),
+				);
+				assert.strictEqual(
+					p.stat.ff,
+					count(events, "flagrantFoul", (e) => e.t === tt && e.pid === p.id),
+				);
+			}
+			assert.strictEqual(
+				t.stat.tf,
+				count(events, "techFoul", (e) => e.t === tt),
+			);
+			assert.strictEqual(
+				t.stat.ff,
+				count(events, "flagrantFoul", (e) => e.t === tt),
+			);
+		}
 
 		const live = playLive(events.slice(), makeLiveBoxScore(result, gid));
 		const last = live.at(-1)!;

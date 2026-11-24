@@ -61,12 +61,14 @@ import {
 import { subRatingsOn } from "../player/subRatings.ts";
 import {
 	ensureTieredBadges,
+	shownTiersForSeason,
 	simTiers,
 	tieredBadgeSimOn,
 } from "../player/tieredBadges.ts";
 import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
 import { careerAgingOn, oldAgeMinutesCap } from "../player/careerAging.ts";
 import {
+	PBP_BADGE_KEYS,
 	PBP_EXPANDED_KEYS,
 	PBP_TRAIT_KEYS,
 } from "../../../common/pbpFlavor/story.ts";
@@ -209,6 +211,9 @@ export const processTeam = async (
 		did: number;
 	},
 	players: Player[],
+	// Whether this team's game has a play-by-play someone will read (stored with the box score or watched live, game/play.ts). When
+	// false, what only the text reads (former teams, career context) is skipped. The sim never reads it
+	pbpText: boolean = true,
 ) => {
 	if (!playerStats) {
 		playerStats = Object.fromEntries([
@@ -235,6 +240,13 @@ export const processTeam = async (
 
 			// ba is still recorded as a player stat for some reason, but not a team stat, so we need to add it here so it gets tracked for the box score correctly
 			...(__SPORT === "basketball" ? [["ba", 0]] : []),
+			// Same for technical and flagrant fouls: box score totals only (writeTeamStats.ts skips them)
+			...(__SPORT === "basketball"
+				? [
+						["tf", 0],
+						["ff", 0],
+					]
+				: []),
 
 			["pts", 0],
 			["ptsQtrs", []],
@@ -442,7 +454,7 @@ export const processTeam = async (
 				}
 			}
 			// The other teams he has played for (regular season), for "facing his former team" (worker/util/pbpGameContext.ts)
-			if (!allStarGame) {
+			if (!allStarGame && pbpText) {
 				const tids = new Set<number>();
 				for (const row of p.stats ?? []) {
 					if (
@@ -460,6 +472,18 @@ export const processTeam = async (
 					(p2 as any).pbpTids = [...tids];
 				}
 			}
+			// 2K badges as the user sees them (scouted, never the sim's own tiers when those differ), for the wording only (pbpFlavor/story.ts)
+			if (pbpText && !allStarGame) {
+				const shown = shownTiersForSeason(p, g.get("season"));
+				if (shown) {
+					for (const [badge, key] of Object.entries(PBP_BADGE_KEYS)) {
+						const tier = (shown as Record<string, number | undefined>)[badge];
+						if (tier) {
+							(p2 as any).pbpRatings[key] = tier;
+						}
+					}
+				}
+			}
 			if (badgeSim) {
 				const bt = simTiers(p);
 				if (bt) {
@@ -471,7 +495,7 @@ export const processTeam = async (
 		// What he had done before this game (games, career and season highs, career totals), only used to word the basketball play-by-play
 		// ("that's a new career high"): see common/pbpFlavor/career.ts. The sim itself never reads it. Not for the All-Star Game, whose stats
 		// don't count
-		if (__SPORT === "basketball" && !allStarGame) {
+		if (__SPORT === "basketball" && !allStarGame && pbpText) {
 			(p2 as any).pbpCareer = careerFromStats(p.stats, {
 				season: g.get("season"),
 				draftYear: p.draft?.year,
@@ -910,7 +934,12 @@ export const processTeam = async (
  * @param {IDBTransaction} ot An IndexedDB transaction on players and teams.
  * @returns {Promise<Record<number, undefined | ReturnType<typeof processTeam>>>} Resolves to a record of team objects, ordered by tid.
  */
-const loadTeams = async (tids: number[], conditions: Conditions) => {
+const loadTeams = async (
+	tids: number[],
+	conditions: Conditions,
+	// Basketball: the teams whose game's play-by-play is stored or watched (see processTeam's pbpText). Undefined: all of them
+	pbpTids?: ReadonlySet<number>,
+) => {
 	const teams: Record<
 		number,
 		undefined | Awaited<ReturnType<typeof processTeam>>
@@ -953,6 +982,7 @@ const loadTeams = async (tids: number[], conditions: Conditions) => {
 					otl: 0,
 				},
 				players,
+				pbpTids === undefined || pbpTids.has(tid),
 			);
 
 			// Tournament format: the final is played to a target score (play.ts passes it to GameSim)
@@ -981,7 +1011,12 @@ const loadTeams = async (tids: number[], conditions: Conditions) => {
 				throw new Error("Team season not found");
 			}
 
-			teams[tid] = await processTeam(t, teamSeason, players);
+			teams[tid] = await processTeam(
+				t,
+				teamSeason,
+				players,
+				pbpTids === undefined || pbpTids.has(tid),
+			);
 		}
 	}
 

@@ -64,7 +64,12 @@ import {
 import { VarietyMemory, pickV, setVariety, weighted } from "./variety.ts";
 import { TrashTalk, applyTrashTalk, tempersFromPlayers } from "./trashTalk.ts";
 import { CareerNotes, parseCareer } from "./career.ts";
-import { StoryNotes, parseGameContext } from "./story.ts";
+import {
+	StoryNotes,
+	parseCoachSystems,
+	parseGameContext,
+	type CoachSystemsContext,
+} from "./story.ts";
 import {
 	roleNames,
 	setPlay,
@@ -216,6 +221,12 @@ export const contextFromInitEvent = (
 		...(Array.isArray(game) ? { game } : undefined),
 	};
 };
+
+// The words a team's defense gets (actions.ts and the calls): from its coach's defensive system, man-to-man without one
+export const schemeOfSystem = (
+	def: CoachSystemsContext[number]["def"] | undefined,
+): "man" | "zone" | "switch" | "press" =>
+	def === "zone" || def === "switch" || def === "press" ? def : "man";
 
 type Attempt = {
 	pid: number;
@@ -560,7 +571,8 @@ export class FlavorSession {
 	private lastShotSaid = false;
 	private crowdN = 0;
 	private lastPtype: string | undefined;
-	// each team's defensive look, from its roster (quick guards press, length plays zone...)
+	// each team's defensive look: its coach's actual defensive system (the coachSystems setting, sent with the game context), else
+	// man-to-man. It never changes during a game (the sim has no in-game scheme changes), so no line says it changed
 	private scheme: [string, string] = ["man", "man"];
 	// a rare stoppage, at most one a game
 	private oddity: boolean;
@@ -634,22 +646,11 @@ export class FlavorSession {
 		}
 		this.variety = new VarietyMemory(names);
 		this.oddity = new Rng(this.gid, 555).random() < 0.06;
+		const systems = this.context.exhibition
+			? undefined
+			: parseCoachSystems(this.context.game);
 		for (const t of [0, 1] as const) {
-			const r = new Rng(this.gid, 777 + t);
-			const ps = [...this.players.values()]
-				.filter((p) => p.t === t)
-				.slice(0, 8);
-			const avg = (k: "spd" | "hgt") =>
-				ps.reduce((a, p) => a + p.R[k], 0) / Math.max(1, ps.length);
-			const [r1, r2, r3] = [r.random(), r.random(), r.random()];
-			this.scheme[t] =
-				avg("spd") >= 62 && r1 < 0.5
-					? "press"
-					: avg("hgt") >= 58 && r2 < 0.4
-						? "zone"
-						: r3 < 0.5
-							? "switch"
-							: "man";
+			this.scheme[t] = schemeOfSystem(systems?.[t].def);
 		}
 		this.periodLens[1] = init.quarterLength * 60;
 		this.records = init.records;
@@ -910,6 +911,28 @@ export class FlavorSession {
 		return { text: `${base} ${tally}${end}` };
 	}
 
+	// The Elam Ending switches on (the clock is off, the first team to the target wins): where each team stands
+	private onElam(rng: Rng, ev: any, score: [number, number]): FlavorResult {
+		const target: number = ev.target;
+		const intro = pickV(rng, [
+			`Elam Ending! The clock is off: first to ${target} wins.`,
+			`The Elam Ending kicks in. No more clock, the first team to ${target} wins it.`,
+			`Elam Ending activated! First team to ${target} wins.`,
+		]);
+		if (!Number.isFinite(target)) {
+			return { text: intro };
+		}
+		let standing;
+		if (score[0] === score[1]) {
+			standing = `It's tied at ${score[0]}, so both teams need ${target - score[0]}.`;
+		} else {
+			const lead: 0 | 1 = score[0] > score[1] ? 0 : 1;
+			const other: 0 | 1 = lead === 0 ? 1 : 0;
+			standing = `With ${this.the(lead)} up ${score[lead]}-${score[other]}, they need ${target - score[lead]} more and ${this.the(other)} need ${target - score[other]}.`;
+		}
+		return { text: `${intro} ${standing}` };
+	}
+
 	private the(t: 0 | 1) {
 		const n = this.labels[t].name;
 		return this.noArticle ? n : `the ${n}`;
@@ -1118,6 +1141,8 @@ export class FlavorSession {
 					res = this.onEndOfPeriod(rng, ev);
 				} else if (e.type === "outOfBounds") {
 					res = this.onOutOfBounds(rng, ev);
+				} else if (e.type === "elamActive") {
+					res = this.onElam(rng, ev, score);
 				}
 		}
 
@@ -1325,20 +1350,7 @@ export class FlavorSession {
 				score[1],
 			),
 		];
-		if (
-			ev.type === "period" &&
-			this.period <= this.numPeriods &&
-			rng.random() < 0.45
-		) {
-			const ti: 0 | 1 = rng.random() < 0.5 ? 0 : 1;
-			const look = {
-				press: "pick up full court with a press",
-				zone: "switch to a 2-3 zone",
-				switch: "start switching everything on defense",
-				man: "go back to man-to-man",
-			}[this.scheme[ti]];
-			notes.push(`${cap(this.the(ti))} ${look}.`);
-		}
+		// (no "they switch to a zone" here: a team's defense is its coach's system all game, story.ts says it at tip-off)
 		// at the half and after three: lead changes, the largest lead
 		if (
 			notes.length < 2 &&

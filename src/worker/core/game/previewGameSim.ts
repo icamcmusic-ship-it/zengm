@@ -171,6 +171,8 @@ export const runPreviewGames = (
 					gid: -1000 - i,
 					teams: teams as any,
 					doPlayByPlay: false,
+					// (its events are never read)
+					storePbp: false,
 					homeCourtFactor: 1,
 					allStarGame: false,
 					baseInjuryRate: 0,
@@ -196,7 +198,7 @@ export const loadMatchups = async (
 ) => {
 	const matchups: [any, any][] = [];
 	for (const [homeTid, awayTid] of pairs) {
-		const teams = await loadTeams([homeTid, awayTid], conditions);
+		const teams = await loadTeams([homeTid, awayTid], conditions, new Set());
 		const schedule = [{ homeTid, awayTid }];
 		await staff.applyCoachSystems(schedule, teams);
 		matchups.push([teams[homeTid], teams[awayTid]]);

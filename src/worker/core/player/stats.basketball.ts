@@ -48,6 +48,9 @@ const stats = {
 		"blk",
 		"ba",
 		"pf",
+		// Technical and flagrant fouls (the technicalFouls setting; 0 with it off, and missing in rows from before they were recorded)
+		"tf",
+		"ff",
 		"pts",
 		"dd",
 		"td",

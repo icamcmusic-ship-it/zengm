@@ -727,13 +727,17 @@ const processLiveGameEventsInner = ({
 				e.s === "blk" ||
 				e.s === "ba" ||
 				e.s === "pf" ||
-				e.s === "pts"
+				e.s === "pts" ||
+				// (technical and flagrant fouls: missing from a box score made before they were recorded)
+				e.s === "tf" ||
+				e.s === "ff"
 			) {
 				const p = playersByPid[e.pid!];
 				if (p) {
-					(p as any)[e.s] += e.amt;
+					(p as any)[e.s] = ((p as any)[e.s] ?? 0) + e.amt;
 				}
-				boxScore.teams[eventT!][e.s] += e.amt;
+				boxScore.teams[eventT!][e.s] =
+					(boxScore.teams[eventT!][e.s] ?? 0) + e.amt;
 
 				if (e.s === "pts") {
 					for (let j = 0; j < 2; j++) {
