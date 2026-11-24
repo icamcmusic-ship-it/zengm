@@ -224,11 +224,16 @@ const validateAndParseScheduleCSV = (
 			if (colTeam.tid === cellTeam.tid) {
 				throw new Error(`${colAbbrev} cannot play itself on day ${day}`);
 			}
+			// Both teams of the game: the column team hosts, the cell team visits
 			if (teamsOnDay.has(cellTeam.tid)) {
 				throw new Error(`${cellAbbrev} has multiple games on day ${day}`);
 			}
+			if (teamsOnDay.has(colTeam.tid)) {
+				throw new Error(`${colAbbrev} has multiple games on day ${day}`);
+			}
 
 			teamsOnDay.add(cellTeam.tid);
+			teamsOnDay.add(colTeam.tid);
 
 			dayGames.push({
 				away: cellTeam,

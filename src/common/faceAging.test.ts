@@ -135,6 +135,47 @@ describe("faceAging", () => {
 		expect(next).toBeDefined();
 		// The user's beard style is kept
 		expect(next!.face.facialHair.id).toBe(face.facialHair.id);
+
+		// An edit with aging allowed: later seasons' faces are rebuilt from the edited face, not the one before the edit
+		const editedFace: FaceConfig = {
+			...face,
+			hair: {
+				...face.hair,
+				id: face.hair.id === "afro" ? "short" : "afro",
+				color: "#ff0000",
+			},
+		};
+		let editedAging: FaceAging | undefined = faceAgingAfterEdit(
+			aging,
+			editedFace,
+			40,
+			true,
+			2041,
+		);
+		let current = editedFace;
+		const edFaces: Record<number, FaceConfig> = { 2041: editedFace };
+		for (let season = 2042; season <= 2046; season++) {
+			const result = ageFaceForSeason(
+				current,
+				editedAging,
+				{ seed: 5, born: 2001, season },
+				OPTIONS,
+			);
+			if (result) {
+				current = result.face;
+				editedAging = result.aging;
+			}
+			edFaces[season] = current;
+		}
+		for (let season = 2041; season <= 2046; season++) {
+			expect(faceForSeason(current, editedAging, season).hair.color).toBe(
+				edFaces[season]!.hair.color,
+			);
+		}
+		// Before the edit: still the old face
+		expect(
+			extractAgingFields(faceForSeason(current, editedAging, 2030)),
+		).toEqual(extractAgingFields(faces[2030]!));
 	});
 
 	test("every aged face draws, with a separate beard colour", () => {

@@ -730,17 +730,26 @@ export const ageFaceForSeason = (
 	return { face: applyAgingFields(face, fields), aging: state };
 };
 
-// After a user edit of the face: lock it (unless allowed) and age on from the edited face
+// After a user edit of the face: lock it (unless allowed) and age on from the edited face. With the season, the edited face
+// is recorded as a complete snapshot then: later snapshots are only differences from the face they start from, so without
+// it past-season faces after the edit (Then and Now, Compare Players, prime faces) would be rebuilt from the pre-edit face
 export const faceAgingAfterEdit = (
 	aging: FaceAging | undefined,
 	face: FaceConfig,
 	age: number,
 	allow: boolean,
+	season?: number,
 ): FaceAging => {
+	const edited = extractAgingFields(face);
+	const h = { ...aging?.h };
+	if (season !== undefined && Object.keys(h).length > 0) {
+		// bc explicitly, so an older snapshot's beard colour doesn't carry over a beard now the hair's colour
+		h[season] = { ...edited, bc: edited.bc };
+	}
 	const out: FaceAging = {
-		b: extractAgingFields(face),
+		b: edited,
 		ba: age,
-		h: aging?.h ?? {},
+		h,
 		e: 1,
 	};
 	if (aging?.s !== undefined) {

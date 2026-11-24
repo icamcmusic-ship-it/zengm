@@ -691,10 +691,11 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		// Frozen Pre-draft Ranks setting, during the draft: where the board had him when the draft started, not among the players left
 		finalPick = preDraftRank.v;
 	} else {
-		// Where the board has him now: by value, the order the AI drafts in (and the Mock Draft shows), not the user's own fuzzed scouting list, which can put a second rounder in the lottery
+		// Where the board has him now: by value as the user's scouts see it (valueFuzz), like the Mock Draft. Never true value,
+		// which would give away the true order of the class one prospect page at a time
 		const board = classPlayers
 			.filter(isProspect)
-			.sort((a, b) => b.value - a.value);
+			.sort((a, b) => b.valueFuzz - a.valueFuzz || a.pid - b.pid);
 		finalPick = board.findIndex((p) => p.pid === pRaw.pid) + 1;
 		if (finalPick <= 0) {
 			finalPick = numPicks + 10;

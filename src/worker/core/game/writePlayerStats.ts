@@ -237,23 +237,29 @@ const doInjury = async (
 		hockey: p2.injury.gamesRemaining,
 	});
 
+	// A reaggravated injury already took its ratings loss when it first happened (its type and length are copied from it),
+	// so it doesn't take another one
+	const reaggravated = reaggravateExtraDays !== undefined;
+
 	// Career Aging: a bounded, seeded loss from major injuries (and a smaller one from other long ones) instead
-	const careerLoss = careerAgingOn()
-		? injuryAthleticLoss({
-				pid: p2.pid,
-				type: p2.injury.type,
-				games: p2.injury.gamesRemaining,
-				age: g.get("season") - p2.born.year,
-				season: g.get("season"),
-				n: p2.injuries.length,
-				seed: g.get("playerTraitsSeed") ?? 0,
-			})
-		: undefined;
+	const careerLoss =
+		careerAgingOn() && !reaggravated
+			? injuryAthleticLoss({
+					pid: p2.pid,
+					type: p2.injury.type,
+					games: p2.injury.gamesRemaining,
+					age: g.get("season") - p2.born.year,
+					season: g.get("season"),
+					n: p2.injuries.length,
+					seed: g.get("playerTraitsSeed") ?? 0,
+				})
+			: undefined;
 
 	if (
 		careerLoss
 			? !last(p2.ratings).locked
-			: gamesRemainingNormalized > 25 &&
+			: !reaggravated &&
+				gamesRemainingNormalized > 25 &&
 				!careerAgingOn() &&
 				Math.random() < gamesRemainingNormalized / 82 &&
 				!last(p2.ratings).locked

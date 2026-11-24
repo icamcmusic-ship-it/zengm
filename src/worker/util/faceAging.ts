@@ -187,7 +187,13 @@ export const faceAgingOnCustomize = (
 		JSON.stringify(stripExtra(prev.face)) !==
 			JSON.stringify(stripExtra(p.face));
 	if (changed) {
-		p.faceAging = faceAgingAfterEdit(prev?.faceAging, p.face, age, allow);
+		p.faceAging = faceAgingAfterEdit(
+			prev?.faceAging,
+			p.face,
+			age,
+			allow,
+			season,
+		);
 	} else if (prev?.faceAging) {
 		p.faceAging = { ...prev.faceAging };
 		if (allow) {
