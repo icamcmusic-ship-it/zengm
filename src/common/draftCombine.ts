@@ -79,6 +79,9 @@ export type DraftCombineResult = {
 	effort?: number;
 	// Pre-Draft Injuries & Combine Medicals: his medical grade. Missing for a combine held before it existed
 	medical?: CombineMedical;
+	// His place in the invite order (1 = first invited), stored when the combine is held so the order never changes afterwards.
+	// Missing for a combine held before it was stored
+	inviteRank?: number;
 };
 
 // ---- Medicals (Pre-Draft Injuries & Combine Medicals) ----
