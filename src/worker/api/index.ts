@@ -693,6 +693,8 @@ const clearInjuries = async (pids: number[] | "all") => {
 			type: "Healthy",
 			gamesRemaining: 0,
 		};
+		// Injury Depth: healed outright, so no minutes restriction or return period either
+		delete p.health;
 	}
 	await idb.cache.players.putAll(players);
 
@@ -6417,7 +6419,10 @@ const upsertCustomizedPlayer = async (
 					}
 				}
 
-				if (p.injury.type !== "Healthy") {
+				if (p.injury.type === "Healthy") {
+					// Injury Depth: healed outright, so no minutes restriction or return period either
+					delete p.health;
+				} else {
 					p.injuries.push({
 						season: g.get("season"),
 						games: p.injury.gamesRemaining,

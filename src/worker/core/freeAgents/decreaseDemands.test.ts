@@ -190,6 +190,39 @@ describe("decreaseDemands", () => {
 		await setupLeague();
 	}, 60_000);
 
+	test("Injury Depth: a free agent's injury heals into a return period that counts down", async () => {
+		g.setWithoutSavingToDB("injuryDepth", true);
+		const [p, q] = await idb.cache.players.indexGetAll(
+			"playersByTid",
+			PLAYER.FREE_AGENT,
+		);
+		p!.injury = { type: "Sprained Ankle", gamesRemaining: 1 };
+		p!.injuries = [
+			{ season: g.get("season"), games: 12, type: "Sprained Ankle" },
+		];
+		// A stale return period from before he became a free agent
+		q!.health = {
+			restrict: 0,
+			restrictTotal: 0,
+			returnGames: 1,
+			bodyPart: "Ankle",
+		};
+		await decreaseDemands();
+		assert.isUndefined(p!.health);
+		assert.isUndefined(q!.health);
+		await decreaseDemands();
+		assert.strictEqual(p!.injury.type, "Healthy");
+		assert.deepStrictEqual(p!.health, {
+			restrict: 4,
+			restrictTotal: 4,
+			returnGames: 15,
+			bodyPart: "Ankle",
+		});
+		await decreaseDemands();
+		assert.strictEqual(p!.health!.restrict, 3);
+		assert.strictEqual(p!.health!.returnGames, 14);
+	});
+
 	test("unwanted free agents drop to the minimum within days in the regular season", async () => {
 		// Nobody has cap space, like late in the season
 		g.setWithoutSavingToDB("salaryCap", 1000);

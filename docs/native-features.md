@@ -889,6 +889,7 @@ season). Never for an edited face. Measured over 3,000 seeds:
   - **Load management:** on the second night of a back-to-back, AI teams rest veterans in their top 8 (34+, or 31+ and injury prone) when they have at least 10 healthy players. For your team, turn it on for the whole team on the Roster page (below Play Through Injuries) or for single players on their player pages.
   - Everyone's base rate is scaled by 0.9 so league-wide totals stay about the same.
 - **Player page:** the Injuries section adds a body-part history (injuries, games missed, last season) and, with the setting on, the restriction / recently returned / injury-prone status and the load management checkbox.
+- **Heal paths:** an injury that runs out (rostered players in `game/play.ts`, free agents in `freeAgents/decreaseDemands.ts`, which also counts free agents' restrictions and return periods down) starts the restriction and return period. Healed outright (God Mode's heal injuries, or editing a player to Healthy) or over the offseason (`newPhaseBeforeDraft.ts`) starts none, and every restriction and return period is cleared before the draft, so none carries into the next season.
 - **Known limits:** the countdowns are per day (like BBGM's injury countdown), not per game played. Resting is decided when the teams are loaded, so a rested player shows as not playing in the box score. With player traits on, a player's durability trait multiplies his injury rate on top of this.
 
 ### Injury rate

@@ -10,6 +10,11 @@ import {
 	getAiCapExceptionCapacity,
 } from "../contract/capExceptions.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import {
+	dailyTick as injuryDepthDailyTick,
+	isInjuryDepthEnabled,
+	onHealed as injuryDepthOnHealed,
+} from "../player/injuryDepth.ts";
 
 // After the season has already started, free agents ask for a short contract. Very cheap players ask for the shortest possible contract, everyone else asks for an extra season.
 export const getInSeasonContractExp = (
@@ -124,6 +129,7 @@ const decreaseDemands = async () => {
 		inSeason || phase === PHASE.FREE_AGENCY
 			? await getDemandMarket(players)
 			: undefined;
+	const injuryDepthEnabled = isInjuryDepthEnabled();
 
 	for (const p of players) {
 		const contractDemand = getContractDemand(p);
@@ -191,9 +197,16 @@ const decreaseDemands = async () => {
 
 		// Also, heal.
 		if (g.get("phase") <= PHASE.PLAYOFFS) {
+			// Injury Depth: his restriction and return period count down like a rostered player's (game/play.ts)
+			if (injuryDepthEnabled) {
+				injuryDepthDailyTick(p);
+			}
 			if (p.injury.gamesRemaining > 0) {
 				p.injury.gamesRemaining -= 1;
 			} else {
+				if (injuryDepthEnabled && p.injury.type !== "Healthy") {
+					injuryDepthOnHealed(p);
+				}
 				p.injury = {
 					type: "Healthy",
 					gamesRemaining: 0,
