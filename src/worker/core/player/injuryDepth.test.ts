@@ -10,11 +10,13 @@ import {
 	getInjuryRiskFactor,
 	getRestrictionFactor,
 	getRestrictionGames,
+	getReturnGames,
 	isInjuryProne,
 	maybeSameBodyPart,
 	onHealed,
 	PRONE_FRACTION,
 	proneHistoryCount,
+	RETURN_GAMES,
 	shouldRest,
 } from "./injuryDepth.ts";
 import { NEW_LEAGUE_INJURY_RATE } from "../../../common/defaultGameAttributes.ts";
@@ -73,6 +75,23 @@ describe("player state", () => {
 		}
 		assert.strictEqual(p.health, undefined);
 		assert.strictEqual(getRestrictionFactor(p.health), 1);
+	});
+
+	test("the 15-day return window scales with the season length", () => {
+		g.setWithoutSavingToDB("numGames", 82);
+		assert.strictEqual(getReturnGames(), RETURN_GAMES);
+		g.setWithoutSavingToDB("numGames", 41);
+		assert.strictEqual(getReturnGames(), 8);
+		const p = makePlayer(1);
+		p.injuries.push({ season: 2025, games: 6, type: "Sprained Ankle" });
+		onHealed(p);
+		assert.strictEqual(p.health?.returnGames, 8);
+		const full = getInjuryRiskFactor(p, false);
+		// A window from a longer season (before the setting changed) is no riskier than a fresh one
+		p.health!.returnGames = 15;
+		assert.closeTo(getInjuryRiskFactor(p, false), full, 1e-9);
+		g.setWithoutSavingToDB("numGames", 3);
+		assert.strictEqual(getReturnGames(), 1);
 	});
 
 	test("short injuries get no restriction, one-day knocks nothing at all", () => {

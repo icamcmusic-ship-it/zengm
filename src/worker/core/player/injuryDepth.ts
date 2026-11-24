@@ -18,14 +18,17 @@ import { PHASE } from "../../../common/constants.ts";
 import { hasMajorPreDraftInjury } from "../../../common/collegeStats/injuries.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
+import { scaleGamesToSeason } from "../season/scheduleDayScale.ts";
 
 export const isInjuryDepthEnabled = () =>
 	__SPORT === "basketball" && !!g.get("injuryDepth");
 
-// Re-injury window after returning, in days (the injury countdown is per day, like the rest of the injury code)
+// Re-injury window after returning, in days (the injury countdown is per day, like the rest of the injury code), for an 82-game
+// season: getReturnGames scales it to the league's season length
 export const RETURN_GAMES = 15;
+export const getReturnGames = () => scaleGamesToSeason(RETURN_GAMES);
 
-// Extra risk right after returning, fading to nothing over RETURN_GAMES
+// Extra risk right after returning, fading to nothing over the return window
 export const RETURN_RISK = 0.8;
 
 export const PRONE_RISK = 1.4;
@@ -123,7 +126,9 @@ export const getInjuryRiskFactor = (
 		factor *= PRONE_RISK;
 	}
 	if (p.health && p.health.returnGames > 0) {
-		factor *= 1 + (RETURN_RISK * p.health.returnGames) / RETURN_GAMES;
+		// (bounded: a window started before the season length changed can be longer than the current one)
+		factor *=
+			1 + RETURN_RISK * Math.min(1, p.health.returnGames / getReturnGames());
 	}
 	if (backToBack) {
 		factor *= BACK_TO_BACK_RISK;
@@ -158,7 +163,7 @@ export const onHealed = (p: Player) => {
 	p.health = {
 		restrict,
 		restrictTotal: restrict,
-		returnGames: RETURN_GAMES,
+		returnGames: getReturnGames(),
 		bodyPart: injuryBodyPart(type),
 	};
 };

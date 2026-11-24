@@ -14,7 +14,13 @@ import {
 	signNeedBonus,
 	sortByNeed,
 } from "./rosterBalance.ts";
-import { gamesMissed, hardshipDiag, nbaHardshipOut } from "./hardship.ts";
+import {
+	gamesMissed,
+	hardshipDiag,
+	nbaHardshipOut,
+	nbaMissedGames,
+	nbaRemainingGames,
+} from "./hardship.ts";
 import {
 	getContractAmount,
 	getContractExp,
@@ -259,6 +265,32 @@ test("hardship: games missed counts his team's games out, not the countdown on t
 	assert.isFalse(nbaHardshipOut(p));
 	p.injury.gamesMissed = 3;
 	assert.isTrue(nbaHardshipOut(p));
+});
+
+test("hardship: the NBA rule's 3 games missed and 6 games out scale with the season length", () => {
+	const p: any = {
+		injury: { type: "Sprained Ankle", gamesRemaining: 6, gamesMissed: 3 },
+		injuries: [],
+	};
+	g.setWithoutSavingToDB("numGames", 82);
+	assert.strictEqual(nbaMissedGames(), 3);
+	assert.strictEqual(nbaRemainingGames(), 6);
+	assert.isTrue(nbaHardshipOut(p));
+
+	// 164 games: 6 missed, 12 out
+	g.setWithoutSavingToDB("numGames", 164);
+	assert.strictEqual(nbaMissedGames(), 6);
+	assert.strictEqual(nbaRemainingGames(), 12);
+	assert.isFalse(nbaHardshipOut(p));
+
+	// 20 games: 1 and 1 (at least 1)
+	g.setWithoutSavingToDB("numGames", 20);
+	assert.strictEqual(nbaMissedGames(), 1);
+	assert.strictEqual(nbaRemainingGames(), 1);
+	p.injury = { type: "Sprained Ankle", gamesRemaining: 1, gamesMissed: 1 };
+	assert.isTrue(nbaHardshipOut(p));
+	g.setWithoutSavingToDB("numGames", 5);
+	assert.strictEqual(nbaMissedGames(), 1);
 });
 
 test("hardship: the NBA rule, 4+ out who have missed 3+ games and are out for a while yet", async () => {

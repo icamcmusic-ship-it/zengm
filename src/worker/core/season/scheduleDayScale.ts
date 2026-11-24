@@ -109,3 +109,19 @@ export const getEditedScheduleSpread = (
 	dayScale: number,
 	realisticScheduleOn: boolean,
 ) => realisticScheduleOn || dayScale < 1;
+
+// A length in games set for an 82-game season (an injury window, the hardship rule's thresholds), for this league's season length,
+// at least 1. The injury countdowns run on day ticks, which follow the compact schedule's days (one per team game, about), so the
+// realistic schedule length needs no other scaling
+export const scaleGamesToSeason = (games: number) => {
+	let numGames;
+	try {
+		numGames = g.get("numGames");
+	} catch {
+		return games;
+	}
+	if (typeof numGames !== "number" || !(numGames > 0)) {
+		return games;
+	}
+	return Math.max(1, Math.round((games * numGames) / 82));
+};

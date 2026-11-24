@@ -5,7 +5,7 @@ import {
 	getRestrictionFactor,
 	isInjuryDepthEnabled,
 	isInjuryProne,
-	RETURN_GAMES,
+	getReturnGames,
 } from "./injuryDepth.ts";
 
 export type HealthInfo = {
@@ -59,7 +59,7 @@ export const getHealthInfo = (p: Player): HealthInfo => {
 		recentBodyPart: enabled ? p.health?.bodyPart : undefined,
 		daysBack:
 			enabled && p.health && p.health.returnGames > 0
-				? RETURN_GAMES - p.health.returnGames
+				? Math.max(0, getReturnGames() - p.health.returnGames)
 				: undefined,
 		loadManagement: !!p.loadManagement,
 		canEditLoadManagement: enabled && g.get("userTids").includes(p.tid),

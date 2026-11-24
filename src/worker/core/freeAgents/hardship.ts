@@ -10,6 +10,7 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
 import getPayroll from "../team/getPayroll.ts";
+import { scaleGamesToSeason } from "../season/scheduleDayScale.ts";
 import { rosterBalanceOn, sortByNeed } from "./rosterBalance.ts";
 
 export const HARDSHIP = {
@@ -32,6 +33,11 @@ export const HARDSHIP = {
 	extraSpots: 3,
 };
 
+// The NBA rule's games missed and games still out are for an 82-game season: scaled to the league's season length (at least 1)
+export const nbaMissedGames = () => scaleGamesToSeason(HARDSHIP.nbaMissed);
+export const nbaRemainingGames = () =>
+	scaleGamesToSeason(HARDSHIP.nbaRemaining);
+
 // The games his team has played without him since his current injury, and whether he counts for the NBA rule. Injuries from before
 // the counter: the recorded length - games remaining - 1 (the countdown also runs at the end of the day he got hurt), 0 if not on record
 export const gamesMissed = (p: Player) => {
@@ -44,8 +50,8 @@ export const gamesMissed = (p: Player) => {
 		: 0;
 };
 export const nbaHardshipOut = (p: Player) =>
-	p.injury.gamesRemaining >= HARDSHIP.nbaRemaining &&
-	gamesMissed(p) >= HARDSHIP.nbaMissed;
+	p.injury.gamesRemaining >= nbaRemainingGames() &&
+	gamesMissed(p) >= nbaMissedGames();
 
 // Counts for the calibration script (rosterBalance.script.test.ts)
 export const hardshipDiag = {
