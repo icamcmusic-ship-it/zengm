@@ -82,11 +82,62 @@ export const combineRatingsRow = (p: Player): PlayerRatings | undefined => {
 };
 
 // Projected draft stock from his combine-time ratings as scouted (his row's fuzz, also in God Mode so the order never changes with
-// it), for the invite list and who skips the drills: who is invited is public, so it never gives away true ratings
+// it), for the invite list when the scouts' consensus board isn't there (inConsensusOrder) and the class's order otherwise: who is
+// invited is public, so it never gives away true ratings
 const stock = (p: Player, r: PlayerRatings) =>
 	applyFuzz(r.pot, r.fuzz ?? 0) +
 	0.5 * applyFuzz(r.ovr, r.fuzz ?? 0) -
 	1.5 * (p.draft.year - p.born.year - 19);
+
+type Row = { p: Player; r: PlayerRatings };
+
+const byStock = (a: Row, b: Row) =>
+	stock(b.p, b.r) - stock(a.p, a.r) || a.p.pid - b.p.pid;
+
+/**
+ * The class in the order invitations go out when the combine is held: the scouts' consensus board (Scout Consensus & Flags: each
+ * prospect's consensus value, or his value as scouted when no scout has seen him), so who is invited follows the consensus and the
+ * drills are something to scout. Falls back to the projected stock (rows as given) when the scouts' room is off. Deterministic: the
+ * room is seeded and draws nothing from the game's random numbers.
+ */
+const inConsensusOrder = async (rows: Row[]): Promise<Row[]> => {
+	// (dynamic: the scouting reports read the combine)
+	const { getProspectRooms, scoutRoomOn } =
+		await import("../scoutingReports/room.ts");
+	if (!scoutRoomOn()) {
+		return rows;
+	}
+	const rooms = await getProspectRooms(rows.map((x) => x.p));
+	if (![...rooms.values()].some((x) => x.room)) {
+		return rows;
+	}
+	const key = (p: Player) => {
+		const consensus = rooms.get(p.pid)?.room?.consensus;
+		if (consensus !== undefined) {
+			return consensus;
+		}
+		return Number.isFinite(p.valueFuzz) ? p.valueFuzz : -Infinity;
+	};
+	return rows
+		.map((x) => ({ ...x, key: key(x.p) }))
+		.sort((a, b) => b.key - a.key || byStock(a, b))
+		.map(({ p, r }) => ({ p, r }));
+};
+
+// Rows with the invite order stored when the combine was held first (in that order), then everyone else as given
+const inStoredInviteOrder = (rows: Row[], draftYear: number): Row[] => {
+	const rank = (x: Row) =>
+		x.p.combine?.season === draftYear
+			? (x.p.combine.inviteRank ?? Infinity)
+			: Infinity;
+	if (!rows.some((x) => rank(x) < Infinity)) {
+		return rows;
+	}
+	return rows
+		.map((x, i) => ({ x, i, rank: rank(x) }))
+		.sort((a, b) => a.rank - b.rank || a.i - b.i)
+		.map(({ x }) => x);
+};
 
 // Sub-ratings (setting on): the subs the drills measure
 const combineSubs = (r: PlayerRatings) => {
@@ -218,10 +269,10 @@ export const getClassCombine = async (
 	holdingNow?: boolean,
 ): Promise<ClassCombine> => {
 	const held = holdingNow || combineHeld(draftYear);
-	const players = (playersInput ?? (await classPlayersOf(draftYear)))
+	let players = (playersInput ?? (await classPlayersOf(draftYear)))
 		.map((p) => ({ p, r: combineRatingsRow(p)! }))
 		.filter((x) => x.r)
-		.sort((a, b) => stock(b.p, b.r) - stock(a.p, a.r) || a.p.pid - b.p.pid);
+		.sort(byStock);
 	const numInvites = numCombineInvites(
 		g.get("numActiveTeams") * Math.max(1, g.get("numDraftRounds")),
 	);
@@ -237,8 +288,13 @@ export const getClassCombine = async (
 			invited.add(p.pid);
 			results.set(p.pid, { pid: p.pid, ...p.combine! });
 		}
+		players = inStoredInviteOrder(players, draftYear);
 	} else if (held && !noDraft()) {
 		// (in a league without a draft, only a combine stored before the setting changed is shown)
+		// Held now: invited from the scouts' consensus board (else the projected stock)
+		if (holdingNow) {
+			players = await inConsensusOrder(players);
+		}
 		const noiseSd = medicalsOn() ? await getMedicalNoiseSd() : undefined;
 		for (const [i, { p, r }] of players.entries()) {
 			if (i >= numInvites) {
@@ -248,6 +304,9 @@ export const getClassCombine = async (
 			const res = generateDraftCombine(toInput(p, r, i + 1));
 			if (noiseSd !== undefined) {
 				res.medical = getMedical(p, noiseSd);
+			}
+			if (holdingNow) {
+				res.inviteRank = i + 1;
 			}
 			results.set(p.pid, res);
 		}
@@ -273,16 +332,22 @@ export const redoStoredCombine = async (draftYear: number, pids: number[]) => {
 		return 0;
 	}
 	const which = new Set(pids);
-	const players = (await classPlayersOf(draftYear))
-		.map((p) => ({ p, r: combineRatingsRow(p)! }))
-		.filter((x) => x.r)
-		.sort((a, b) => stock(b.p, b.r) - stock(a.p, a.r) || a.p.pid - b.p.pid);
+	const players = inStoredInviteOrder(
+		(await classPlayersOf(draftYear))
+			.map((p) => ({ p, r: combineRatingsRow(p)! }))
+			.filter((x) => x.r)
+			.sort(byStock),
+		draftYear,
+	);
 	let redone = 0;
 	for (const [i, { p, r }] of players.entries()) {
 		if (!which.has(p.pid) || p.combine?.season !== draftYear) {
 			continue;
 		}
-		const { pid, ...rest } = generateDraftCombine(toInput(p, r, i + 1));
+		const inviteRank = p.combine.inviteRank;
+		const { pid, ...rest } = generateDraftCombine(
+			toInput(p, r, inviteRank ?? i + 1),
+		);
 		const medical = p.combine.medical;
 		p.combine = {
 			...rest,
@@ -290,6 +355,9 @@ export const redoStoredCombine = async (draftYear: number, pids: number[]) => {
 		};
 		if (medical) {
 			p.combine.medical = medical;
+		}
+		if (inviteRank !== undefined) {
+			p.combine.inviteRank = inviteRank;
 		}
 		await idb.cache.players.put(p);
 		redone += 1;

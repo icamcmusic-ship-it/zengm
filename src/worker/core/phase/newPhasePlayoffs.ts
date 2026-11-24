@@ -9,6 +9,7 @@ import type {
 import { PHASE } from "../../../common/constants.ts";
 import * as college from "../college/index.ts";
 import markUserControl from "../team/markUserControl.ts";
+import { announceHofLocks } from "../hallOfFame/index.ts";
 
 const newPhasePlayoffs = async (
 	conditions: Conditions,
@@ -129,6 +130,9 @@ const newPhasePlayoffs = async (
 		g.get("season"),
 		PHASE.PLAYOFFS,
 	);
+
+	// Hall of Fame Ballot: the newly eligible players who are sure to go in on their first ballot after the playoffs
+	await announceHofLocks(conditions);
 
 	// Don't redirect if we're viewing a live game now
 	let redirect;

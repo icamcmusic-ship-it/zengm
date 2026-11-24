@@ -16,6 +16,7 @@ import {
 	yearNoise,
 } from "../../../common/hofBallot.ts";
 import { COACH_RETIRED } from "../../../common/staff.ts";
+import { legacyTidOf as legacyTidOfStats } from "../../../common/legacyTid.ts";
 import { COACH_OF_THE_YEAR } from "../../../common/coachExecAwards.ts";
 import type {
 	Awards,
@@ -68,26 +69,15 @@ const playerName = (p: { firstName: string; lastName: string }) =>
 const playerLink = (p: Player) =>
 	`<a href="${helpers.leagueUrl(["player", p.pid])}">${playerName(p)}</a>`;
 
-// The team he played the most regular season games for
-export const legacyTidOf = (p: Pick<Player, "stats" | "tid">) => {
-	const gp = new Map<number, number>();
-	for (const row of p.stats) {
-		if (row.tid >= 0 && !row.playoffs) {
-			gp.set(row.tid, (gp.get(row.tid) ?? 0) + (row.gp ?? 0));
-		}
-	}
-	let best = -1;
-	let bestGp = -1;
-	for (const [tid, n] of gp) {
-		if (n > bestGp) {
-			best = tid;
-			bestGp = n;
-		}
-	}
-	return best;
-};
+// His legacy team, the same one the Hall of Fame page shows (common/legacyTid.ts)
+export const legacyTidOf = (p: Pick<Player, "stats">) =>
+	legacyTidOfStats(p.stats);
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
+
+// He had died by this season
+export const diedBy = (p: Pick<Player, "diedYear">, season: number) =>
+	typeof p.diedYear === "number" && p.diedYear <= season;
 
 // "first ballot, 93.5%" / "4th year, 77.0%" / "veterans committee"
 export const ballotLine = (
@@ -150,21 +140,30 @@ const runBallot = async (season: number, conditions: Conditions) => {
 	// New candidates retired `wait` seasons ago (or within the window, for a league that just turned the ballot on). Candidates
 	// already on the ballot can have retired earlier than that window (screened late), so look back twice as far for them
 	const newMin = season - wait - (HOF_MAX_YEARS - 1);
+	// (up to this season: a player who died is screened at the next ballot, the waiting period waived)
 	for (
 		let retiredYear = season - wait - 2 * HOF_MAX_YEARS;
-		retiredYear <= season - wait;
+		retiredYear <= season;
 		retiredYear++
 	) {
 		// Players retired before the league started are history, not candidates
 		if (retiredYear < startingSeason) {
 			continue;
 		}
+		const waiting = retiredYear > season - wait;
 		const players = await idb.merged.players.getAll({ retiredYear });
 		for (const p0 of players) {
 			if (p0.tid !== PLAYER.RETIRED || p0.hof || p0.hofBallot?.status) {
 				continue;
 			}
+			const posthumous = waiting && diedBy(p0, season);
+			if (waiting && !posthumous && !p0.hofBallot) {
+				continue;
+			}
 			let ballot = p0.hofBallot;
+			// Score and threshold as of this season, so a change of the Hall of Fame factor (or the season length) applies to
+			// candidates already on the ballot too
+			const { score, threshold } = hofScoreBasketball(p0);
 			if (ballot) {
 				const nextSeason = ballot.first + ballot.votes.length;
 				// Already voted this season, or somehow skipped seasons (feature off for a while): his window still ends 10
@@ -172,11 +171,17 @@ const runBallot = async (season: number, conditions: Conditions) => {
 				if (nextSeason > season || ballot.first + HOF_MAX_YEARS <= season) {
 					continue;
 				}
+				if (threshold > 0) {
+					ballot = {
+						...ballot,
+						score: round1(score),
+						threshold: round1(threshold),
+					};
+				}
 			} else {
 				if (retiredYear < newMin) {
 					continue;
 				}
-				const { score, threshold } = hofScoreBasketball(p0);
 				if (!(threshold > 0) || score / threshold < HOF_SCREEN_RATIO) {
 					continue;
 				}
@@ -185,6 +190,7 @@ const runBallot = async (season: number, conditions: Conditions) => {
 					votes: [],
 					score: round1(score),
 					threshold: round1(threshold),
+					...(posthumous ? { posthumous: true } : {}),
 				};
 			}
 
@@ -219,7 +225,7 @@ const runBallot = async (season: number, conditions: Conditions) => {
 					p,
 					season,
 					conditions,
-					`${playerLink(p)} was elected to the ${hofLink()}${
+					`${playerLink(p)} was ${diedBy(p, season) ? "posthumously " : ""}elected to the ${hofLink()}${
 						year === 1
 							? " on his first ballot"
 							: ` in his ${helpers.ordinal(year)} year on the ballot`
@@ -293,7 +299,7 @@ const runVeterans = async (
 			p,
 			season,
 			conditions,
-			`${playerLink(p)} was elected to the ${hofLink()} by the veterans committee.`,
+			`${playerLink(p)} was ${diedBy(p, season) ? "posthumously " : ""}elected to the ${hofLink()} by the veterans committee.`,
 		);
 		await idb.cache.players.put(p);
 		out.push({
@@ -570,6 +576,120 @@ const classEvent = (
 		},
 		conditions,
 	);
+};
+
+// A first-ballot lock: his case this far above the threshold, and a first-year share this far above the 75% needed
+export const HOF_LOCK_RATIO = 1.15;
+export const HOF_LOCK_PCT = 85;
+
+/**
+ * End of the regular season, ballot on: a news item naming the players newly eligible for this season's ballot (after the playoffs)
+ * who are sure to go in on their first ballot: screening score at least HOF_LOCK_RATIO of the threshold and a first-year vote, as
+ * the ballot will count it (the same seeded lean and noise), of HOF_LOCK_PCT% or more. Players who died during their waiting period
+ * count too (screened early, see runBallot). Returns their pids.
+ */
+export const announceHofLocks = async (conditions: Conditions = {}) => {
+	if (__SPORT !== "basketball" || !hofBallotOn() || isCollege()) {
+		return [];
+	}
+	const season = g.get("season");
+	const wait = hofBallotWait();
+	const locks: Player[] = [];
+	for (
+		let retiredYear = Math.max(g.get("startingSeason"), season - wait);
+		retiredYear < season;
+		retiredYear++
+	) {
+		const players = await idb.merged.players.getAll({ retiredYear });
+		for (const p of players) {
+			if (p.tid !== PLAYER.RETIRED || p.hof || p.hofBallot) {
+				continue;
+			}
+			if (retiredYear > season - wait && !diedBy(p, season)) {
+				continue;
+			}
+			const { score, threshold } = hofScoreBasketball(p);
+			if (!(threshold > 0)) {
+				continue;
+			}
+			// As runBallot will count it (rounded like the stored ballot)
+			const ratio = round1(score) / round1(threshold);
+			if (ratio < HOF_LOCK_RATIO) {
+				continue;
+			}
+			const pct = votePct({
+				ratio,
+				year: 1,
+				lean: voterLean(p.pid),
+				noise: yearNoise(p.pid, season),
+			});
+			if (pct >= HOF_LOCK_PCT) {
+				locks.push(p);
+			}
+		}
+	}
+	if (locks.length === 0) {
+		return [];
+	}
+	locks.sort((a, b) => a.pid - b.pid);
+	const names = locks.map(playerLink);
+	const list =
+		names.length === 1
+			? names[0]
+			: `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+	const tids = [...new Set(locks.flatMap((p) => p.statsTids))];
+	logEvent(
+		{
+			type: "hallOfFame",
+			text: `${list} ${locks.length === 1 ? "is a lock" : "are locks"} to be elected to the ${hofLink()} on the first ballot when the votes are counted after the playoffs.`,
+			showNotification: tids.includes(g.get("userTid")),
+			pids: locks.map((p) => p.pid),
+			tids,
+			score: 10,
+		},
+		conditions,
+	);
+	return locks.map((p) => p.pid);
+};
+
+/**
+ * The ballot was just turned off: from now on players are inducted when they retire (player.retire), so the retired players the
+ * ballot never got to (still waiting, or on it with votes left) would never be. Each of them who is worthy (madeHof, as at
+ * retirement) is inducted now, once. Players the vote already decided (inducted, dropped, ran out of years, veterans committee)
+ * are left as they are, as are players retired before the league started. Returns the pids inducted.
+ */
+export const catchUpHofAfterBallotOff = async (conditions: Conditions = {}) => {
+	if (__SPORT !== "basketball" || hofBallotOn() || isCollege()) {
+		return [];
+	}
+	const season = g.get("season");
+	const inducted: number[] = [];
+	for (
+		let retiredYear = g.get("startingSeason");
+		retiredYear <= season;
+		retiredYear++
+	) {
+		const players = await idb.merged.players.getAll({ retiredYear });
+		for (const p0 of players) {
+			if (p0.tid !== PLAYER.RETIRED || p0.hof || p0.hofBallot?.status) {
+				continue;
+			}
+			const { score, threshold } = hofScoreBasketball(p0);
+			if (!(score > threshold)) {
+				continue;
+			}
+			const p = (await idb.cache.players.get(p0.pid)) ?? p0;
+			await induct(
+				p,
+				season,
+				conditions,
+				`${playerLink(p)} was ${diedBy(p, season) ? "posthumously " : ""}inducted into the ${hofLink()}.`,
+			);
+			await idb.cache.players.put(p);
+			inducted.push(p.pid);
+		}
+	}
+	return inducted;
 };
 
 /**

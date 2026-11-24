@@ -17,6 +17,7 @@ import { initUILocalGames } from "../../util/initUILocalGames.ts";
 import { disableNba2027, initializeNba2027 } from "../draft/nba2027.ts";
 import { groupByUnique } from "../../../common/utils.ts";
 import { syncGms } from "../gm/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { aiResignNegotiations } from "../phase/newPhaseResignPlayers.ts";
 import { newLeagueSalt } from "../../../common/leagueSalt.ts";
 
@@ -58,6 +59,8 @@ const setGameAttributes = async (
 	} = {},
 ) => {
 	const toUpdate = new Set<keyof GameAttributesLeague>();
+	// (same as hallOfFame's hofBallotOn, read before and after the change)
+	const hofBallotWasOn = __SPORT === "basketball" && featureOn("hofBallot");
 
 	if (
 		gameAttributes.difficulty !== undefined &&
@@ -253,6 +256,22 @@ const setGameAttributes = async (
 			toUpdate.has("draftType"))
 	) {
 		await draft.genPicks();
+	}
+
+	// More draft rounds mid-league (settings, a scheduled event): every upcoming class gets the prospects it is now short of, once.
+	// (A new team does the same in addNewTeamToExistingLeague; fewer rounds or teams leave the classes as they are)
+	if (
+		!skipDraftGenPicks &&
+		toUpdate.has("numDraftRounds") &&
+		g.get("numDraftRounds") > 0
+	) {
+		await draft.topUpDraftClasses(undefined, undefined, { undersized: true });
+	}
+
+	// Hall of Fame Ballot turned off: the candidates it never got to are inducted now if worthy (they'd never be otherwise)
+	if (hofBallotWasOn && !featureOn("hofBallot")) {
+		const { catchUpHofAfterBallotOff } = await import("../hallOfFame/index.ts");
+		await catchUpHofAfterBallotOff();
 	}
 
 	// Reset playerBioInfo caches

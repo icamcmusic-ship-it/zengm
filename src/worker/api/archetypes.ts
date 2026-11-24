@@ -73,6 +73,7 @@ import {
 } from "../../common/archetypes/tuning.ts";
 import { traitsEnabled } from "../core/player/traits.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
+import fuzzRating from "../core/player/fuzzRating.ts";
 import { TWO_K_NAMES } from "../../common/archetypes/defs.data.ts";
 import { user2kLabel } from "../../common/archetypes/twoK/user2kLookup.ts";
 
@@ -605,7 +606,11 @@ export const reviewQueue = async ({
 			tier: p.tid >= 0 ? 0 : p.tid === PLAYER.UNDRAFTED ? 1 : 2,
 			pid: p.pid,
 			conf: found.view.conf ?? 50,
-			ovr: row.ovr ?? 0,
+			// (a prospect's ovr as the user's scouts see it: the order of the queue never gives away true ratings)
+			ovr:
+				p.tid === PLAYER.UNDRAFTED
+					? fuzzRating(row.ovr ?? 0, row.fuzz ?? 0)
+					: (row.ovr ?? 0),
 			id: found.view.id,
 			family: familyNameOf(found.view.id),
 		});

@@ -1,6 +1,7 @@
 import { bySport } from "../../common/sportFunctions.ts";
 import { maxBy } from "../../common/utils.ts";
 import { getPosByGpF } from "../core/player/getPosByGpF.ts";
+import { legacyTidOf } from "../../common/legacyTid.ts";
 
 // Would be better as part of player.formatAll
 export const processPlayersHallOfFame = <
@@ -68,9 +69,7 @@ export const processPlayersHallOfFame = <
 		let bestStats;
 		let bestPos: string | undefined;
 		const posByEWA: Record<string, number> = {};
-		const teamSums: Record<number, number> = {};
 		for (const ps of filteredStats) {
-			const tid = ps.tid;
 			const ewa = bySport({
 				baseball: ps.war,
 				basketball: ps.ewa,
@@ -96,11 +95,6 @@ export const processPlayersHallOfFame = <
 					posByEWA[pos] += ewa;
 				}
 			}
-			if (Object.hasOwn(teamSums, tid)) {
-				teamSums[tid] += ewa;
-			} else {
-				teamSums[tid] = ewa;
-			}
 		}
 
 		bestStats ??= p.careerStats;
@@ -108,13 +102,8 @@ export const processPlayersHallOfFame = <
 			maxBy(Object.entries(posByEWA), ([, ewa]) => ewa)?.[0] ??
 			p.ratings.at(-1)?.pos;
 
-		const legacyTid = Number.parseInt(
-			Object.keys(teamSums).reduce(
-				(teamA: any, teamB: any) =>
-					teamSums[teamA]! > teamSums[teamB]! ? teamA : teamB,
-				-1,
-			),
-		);
+		// The same legacy team everywhere (ballot rows, Hall of Fame Watch, ...)
+		const legacyTid = legacyTidOf(filteredStats);
 
 		return {
 			...p,

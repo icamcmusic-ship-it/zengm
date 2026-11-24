@@ -17,7 +17,9 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import {
 	HOF_AWARD,
+	announceHofLocks,
 	ballotLine,
+	catchUpHofAfterBallotOff,
 	clearHofBallotOnUnretire,
 	coachHofCase,
 	runHallOfFame,
@@ -25,6 +27,8 @@ import {
 import { hofWatchFor, projectHofScore } from "./watch.ts";
 import retire from "../player/retire.ts";
 import { hofScoreBasketball } from "../player/madeHof.basketball.ts";
+import { recomputedHof } from "../debug/recomputeHallOfFame.ts";
+import { league as leagueCore } from "../index.ts";
 
 // A retired player with `n` seasons of the same value (value = (dws + ows + ewa) / 2)
 const makePlayer = (
@@ -186,6 +190,102 @@ describe("ballot", () => {
 			(await idb.cache.players.get(4))!.hofBallot?.first,
 			2020,
 		);
+	});
+
+	test("the threshold is recomputed every year: a lower Hall of Fame factor applies to candidates already on the ballot", async () => {
+		const borderline = makePlayer(30, 9, 12);
+		await resetCache({ players: [borderline] });
+		await idb.cache.awards.put(awardsRow(2019));
+		await runHallOfFame({});
+		const first = (await idb.cache.players.get(30))!.hofBallot!;
+		assert.isUndefined(first.status);
+
+		g.setWithoutSavingToDB("hofFactor", 0.5);
+		g.setWithoutSavingToDB("season", 2020);
+		await idb.cache.awards.put(awardsRow(2020));
+		await runHallOfFame({});
+		g.setWithoutSavingToDB("hofFactor", 1);
+		const second = (await idb.cache.players.get(30))!.hofBallot!;
+		assert.closeTo(second.threshold, first.threshold / 2, 0.11);
+		const row = (await idb.cache.awards.get(2020))!.hof!.ballot![0]!;
+		assert.strictEqual(row.threshold, second.threshold);
+		// Twice his old ratio: in
+		assert.strictEqual(second.status, "inducted");
+	});
+
+	test("posthumous: a player who died is screened at the next ballot, the waiting period waived", async () => {
+		const died = makePlayer(40, 15, 12, 2018);
+		died.diedYear = 2018;
+		const alive = makePlayer(41, 15, 12, 2018);
+		await resetCache({ players: [died, alive] });
+		await idb.cache.awards.put(awardsRow(2019));
+		await runHallOfFame({});
+		const p = (await idb.cache.players.get(40))!;
+		assert.strictEqual(p.hofBallot?.first, 2019);
+		assert.isTrue(p.hofBallot?.posthumous);
+		assert.strictEqual(p.hof, 1);
+		assert.include(p.hofStory?.plaque ?? "", "Inducted posthumously.");
+		assert.notInclude(p.hofStory?.speech.join(" ") ?? "", "I'm not much");
+		// Still waiting
+		assert.isUndefined((await idb.cache.players.get(41))!.hofBallot);
+	});
+
+	test("turning the ballot off inducts the worthy candidates it never got to, once", async () => {
+		// Still in his waiting period
+		const waiting = makePlayer(60, 15, 12, 2018);
+		// On the ballot, votes left
+		const pending = makePlayer(61, 12, 12, 2016);
+		pending.hofBallot = {
+			first: 2018,
+			votes: [60],
+			score: 140,
+			threshold: 120,
+		};
+		// The vote is done with him
+		const dropped = makePlayer(62, 15, 12, 2016);
+		dropped.hofBallot = {
+			first: 2019,
+			votes: [3],
+			score: 140,
+			threshold: 120,
+			status: "dropped",
+		};
+		const role = makePlayer(63, 2, 10, 2018);
+		await resetCache({ players: [waiting, pending, dropped, role] });
+
+		await leagueCore.setGameAttributes({ featureHofBallot: false });
+		for (const pid of [60, 61]) {
+			const p = (await idb.cache.players.get(pid))!;
+			assert.strictEqual(p.hof, 1, String(pid));
+			assert.isTrue(
+				p.awards.some((a) => a.type === HOF_AWARD && a.season === 2019),
+			);
+		}
+		assert.isUndefined((await idb.cache.players.get(62))!.hof);
+		assert.isUndefined((await idb.cache.players.get(63))!.hof);
+		// Once
+		assert.deepEqual(await catchUpHofAfterBallotOff(), []);
+		// Not while the ballot is on
+		g.setWithoutSavingToDB("featureHofBallot", true);
+		assert.deepEqual(await catchUpHofAfterBallotOff(), []);
+	});
+
+	test("first-ballot locks are announced at the end of the regular season, and go in", async () => {
+		const great = makePlayer(70, 15, 12);
+		const borderline = makePlayer(71, 9, 12);
+		// Not eligible until 2020
+		const recent = makePlayer(72, 15, 12, 2017);
+		await resetCache({ players: [great, borderline, recent] });
+		await idb.cache.awards.put(awardsRow(2019));
+		assert.deepEqual(await announceHofLocks({}), [70]);
+		await runHallOfFame({});
+		const p = (await idb.cache.players.get(70))!;
+		assert.strictEqual(p.hofBallot?.status, "inducted");
+		assert.strictEqual(p.hofBallot?.votes.length, 1);
+		// Nothing to announce once they are on the ballot, or with the ballot off
+		assert.deepEqual(await announceHofLocks({}), []);
+		g.setWithoutSavingToDB("featureHofBallot", false);
+		assert.deepEqual(await announceHofLocks({}), []);
 	});
 
 	test("retirement: inducted at once with the ballot off, not with it on", async () => {
@@ -388,6 +488,44 @@ describe("un-retirement", () => {
 		assert.strictEqual(
 			ballotLine({ ...hofBallot, votes: [80] }, 2010),
 			"first ballot, 80.0%",
+		);
+	});
+});
+
+describe("recompute Hall of Fame (debug)", () => {
+	test("keeps ballot and veterans committee inductions, leaves ballot candidates to the ballot", () => {
+		const options = { ballotOn: true, startingSeason: 2000 };
+		// Voted in with a case below the instant threshold
+		const voted = makePlayer(50, 7, 12);
+		voted.hof = 1;
+		voted.hofBallot = {
+			first: 2019,
+			votes: [80],
+			score: 90,
+			threshold: 120,
+			status: "inducted",
+		};
+		assert.isUndefined(recomputedHof(voted, options));
+		const veterans = makePlayer(51, 7, 12);
+		veterans.hof = 1;
+		veterans.hofBallot = {
+			first: 2005,
+			votes: [40],
+			score: 110,
+			threshold: 120,
+			status: "veterans",
+		};
+		assert.isUndefined(
+			recomputedHof(veterans, { ...options, ballotOn: false }),
+		);
+		// A great player still waiting for the ballot: not inducted by the recompute
+		const waiting = makePlayer(52, 15, 12);
+		assert.isUndefined(recomputedHof(waiting, options));
+		// Retired before the league started (not a ballot candidate), or the ballot off: madeHof decides
+		assert.isTrue(recomputedHof(makePlayer(53, 15, 12, 1995), options));
+		assert.isTrue(recomputedHof(waiting, { ...options, ballotOn: false }));
+		assert.isFalse(
+			recomputedHof(makePlayer(54, 2, 10), { ...options, ballotOn: false }),
 		);
 	});
 });

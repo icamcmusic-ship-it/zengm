@@ -1903,6 +1903,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		score: number;
 		threshold: number;
 		status?: "inducted" | "dropped" | "expired" | "veterans";
+		// Screened before his waiting period was up because he had died
+		posthumous?: boolean;
 	};
 	// College Hall of Fame (college leagues, core/hallOfFame/college.ts): the season he was inducted
 	collegeHof?: number;

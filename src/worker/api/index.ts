@@ -208,6 +208,7 @@ import type { LookingForState } from "../../ui/views/TradingBlock/useLookingForS
 import { getPlayer } from "../views/player.ts";
 import { foldRetiredAdvCareers } from "../core/player/advStatsStorage.ts";
 import { getPlayersForExport } from "../util/playerExport.ts";
+import { getDraftSlotHof } from "../util/draftSlotHof.ts";
 import {
 	getPlayerProfileExport,
 	getPlayerProfileExportSections,
@@ -3045,7 +3046,8 @@ const getProProjections = (pids: number[]) => {
 
 const getDraftDayInfo = async (otherTid: number | undefined) => {
 	const boards = await draftDay.getAITeamBoards();
-	const tid = otherTid ?? boards[0]?.tid;
+	// The first team that isn't one of the user's (those are listed in spectator mode and auto play, see getAITeamBoards)
+	const tid = otherTid ?? boards.find((b) => !b.user)?.tid;
 	return {
 		boards,
 		trade: tid !== undefined ? await draftDay.getDraftDayTrade(tid) : undefined,
@@ -7160,6 +7162,7 @@ const api = {
 		runMockDraft,
 		getProProjections,
 		getDraftDayInfo,
+		getDraftSlotHof,
 		getDraftPickValueChart,
 		getDraftNightOffers,
 		declineDraftNightOffer,

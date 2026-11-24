@@ -132,14 +132,12 @@ const leagueSeed = () => {
 };
 const classSeed = (draftYear: number) => `${leagueSeed()}|${draftYear}`;
 
-const genPlayersWithoutSaving = async (
-	draftYear: number,
-	scoutingLevel: number,
-	existingPlayers: PlayerWithoutKey[],
-	forceScrubs?: boolean,
-): Promise<PlayerWithoutKey[]> => {
-	// If user has increased the number of rounds - code below ensures excess players are scrubs.
-	// If user has descreased the number of rounds - keep number of prospects the same, more will go undrafted.
+/**
+ * How many prospects a draft class should have, from the number of draft rounds and teams (never fewer than the default rounds need)
+ * and how many players a season needs to fill the league under the forced retirement settings. normalNumPlayers: the default rounds'
+ * worth, beyond which new prospects are scrubs.
+ */
+export const getDraftClassTargetSize = () => {
 	const normalNumPlayers = Math.round(
 		(defaultGameAttributes.numDraftRounds * g.get("numActiveTeams") * 7) / 6,
 	);
@@ -171,6 +169,19 @@ const genPlayersWithoutSaving = async (
 			baseNumPlayers = numPlayersNeededPerYear;
 		}
 	}
+	return { baseNumPlayers, normalNumPlayers };
+};
+
+const genPlayersWithoutSaving = async (
+	draftYear: number,
+	scoutingLevel: number,
+	existingPlayers: PlayerWithoutKey[],
+	forceScrubs?: boolean,
+): Promise<PlayerWithoutKey[]> => {
+	// If user has increased the number of rounds - code below ensures excess players are scrubs.
+	// If user has descreased the number of rounds - keep number of prospects the same, more will go undrafted.
+	const { baseNumPlayers, normalNumPlayers } = getDraftClassTargetSize();
+	const draftAges = g.get("draftAges");
 
 	const numPlayers = baseNumPlayers - existingPlayers.length;
 
