@@ -109,18 +109,8 @@ const ALLOW: Allow[] = [
 	// Archetypes
 	{
 		file: "worker/api/archetypes.ts",
-		line: "ovr: row.ovr,",
-		why: "archetypeRoster: a team's roster (pros)",
-	},
-	{
-		file: "worker/api/archetypes.ts",
 		line: "players.sort((a, b) => b.ovr - a.ovr || a.pid - b.pid)",
 		why: "archetypeRoster: a team's roster (pros)",
-	},
-	{
-		file: "worker/api/archetypes.ts",
-		line: "ovr: (last(p.ratings) as any).ovr",
-		why: "archetypeLandscape: players on teams and free agents only",
 	},
 	{
 		file: "worker/api/archetypes.ts",

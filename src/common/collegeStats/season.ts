@@ -842,6 +842,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		blk: total.blk,
 		ba: total.ba,
 		pf: total.pf,
+		// Technical and flagrant fouls aren't simulated for pre-draft seasons
+		tf: 0,
+		ff: 0,
 		pts: total.pts,
 		dd,
 		td,

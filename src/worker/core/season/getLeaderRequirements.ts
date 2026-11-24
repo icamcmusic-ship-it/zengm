@@ -283,6 +283,9 @@ const getLeaderRequirements = () => {
 			tov: basketballPerGameStats,
 			ba: basketballPerGameStats,
 			pf: basketballPerGameStats,
+			// Technical and flagrant fouls (box-score stats since they were recorded)
+			tf: basketballPerGameStats,
+			ff: basketballPerGameStats,
 			fg: basketballFgStats,
 			fga: basketballFgStats,
 			fgp: basketballFgStats,
