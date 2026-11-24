@@ -120,18 +120,46 @@ export const makeEraAdjuster = (
 	};
 };
 
-// A multi-season (career) factor: the seasons' factors weighted by his games in each
+const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+
+// What a season's stat is made of: the total of a counting stat, the makes (numerator) of a percentage
+const careerWeight = (stat: string, r: Record<string, unknown>) => {
+	switch (stat) {
+		case "trb":
+			return r.orb !== undefined || r.drb !== undefined
+				? n(r.orb) + n(r.drb)
+				: n(r.trb);
+		case "fgp":
+			return n(r.fg);
+		case "tpp":
+			return n(r.tp);
+		case "ftp":
+			return n(r.ft);
+		case "efg":
+			return n(r.fg) + 0.5 * n(r.tp);
+		case "tsp":
+			return n(r.pts);
+		default:
+			return n(r[stat]);
+	}
+};
+
+// A multi-season (career) factor, the same as adjusting each season and adding them up (the Records Book): his seasons' factors
+// weighted by his total of the stat in each (for a percentage, his makes; the attempts aren't adjusted). Times his career total,
+// per game or per 36 average or percentage, it gives the sum of the adjusted seasons over the same games, minutes or attempts.
+// rows: his raw stats rows (season totals).
 export const careerEraFactor = (
 	adj: EraAdjuster,
 	stat: string,
-	rows: { season: number; gp: number }[],
+	rows: ({ season: number } & Record<string, unknown>)[],
 ) => {
 	let w = 0;
 	let sum = 0;
 	for (const r of rows) {
-		if (r.gp > 0) {
-			w += r.gp;
-			sum += r.gp * adj.factor(r.season, stat);
+		const x = careerWeight(stat, r);
+		if (x > 0) {
+			w += x;
+			sum += x * adj.factor(r.season, stat);
 		}
 	}
 	return w > 0 ? sum / w : 1;
