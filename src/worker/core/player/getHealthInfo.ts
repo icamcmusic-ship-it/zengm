@@ -1,6 +1,7 @@
 import { g } from "../../util/index.ts";
 import { injuryBodyPart } from "../../../common/injuryBodyPart.ts";
-import type { Player } from "../../../common/types.ts";
+import type { InjuryTreatment, Player } from "../../../common/types.ts";
+import { injuryRecordGames } from "./injuryRecovery.ts";
 import {
 	getRestrictionFactor,
 	isInjuryDepthEnabled,
@@ -27,6 +28,11 @@ export type HealthInfo = {
 	daysBack: number | undefined;
 	loadManagement: boolean;
 	canEditLoadManagement: boolean;
+	// Surgery or rehab for his current major injury, and whether the user can still choose (player/injuryRecovery.ts)
+	treatment: InjuryTreatment | undefined;
+	canChooseTreatment: boolean;
+	// Games his team has played without him since his current injury
+	gamesMissed: number | undefined;
 };
 
 export const getHealthInfo = (p: Player): HealthInfo => {
@@ -39,7 +45,8 @@ export const getHealthInfo = (p: Player): HealthInfo => {
 			parts.set(bodyPart, row);
 		}
 		row.count += 1;
-		row.games += injury.games;
+		// Games he missed (the recorded count once it's over)
+		row.games += injuryRecordGames(injury);
 		row.lastSeason = Math.max(row.lastSeason, injury.season);
 		if (!row.types.includes(injury.type)) {
 			row.types.push(injury.type);
@@ -63,5 +70,12 @@ export const getHealthInfo = (p: Player): HealthInfo => {
 				: undefined,
 		loadManagement: !!p.loadManagement,
 		canEditLoadManagement: enabled && g.get("userTids").includes(p.tid),
+		treatment: p.injury.gamesRemaining > 0 ? p.injury.treatment : undefined,
+		canChooseTreatment:
+			!!p.injury.treatmentOpen &&
+			p.injury.gamesRemaining > 0 &&
+			g.get("userTids").includes(p.tid) &&
+			!g.get("spectator"),
+		gamesMissed: p.injury.gamesRemaining > 0 ? p.injury.gamesMissed : undefined,
 	};
 };

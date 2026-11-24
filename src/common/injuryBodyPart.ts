@@ -1,19 +1,27 @@
 // Body part for an injury name, used for injury history and for re-injuries of the same body part (injuryDepth setting). Custom injury names that match nothing get "Other".
 
+// Stock names, plus common synonyms and plurals so a league's custom injury names ("Torn Quad", "Broken Toes", "Sore Lower Back") find
+// their body part too
 const BODY_PARTS: [string, RegExp][] = [
-	["Knee", /\b(acl|mcl|pcl|knee|kneecap|meniscus|patellar)\b/i],
-	["Ankle", /\b(ankle|achilles|peroneal)\b/i],
-	["Foot", /\b(foot|toe|plantar)\b/i],
-	["Leg", /\b(leg|calf|hamstring|quadriceps|shin)\b/i],
-	["Hip/Groin", /\b(hip|groin|tailbone|flexor)\b/i],
-	["Back", /\b(back|disc|spine)\b/i],
-	["Torso", /\b(rib|ribs|abdomen|oblique|esh?ophagus|chest|heart)\b/i],
-	["Shoulder", /\b(shoulder|collarbone|rotator)\b/i],
-	["Arm", /\b(arm|bicep|tricep|elbow)\b/i],
-	["Hand", /\b(hand|wrist|finger|thumb)\b/i],
+	["Knee", /\b(acl|mcl|pcl|lcl|knees?|kneecaps?|meniscus|patellar?)\b/i],
+	["Ankle", /\b(ankles?|achilles|peroneal)\b/i],
+	["Foot", /\b(foot|feet|toes?|plantar|heels?|metatarsals?|arch)\b/i],
+	[
+		"Leg",
+		/\b(legs?|calf|calves|hamstrings?|quadriceps|quads?|shins?|thighs?|femur|tibia|fibula)\b/i,
+	],
+	["Hip/Groin", /\b(hips?|groin|tailbone|flexor|pelvis|adductor)\b/i],
+	["Back", /\b(back|disc|spine|spinal|lumbar|vertebrae?)\b/i],
+	[
+		"Torso",
+		/\b(rib|ribs|abdomen|abdominal|oblique|esh?ophagus|chest|heart|sternum|pectoral|pec)\b/i,
+	],
+	["Shoulder", /\b(shoulders?|collarbone|clavicle|rotator|labrum)\b/i],
+	["Arm", /\b(arms?|biceps?|triceps?|elbows?|forearms?)\b/i],
+	["Hand", /\b(hands?|wrists?|fingers?|thumbs?|knuckles?|metacarpals?)\b/i],
 	[
 		"Head",
-		/\b(head|concussion|neck|whiplash|face|facial|eye|eyelid|orbital|nose|jaw|cheekbone|tooth|throat|seizure)\b/i,
+		/\b(head|concussion|neck|whiplash|face|facial|eyes?|eyelid|orbital|nose|jaw|cheekbone|tooth|teeth|throat|seizure|skull|ear|lip)\b/i,
 	],
 ];
 

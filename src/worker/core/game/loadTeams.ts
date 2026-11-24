@@ -4,6 +4,7 @@ import { getTalentShift, shiftRatingsForSim } from "./talentCenter.ts";
 import { allStar, player, season, team } from "../index.ts";
 import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
+import { gameTimeDecisionPlays } from "../player/injuryRecovery.ts";
 import { idb } from "../../db/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { isRedshirting } from "../college/redshirt.ts";
@@ -406,6 +407,27 @@ export const processTeam = async (
 			ptModifier: p.ptModifier,
 			ovrs: rating.ovrs,
 		};
+
+		// Injury outlook: a questionable or doubtful player's game-time decision. When he plays, it's like playing through an injury
+		// (valueNoPot and the composites already have its playing-through factor)
+		if (
+			p2.injured &&
+			!allStarGame &&
+			isInjuryDepthEnabled() &&
+			!isHoldingOut(p)
+		) {
+			const gtd = gameTimeDecisionPlays(
+				p,
+				teamSeason.won + teamSeason.lost + teamSeason.tied + teamSeason.otl,
+				g.get("season"),
+				playoffs,
+			);
+			if (gtd) {
+				p2.injured = false;
+				p2.injury.playingThrough = true;
+				p2.injury.gtd = gtd;
+			}
+		}
 
 		if (__SPORT === "basketball") {
 			// His true ovr, not the fuzzed one (Game Sim Fixes: the team strength gap, SIM_FIX_STRENGTH_GAP). Removed from the sim's result

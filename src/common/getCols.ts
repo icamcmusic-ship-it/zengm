@@ -3309,6 +3309,18 @@ const cols: {
 		sortSequence: ["desc", "asc"],
 		sortType: "number",
 	},
+	"Games Missed": {
+		desc: "Team Games Missed With the Injury",
+		sortSequence: ["desc", "asc"],
+		sortType: "number",
+		title: "Missed",
+	},
+	"Expected Return": {
+		desc: "Expected Return (Day of the Schedule)",
+		sortSequence: ["asc", "desc"],
+		sortType: "number",
+		title: "Back",
+	},
 	GOAT: {
 		desc: "GOAT Score",
 		sortSequence: ["desc", "asc"],

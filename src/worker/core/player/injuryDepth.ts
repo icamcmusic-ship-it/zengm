@@ -73,7 +73,8 @@ export const isInjuryProne = (
 	// the rate, and get hurt more, season after season)
 	let count = 0;
 	for (const injury of p.injuries ?? []) {
-		if (injury.season >= season - 2 && injury.games >= 3) {
+		// (games missed: the stored count once an injury is over, player/injuryRecovery.ts)
+		if (injury.season >= season - 2 && (injury.missed ?? injury.games) >= 3) {
 			count += 1;
 		}
 	}
