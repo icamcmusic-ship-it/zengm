@@ -1,6 +1,6 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers, local } from "../../util/index.ts";
+import { g, helpers } from "../../util/index.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import { getContractDemand } from "../contract/index.ts";
 import type { Player } from "../../../common/types.ts";
@@ -15,6 +15,7 @@ import {
 	isInjuryDepthEnabled,
 	onHealed as injuryDepthOnHealed,
 } from "../player/injuryDepth.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 // After the season has already started, free agents ask for a short contract. Very cheap players ask for the shortest possible contract, everyone else asks for an extra season.
 export const getInSeasonContractExp = (
@@ -34,7 +35,6 @@ export const getDemandMarket = async (freeAgents: Player[]) => {
 	const salaryCapType = g.get("salaryCapType");
 	const maxRosterSize = g.get("maxRosterSize");
 	const minRosterSize = g.get("minRosterSize");
-	const userTids = g.get("userTids");
 
 	const exceptions = capExceptionsEnabled();
 	const gms = exceptions ? await getAllGmWeights() : undefined;
@@ -53,8 +53,7 @@ export const getDemandMarket = async (freeAgents: Player[]) => {
 			lastManValues.push(values[index]!);
 		}
 		// User teams sign free agents like AI teams in spectator mode and auto play (autoSign), so their cap space is part of the market then
-		const aiSigns =
-			!userTids.includes(t.tid) || !!local.autoPlayUntil || g.get("spectator");
+		const aiSigns = !userRunsTeam(t.tid);
 		if (!aiSigns || roster.length >= maxRosterSize) {
 			continue;
 		}

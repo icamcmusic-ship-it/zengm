@@ -2,7 +2,7 @@ import { PLAYER, POSITION_COUNTS } from "../../../common/constants.ts";
 import { player, freeAgents } from "../index.ts";
 import rosterAutoSort from "./rosterAutoSort.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers, local } from "../../util/index.ts";
+import { g, helpers } from "../../util/index.ts";
 import type { Player } from "../../../common/types.ts";
 import { KEY_POSITIONS_NEEDED } from "../freeAgents/getBest.ts";
 import { getContractDemand } from "../contract/index.ts";
@@ -16,6 +16,7 @@ import {
 	sortByNeed,
 } from "../freeAgents/rosterBalance.ts";
 import { hardshipMoves, isHardshipPlayer } from "../freeAgents/hardship.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 const dropPlayers = async (players: Player[], numToDrop: number) => {
 	// Automatically drop lowest value players until we reach g.get("maxRosterSize")
@@ -276,10 +277,7 @@ const checkRosterSizes = async (
 			continue;
 		}
 
-		const userTeamAndActive =
-			g.get("userTids").includes(t.tid) &&
-			!local.autoPlayUntil &&
-			!g.get("spectator");
+		const userTeamAndActive = userRunsTeam(t.tid);
 
 		if (
 			(userTeamAndActive && userOrOther === "user") ||

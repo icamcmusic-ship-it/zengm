@@ -21,7 +21,6 @@ import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import g from "../../util/g.ts";
 import helpers from "../../util/helpers.ts";
-import local from "../../util/local.ts";
 import logEvent from "../../util/logEvent.ts";
 import toUI from "../../util/toUI.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
@@ -41,6 +40,7 @@ import { formatAll } from "../player/format.ts";
 import { developTraits } from "../player/traits.ts";
 import getPayroll from "../team/getPayroll.ts";
 import rosterAutoSort from "../team/rosterAutoSort.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 export const stashOn = () =>
 	__SPORT === "basketball" && featureOn("draftStash");
@@ -60,10 +60,7 @@ export const getStashedPlayers = async (tid?: number) => {
 export const getRightsTid = (p: { tid: number; stash?: { tid: number } }) =>
 	p.tid === PLAYER.STASHED ? (p.stash?.tid ?? PLAYER.STASHED) : p.tid;
 
-const isAiTeam = (tid: number) =>
-	!g.get("userTids").includes(tid) ||
-	!!local.autoPlayUntil ||
-	g.get("spectator");
+const isAiTeam = (tid: number) => !userRunsTeam(tid);
 
 const playerLink = (p: Player) =>
 	`<a href="${helpers.leagueUrl(["player", p.pid])}">${p.firstName} ${p.lastName}</a>`;

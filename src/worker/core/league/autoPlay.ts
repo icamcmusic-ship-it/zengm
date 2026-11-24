@@ -13,6 +13,7 @@ import type { Conditions, Phase } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { choice } from "../../../common/random.ts";
 import * as college from "../college/index.ts";
+import { aiResignNegotiations } from "../phase/newPhaseResignPlayers.ts";
 
 // Depending on phase, initiate action that will lead to the next phase
 const autoPlay = async (conditions: Conditions = {}) => {
@@ -101,6 +102,9 @@ const autoPlay = async (conditions: Conditions = {}) => {
 	} else if (currentPhase === PHASE.AFTER_DRAFT) {
 		await phase.newPhase(PHASE.RESIGN_PLAYERS, conditions);
 	} else if (currentPhase === PHASE.RESIGN_PLAYERS) {
+		// Auto play started during re-signing: the AI decides the user's open negotiations, like spectator mode does, instead of
+		// letting all of them walk at free agency
+		await aiResignNegotiations(g.get("userTids"));
 		await phase.newPhase(PHASE.FREE_AGENCY, conditions);
 	} else if (currentPhase === PHASE.FREE_AGENCY && college.isCollege()) {
 		// College mode: no free agency days

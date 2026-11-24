@@ -3,12 +3,13 @@ import { orderBy } from "../../../common/utils.ts";
 import { withRandom } from "../../../common/random.ts";
 import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, local } from "../../util/index.ts";
+import { g } from "../../util/index.ts";
 import { getContractDemand } from "../contract/index.ts";
 import getPayroll from "../team/getPayroll.ts";
 import getBest from "./getBest.ts";
 import { makeAiCapExceptionPicker } from "../contract/capExceptions.ts";
 import { getAllGmWeights, gmFaPayroll } from "../gm/index.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 // How interested an AI team is in a free agent, from autoSign: every day each team (unless it skips that day) signs the best free agent it can fit, so his chances depend on where he is on each team's list
 export type MarketTier = "topTarget" | "backup" | "fallback";
@@ -89,15 +90,9 @@ export const getFreeAgentMarket = async (
 	if (signingAllowed) {
 		const sorted = orderBy(freeAgents, "value", "desc");
 		const teams = await idb.cache.teams.getAll();
-		const userTids = g.get("userTids");
 		const gms = await getAllGmWeights();
 		for (const t of teams) {
-			if (
-				t.disabled ||
-				(userTids.includes(t.tid) &&
-					!local.autoPlayUntil &&
-					!g.get("spectator"))
-			) {
+			if (t.disabled || userRunsTeam(t.tid)) {
 				continue;
 			}
 			if (

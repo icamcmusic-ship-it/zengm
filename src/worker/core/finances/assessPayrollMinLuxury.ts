@@ -1,6 +1,6 @@
 import { team } from "../index.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { g, helpers, logEvent } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { ownerDistribution } from "./ownerDistribution.ts";
 import getLuxuryTaxAmount from "./getLuxuryTaxAmount.ts";
@@ -8,6 +8,7 @@ import getMinPayrollAmount from "./getMinPayrollAmount.ts";
 import { isRepeaterTaxTeam } from "../contract/capExceptions.ts";
 import { shareRevenue } from "../commercial/index.ts";
 import { ownerOfficeEnabled } from "../ownerOffice/index.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 const rosterLink = (tid: number) =>
 	`<a href="${helpers.leagueUrl([
@@ -140,12 +141,8 @@ const assessPayrollMinLuxury = async () => {
 
 	// Realistic AI Economy: AI owners take out most of the cash above a reserve, so it doesn't grow without bound
 	if (featureOn("realisticEconomy")) {
-		const userTids =
-			g.get("spectator") || local.autoPlayUntil
-				? new Set<number>()
-				: new Set(g.get("userTids"));
 		for (const teamSeason of teamSeasons) {
-			if (userTids.has(teamSeason.tid)) {
+			if (userRunsTeam(teamSeason.tid)) {
 				continue;
 			}
 			// Owner's Office: the owner leaves what an active project still costs, so AI teams can afford projects at all

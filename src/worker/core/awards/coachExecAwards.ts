@@ -26,12 +26,13 @@ import type { Coach, Gm, Team, TeamSeason } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { getActiveSeasonSelector } from "../../db/merged/players.ts";
 import { FormulaEvaluator } from "../../util/FormulaEvaluator.ts";
-import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { g, helpers, logEvent } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { getExpectedWinps } from "../college/expectations.ts";
 import { isCollege } from "../college/isCollege.ts";
 import ovr from "../team/ovr.ts";
 import { getFormattedAll } from "../team/getFormatted.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 export const coachExecAwardsOn = () =>
 	__SPORT === "basketball" && featureOn("coachExecAwards");
@@ -546,10 +547,7 @@ export const getCoyCandidates = async (
 	return { formula, candidates };
 };
 
-export const userControlsTeamNow = (tid: number) =>
-	g.get("userTids").includes(tid) &&
-	!local.autoPlayUntil &&
-	!g.get("spectator");
+export const userControlsTeamNow = userRunsTeam;
 
 const allGms = (teams: Team[]) => {
 	const gms: Gm[] = [];

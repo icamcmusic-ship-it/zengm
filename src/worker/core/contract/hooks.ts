@@ -5,7 +5,7 @@ import {
 } from "../../../common/contracts.ts";
 import type { Phase } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, local } from "../../util/index.ts";
+import { g } from "../../util/index.ts";
 import moodInfo from "../player/moodInfo.ts";
 import getPayroll from "../team/getPayroll.ts";
 import {
@@ -24,6 +24,7 @@ import {
 } from "./unrest.ts";
 import { getAllGmWeights } from "../gm/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 
 // These never stop a phase change or a day of games, they just log the error
 const safely = async (name: string, cb: () => Promise<void>) => {
@@ -68,7 +69,6 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 	}
 
 	const season = g.get("season");
-	const userTids = g.get("userTids");
 	const salaryCapType = g.get("salaryCapType");
 	// AI GM personalities (setting): loyal GMs extend more often, big spenders extend into the tax. Empty when off
 	const gms = await getAllGmWeights();
@@ -79,7 +79,7 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 			.map((t) => t.tid),
 	);
 	for (let tid = 0; tid < g.get("numTeams"); tid++) {
-		if (userTids.includes(tid) && !local.autoPlayUntil && !g.get("spectator")) {
+		if (userRunsTeam(tid)) {
 			continue;
 		}
 		if (disabledTids.has(tid)) {
