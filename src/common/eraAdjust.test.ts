@@ -52,13 +52,30 @@ test("era factors: relative to each season's league average, on the all-time ave
 	// TS%: the league's rate
 	const ts = adj.leagueRate(2001, "tsp")!;
 	assert.closeTo(ts, 105 / (2 * (88 + 0.44 * 22)), 1e-9);
-	// a career: weighted by games
+	// a career: each season adjusted and added up, so weighted by his total of the stat in each season
 	assert.closeTo(
 		careerEraFactor(adj, "pts", [
-			{ season: 2000, gp: 60 },
-			{ season: 2002, gp: 20 },
+			{ season: 2000, gp: 60, pts: 1200 },
+			{ season: 2002, gp: 20, pts: 600 },
 		]),
-		(60 * (105 / 95) + 20 * (105 / 115)) / 80,
+		(1200 * (105 / 95) + 600 * (105 / 115)) / 1800,
+		1e-9,
+	);
+	// rebounds from orb + drb; a percentage by his makes (attempts aren't adjusted)
+	assert.closeTo(
+		careerEraFactor(adj, "trb", [
+			{ season: 2000, orb: 10, drb: 30 },
+			{ season: 2002, orb: 0, drb: 10 },
+		]),
+		(40 * adj.factor(2000, "trb") + 10 * adj.factor(2002, "trb")) / 50,
+		1e-9,
+	);
+	assert.closeTo(
+		careerEraFactor(adj, "fgp", [
+			{ season: 2000, fg: 300, fga: 700 },
+			{ season: 2002, fg: 100, fga: 200 },
+		]),
+		(300 * adj.factor(2000, "fgp") + 100 * adj.factor(2002, "fgp")) / 400,
 		1e-9,
 	);
 	// one season: every factor is 1

@@ -6,6 +6,7 @@ import { LEAGUE_DATABASE_VERSION, PHASE } from "../../common/constants.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { makeSeededRandom } from "../../common/random.ts";
 import { last } from "../../common/utils.ts";
+import { isPreDraftStatsRow } from "../../common/preDraft.ts";
 import { draft, game, league, phase } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
@@ -132,6 +133,79 @@ describe("era-adjusted views", () => {
 			era: "era",
 		});
 		assert.isAbove(cat(career, "pts").leaders.length, 0);
+	});
+
+	test("leaders: a career is each season adjusted and added up, like the Records Book", async () => {
+		const adj = await getEraAdjuster();
+		const cat = (out: any, stat: string) =>
+			out.categories.find((c: any) => c.stat === stat);
+		// His regular season pro rows, each adjusted by its season's factor
+		const seasonRows = async (pid: number) => {
+			const p = (await idb.merged.players.get(pid))!;
+			return p.stats.filter(
+				(row) => !row.playoffs && !isPreDraftStatsRow(row, p.draft.year),
+			);
+		};
+		const sum = (rows: any[], f: (row: any) => number) =>
+			rows.reduce((total, row) => total + f(row), 0);
+
+		const totals = await load("leaders", {
+			season: "career",
+			statType: "totals",
+			playoffs: "regularSeason",
+			era: "era",
+		});
+		const perGame = await load("leaders", {
+			season: "career",
+			statType: "perGame",
+			playoffs: "regularSeason",
+			era: "era",
+		});
+		let checked = 0;
+		for (const stat of ["pts", "tp", "trb"]) {
+			for (const l of cat(totals, stat).leaders.slice(0, 5)) {
+				const rows = await seasonRows(l.pid);
+				const value = (row: any) =>
+					stat === "trb" ? row.orb + row.drb : row[stat];
+				const adjusted = sum(
+					rows,
+					(row) => value(row) * adj.factor(row.season, stat),
+				);
+				assert.closeTo(l.stat, adjusted, 1e-6, stat);
+				checked += 1;
+			}
+			for (const l of cat(perGame, stat).leaders.slice(0, 5)) {
+				const rows = await seasonRows(l.pid);
+				const value = (row: any) =>
+					stat === "trb" ? row.orb + row.drb : row[stat];
+				const adjusted = sum(
+					rows,
+					(row) => value(row) * adj.factor(row.season, stat),
+				);
+				assert.closeTo(
+					l.stat,
+					adjusted / sum(rows, (row) => row.gp),
+					1e-6,
+					stat,
+				);
+				checked += 1;
+			}
+		}
+		// A percentage: his adjusted makes over his attempts
+		for (const l of cat(perGame, "tpp").leaders.slice(0, 5)) {
+			const rows = await seasonRows(l.pid);
+			const adjusted = sum(
+				rows,
+				(row) => row.tp * adj.factor(row.season, "tpp"),
+			);
+			assert.closeTo(
+				l.stat,
+				(100 * adjusted) / sum(rows, (row) => row.tpa),
+				1e-6,
+			);
+			checked += 1;
+		}
+		assert.isAbove(checked, 10);
 	});
 
 	test("records book: era-adjusted lists with TS+, no single games or team records", async () => {

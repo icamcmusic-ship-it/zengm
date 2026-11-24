@@ -899,16 +899,15 @@ export default defineView({
 					return;
 				}
 				const { p, playerStats, skills, badges, getTeamAndPos } = info;
-				// Era-adjusted: a season's factor, or for a career his seasons' factors weighted by his games
+				// Era-adjusted: a season's factor, or for a career each season adjusted and added up, like the Records Book (his
+				// seasons' factors weighted by his total of the stat in each)
 				const careerRows =
 					eraAdj && season === "career"
-						? pRaw.stats
-								.filter((row) =>
-									inputs.playoffs === "combined"
-										? true
-										: row.playoffs === (inputs.playoffs === "playoffs"),
-								)
-								.map((row) => ({ season: row.season, gp: row.gp ?? 0 }))
+						? pRaw.stats.filter((row) =>
+								inputs.playoffs === "combined"
+									? true
+									: row.playoffs === (inputs.playoffs === "playoffs"),
+							)
 						: undefined;
 				const eraFactor = (stat: string) =>
 					!eraAdj

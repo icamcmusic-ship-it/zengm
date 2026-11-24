@@ -6,6 +6,7 @@ import {
 	ageFaceForSeason,
 	agedFields,
 	applyAgingFields,
+	extractAgingFields,
 	faceAgingAfterEdit,
 	faceForSeason,
 	type FaceAging,
@@ -77,7 +78,9 @@ const agingContext = (p: AgingPlayer) => {
 	};
 };
 
-// Ages one player's face to a season, in place. Returns true if anything changed (the caller saves the player).
+// Ages one player's face to a season, in place. Returns true if his face or its stored aging state (generated fields,
+// snapshots) changed, so the caller saves the player. Only the season marker moving isn't worth a write: without it the same
+// (pure, cheap) aging is just worked out again next time.
 export const agePlayerFace = (
 	p: AgingPlayer,
 	season: number,
@@ -101,9 +104,15 @@ export const agePlayerFace = (
 	if (!result) {
 		return false;
 	}
+	const changed =
+		!p.faceAging ||
+		JSON.stringify(result.aging.b) !== JSON.stringify(p.faceAging.b) ||
+		JSON.stringify(result.aging.h) !== JSON.stringify(p.faceAging.h) ||
+		JSON.stringify(extractAgingFields(result.face)) !==
+			JSON.stringify(extractAgingFields(p.face));
 	p.face = result.face;
 	p.faceAging = result.aging;
-	return true;
+	return changed;
 };
 
 // Preseason: active players and free agents (already being saved by the caller), draft prospects and, with the option,
@@ -173,13 +182,38 @@ export const ageAllFacesNewLeague = async () => {
 	await ageNewPlayerFaces(players);
 };
 
+// A generated face that hasn't been aged or edited yet: what Customize Player starts a new player with, and what "Randomize"
+// gives (the form sends the face with this state). Aging only ever touches the aging fields, so a face whose aging fields are
+// still the generated ones has nothing of the user's for aging to overwrite.
+export const freshFaceAging = (face: AgingPlayer["face"]): FaceAging => ({
+	b: extractAgingFields(face),
+	h: {},
+});
+
+const isFreshFace = (p: AgingPlayer) => {
+	const aging = p.faceAging;
+	return (
+		!!aging &&
+		aging.e === undefined &&
+		aging.s === undefined &&
+		Object.keys(aging.h ?? {}).length === 0 &&
+		JSON.stringify(aging.b) === JSON.stringify(extractAgingFields(p.face))
+	);
+};
+
 // Customize Player save: a face the user changed is locked from aging (unless "Allow aging" is ticked), and ages on from
-// the edited face if allowed. The UI sends p.faceAging with its "a" flag set from the checkbox.
+// the edited face if allowed. The UI sends p.faceAging with its "a" flag set from the checkbox. A generated face nobody edited
+// (a new player's, or a "Randomize" one) isn't locked: it gets a clean aging state, and true is returned so the caller ages
+// it to his age once he has a pid.
 export const faceAgingOnCustomize = (
 	p: AgingPlayer,
 	prev: AgingPlayer | undefined,
 	season: number,
 ) => {
+	if (!p.imgURL && p.face?.hair && isFreshFace(p)) {
+		p.faceAging = freshFaceAging(p.face);
+		return true;
+	}
 	const allow = p.faceAging?.a === 1;
 	const age = season - p.born.year;
 	const changed =
@@ -204,6 +238,7 @@ export const faceAgingOnCustomize = (
 	} else {
 		delete p.faceAging;
 	}
+	return false;
 };
 
 // Team colours and jersey are set for drawing, not chosen by the user

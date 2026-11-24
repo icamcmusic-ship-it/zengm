@@ -14,6 +14,7 @@ import {
 	toRoman,
 } from "../../util/romanNumerals.ts";
 import { generateFace } from "../../util/face.ts";
+import { applyAgingFields } from "../../../common/faceAging.ts";
 import { randInt, choice } from "../../../common/random.ts";
 import { inheritFromRelative } from "./heredity.ts";
 
@@ -151,8 +152,11 @@ const makeSimilar = async (existingRelative: Player, newRelative: Player) => {
 	}
 
 	if (!existingRelative.imgURL) {
+		// Face Aging: take after the face he was generated with, not his aged one (a father's grey hair and receding hairline)
 		newRelative.face = generateFace({
-			relative: existingRelative.face,
+			relative: existingRelative.faceAging
+				? applyAgingFields(existingRelative.face, existingRelative.faceAging.b)
+				: existingRelative.face,
 		});
 	}
 };

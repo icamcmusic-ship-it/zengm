@@ -18,6 +18,7 @@ import { getContractStartSeason } from "../util/getContractStartSeason.ts";
 import { defineView } from "../util/defineView.ts";
 import { last, orderBy } from "../../common/utils.ts";
 import { upgradeFace } from "../util/face.ts";
+import { freshFaceAging } from "../util/faceAging.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
 import { ensureSubs } from "../core/player/subRatings.ts";
@@ -117,6 +118,8 @@ export default defineView({
 				);
 				appearanceOption = "Cartoon Face";
 				p.imgURL = "http://";
+				// Face Aging: a generated face, not locked from aging unless the user edits it (aged to his age on save)
+				(p as any).faceAging = freshFaceAging(p.face);
 				contract = p.contractDemand;
 			} else {
 				// Load a player to edit

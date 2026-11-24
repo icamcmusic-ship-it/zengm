@@ -6,10 +6,13 @@ import {
 import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
-import { randInt } from "../../../common/random.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
+import { hashString } from "../../../common/coachSystems.ts";
+import { saltedSeed } from "../../../common/leagueSalt.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import moodInfo from "../player/moodInfo.ts";
 import { getEgoTradeRequestInfo } from "../player/traits.ts";
+import { getSimDay } from "../player/injuryDepth.ts";
 import { sumMoodComponents } from "./moodHistory.ts";
 import { estimateMarketValue, playerLink, teamLink } from "./options.ts";
 
@@ -59,6 +62,15 @@ export const shouldRequestTrade = ({
 	// Player traits (ego): a diva asks sooner (positive), a team-first player later
 	moodShift?: number;
 }) => isStar && !signedThisSeason && moodSum <= TRADE_REQUEST_MOOD + moodShift;
+
+// Seeded draws for trade requests and holdouts, keyed by player, season and day (and the league salt), like the rest of the personality
+// code: replaying a day gives the same decisions, and they never move the game's Math.random stream
+export const unrestRandom = (key: string) => {
+	const random = makeSeededRandom(saltedSeed(hashString(`unrest|${key}`)));
+	// Warm up: the first values of nearby seeds look alike
+	random();
+	return random;
+};
 
 // Check for new trade requests, and withdraw old ones that no longer apply. Called about once a week during the regular season.
 export const updateTradeRequests = async () => {
@@ -123,7 +135,10 @@ export const updateTradeRequests = async () => {
 				signedThisSeason: !!signedThisSeason,
 				moodShift: ego.moodShift,
 			}) &&
-			Math.random() < TRADE_REQUEST_PROB * ego.probMult
+			unrestRandom(
+				`tradeRequest|${p.pid}|${season}|${g.get("phase")}|${getSimDay() ?? -1}`,
+			)() <
+				TRADE_REQUEST_PROB * ego.probMult
 		) {
 			p.tradeRequest = {
 				season,
@@ -196,6 +211,8 @@ export const startHoldouts = async () => {
 		}
 
 		const mood = await moodInfo(p, p.tid);
+		// Once a season, so keyed by player and season
+		const random = unrestRandom(`holdout|${p.pid}|${season}`);
 		if (
 			!shouldHoldOut({
 				moodSum: sumMoodComponents(mood.components),
@@ -204,12 +221,15 @@ export const startHoldouts = async () => {
 				seasonsLeft: getContractExp(contract) - season + 1,
 				minContract: g.get("minContract"),
 			}) ||
-			Math.random() >= Math.min(1, HOLDOUT_PROB * frequency)
+			random() >= Math.min(1, HOLDOUT_PROB * frequency)
 		) {
 			continue;
 		}
 
-		const games = Math.max(1, Math.round(randInt(3, 12) * numGamesFactor));
+		const games = Math.max(
+			1,
+			Math.round((3 + Math.floor(random() * 10)) * numGamesFactor),
+		);
 		p.holdout = {
 			season,
 			tid: p.tid,
