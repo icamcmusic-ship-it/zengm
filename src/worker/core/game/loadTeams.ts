@@ -4,6 +4,7 @@ import { getTalentShift, shiftRatingsForSim } from "./talentCenter.ts";
 import { allStar, player, season, team } from "../index.ts";
 import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
+import { isSuspended } from "../player/techDiscipline.ts";
 import { gameTimeDecisionPlays } from "../player/injuryRecovery.ts";
 import { idb } from "../../db/index.ts";
 import { isCollege } from "../college/isCollege.ts";
@@ -416,7 +417,10 @@ export const processTeam = async (
 					p.injury.gamesRemaining <= playThroughInjuries,
 			},
 			// Holding out counts as injured, so he doesn't play
-			injured: p.injury.gamesRemaining > playThroughInjuries || isHoldingOut(p),
+			injured:
+				p.injury.gamesRemaining > playThroughInjuries ||
+				isHoldingOut(p) ||
+				isSuspended(p),
 			jerseyNumber,
 			ptModifier: p.ptModifier,
 			ovrs: rating.ovrs,
@@ -428,7 +432,8 @@ export const processTeam = async (
 			p2.injured &&
 			!allStarGame &&
 			isInjuryDepthEnabled() &&
-			!isHoldingOut(p)
+			!isHoldingOut(p) &&
+			!isSuspended(p)
 		) {
 			const gtd = gameTimeDecisionPlays(
 				p,
@@ -527,6 +532,11 @@ export const processTeam = async (
 				draftYear: p.draft?.year,
 				age: p2.age,
 			});
+			// League discipline (technicalFouls setting): his technicals this regular season, for "his 9th technical of the season"
+			if (g.get("technicalFouls") && g.get("phase") === PHASE.REGULAR_SEASON) {
+				(p2 as any).pbpRatings.stf =
+					p.discipline?.season === g.get("season") ? p.discipline.tf : 0;
+			}
 		}
 
 		// Player traits (the playerTraits setting): his effects on the game, computed once per game. Undefined with the setting off, and then the

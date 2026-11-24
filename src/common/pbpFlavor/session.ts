@@ -35,6 +35,7 @@ import {
 	technicalFreeThrow,
 	timeoutText,
 	tipOff,
+	type DisciplineCtx,
 	type Trip,
 } from "./plays.ts";
 import { Rng } from "./rng.ts";
@@ -517,6 +518,12 @@ export class FlavorSession {
 	private injured = new Set<number>();
 	private fouledOut = new Set<number>();
 	private ejected = new Set<number>();
+	// For the technical, flagrant and ejection wording: each player's temper trait score (low is a hothead) and his technicals this
+	// regular season before the game (only sent with the technicalFouls setting on, for a game whose stats count)
+	private tempers = new Map<number, number>();
+	private seasonTechs = new Map<number, number>();
+	// Technicals per player this game, for the season count
+	private gameTechs = new Map<number, number>();
 	// the type of the last event worded, and whether it was a dunk (for the wording of a technical foul)
 	private lastType: string | undefined;
 	private lastDunk = false;
@@ -631,6 +638,14 @@ export class FlavorSession {
 				R.dnk = 0;
 			}
 			const lft = p.ratings?.["lft"];
+			const temper = p.ratings?.["temper"];
+			if (typeof temper === "number" && Number.isFinite(temper)) {
+				this.tempers.set(p.pid, temper);
+			}
+			const stf = p.ratings?.["stf"];
+			if (typeof stf === "number" && Number.isFinite(stf) && stf >= 0) {
+				this.seasonTechs.set(p.pid, stf);
+			}
 			this.players.set(p.pid, {
 				pid: p.pid,
 				name: p.name.replaceAll(/\s+/g, " ").trim() || "???",
@@ -1095,11 +1110,11 @@ export class FlavorSession {
 				} else if (e.type === "ft" || e.type === "missFt") {
 					res = this.onFt(rng, ev, dPts, score, future);
 				} else if (e.type === "techFoul") {
-					res = this.onTechFoul(rng, ev, future);
+					res = this.onTechFoul(rng, ev, future, score);
 				} else if (e.type === "flagrantFoul") {
-					res = this.onFlagrant(rng, ev);
+					res = this.onFlagrant(rng, ev, score);
 				} else if (e.type === "ejection") {
-					res = this.onEjection(rng, ev);
+					res = this.onEjection(rng, ev, score);
 				} else if (
 					e.type === "pfNonShooting" ||
 					e.type === "pfBonus" ||
@@ -2783,10 +2798,37 @@ export class FlavorSession {
 	}
 
 	// ---- technical and flagrant fouls, ejections ----
+	// The situation, for their context lines: team t is the one called for it, p the player (none for the bench)
+	private disciplineCtx(
+		t: 0 | 1,
+		p: FPlayer | undefined,
+		score: [number, number] | undefined,
+		clock: number | undefined,
+	): DisciplineCtx {
+		const margin = score ? Math.abs(score[0] - score[1]) : undefined;
+		const temper = p ? this.tempers.get(p.pid) : undefined;
+		return {
+			late:
+				margin !== undefined &&
+				this.finalPeriod() &&
+				clock !== undefined &&
+				Number.isFinite(clock) &&
+				clock <= 120 &&
+				margin <= 6,
+			blowout: margin !== undefined && margin >= 20,
+			playoffs: !!this.context.playoffs,
+			rivalry: Number(this.context.rivalry ?? 0) > 0,
+			// (the home team is the first one, except in an exhibition between named teams)
+			home: this.noArticle || this.context.exhibition ? undefined : t === 0,
+			hothead: temper !== undefined && temper < 35,
+		};
+	}
+
 	private onTechFoul(
 		rng: Rng,
 		ev: any,
 		future: readonly any[] | undefined,
+		score?: [number, number],
 	): FlavorResult {
 		const t: 0 | 1 = ev.t;
 		const p = ev.pid === undefined ? undefined : this.pl(ev.pid);
@@ -2800,7 +2842,16 @@ export class FlavorSession {
 				break;
 			}
 		}
+		let seasonNum: number | undefined;
+		if (p) {
+			const inGame = (this.gameTechs.get(p.pid) ?? 0) + 1;
+			this.gameTechs.set(p.pid, inGame);
+			const before = this.seasonTechs.get(p.pid);
+			seasonNum = before === undefined ? undefined : before + inGame;
+		}
 		const text = technicalFoul(rng, p, this.the(t), ev.num ?? 1, {
+			...this.disciplineCtx(t, p, score, ev.clock),
+			seasonNum,
 			afterDunk: this.lastDunk,
 			afterFoul:
 				this.lastType !== undefined &&
@@ -2844,7 +2895,11 @@ export class FlavorSession {
 		return this.cleanResult(res, {});
 	}
 
-	private onFlagrant(rng: Rng, ev: any): FlavorResult {
+	private onFlagrant(
+		rng: Rng,
+		ev: any,
+		score?: [number, number],
+	): FlavorResult {
 		const f = this.pl(ev.pid);
 		const shooter = this.pl(ev.pidShooting);
 		const defT: 0 | 1 = ev.t;
@@ -2874,19 +2929,37 @@ export class FlavorSession {
 		};
 		this.ato = [false, false];
 		return {
-			text: flagrantFoul(rng, f, shooter, tag, level, this.the(offT)),
+			text: flagrantFoul(
+				rng,
+				f,
+				shooter,
+				tag,
+				level,
+				this.the(offT),
+				this.disciplineCtx(defT, f, score, ev.clock),
+			),
 			danger: level === 2,
 			ptype: level === 2 ? "flagrant2" : "flagrant1",
 		};
 	}
 
-	private onEjection(rng: Rng, ev: any): FlavorResult {
+	private onEjection(
+		rng: Rng,
+		ev: any,
+		score?: [number, number],
+	): FlavorResult {
 		const p = ev.pid === undefined ? undefined : this.pl(ev.pid);
 		if (p) {
 			this.ejected.add(p.pid);
 		}
 		return {
-			text: ejectionText(rng, p, this.the(ev.t), ev.reason),
+			text: ejectionText(
+				rng,
+				p,
+				this.the(ev.t),
+				ev.reason,
+				this.disciplineCtx(ev.t === 1 ? 1 : 0, p, score, ev.clock),
+			),
 			danger: true,
 			ptype: "ejection",
 		};

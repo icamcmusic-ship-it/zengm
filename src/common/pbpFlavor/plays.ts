@@ -3,6 +3,7 @@
 // sim logs one event per free throw and per foul rather than one per trip to the line.
 import { pickV, pickW, weighted } from "./variety.ts";
 import type { Rng } from "./rng.ts";
+import { ordinal } from "./color.ts";
 import {
 	R100,
 	aRun,
@@ -1325,6 +1326,88 @@ export const pickOnCourt = (
 ) => weighted(rng, ps, w);
 export { R100, clockOf };
 
+// The situation around a technical, flagrant or ejection, for the context lines. All optional: an old stored game, or a game with
+// no context, reads as it did
+export type DisciplineCtx = {
+	// The final period (or overtime), two minutes or less to go, within 6 points
+	late?: boolean;
+	// A lopsided game (20+ points)
+	blowout?: boolean;
+	playoffs?: boolean;
+	rivalry?: boolean;
+	// The fouling team is the home team (undefined at a neutral site or when not known): the crowd reaction
+	home?: boolean;
+	// A known hothead (a low temper trait)
+	hothead?: boolean;
+	// His technicals this regular season, this one included (only known for a game whose stats count, technicals setting on)
+	seasonNum?: number;
+};
+
+// The league's automatic suspension (worker/core/player/techDiscipline.ts TECH_SUSPENSION_FIRST): kept in step by a test
+export const TECH_SUSPENSION_AT = 16;
+
+const seasonTechNote = (rng: Rng, n: number | undefined) => {
+	if (n === undefined || n < 3) {
+		return "";
+	}
+	if (n === TECH_SUSPENSION_AT) {
+		return pickV(rng, [
+			`That's his ${ordinal(n)} technical of the season, and that means an automatic one game suspension.`,
+			`That is technical number ${n} this season for him: he'll be suspended for the next game.`,
+		]);
+	}
+	if (n > TECH_SUSPENSION_AT) {
+		return pickV(rng, [
+			`That's ${n} technicals on the season, and the league is keeping count.`,
+			`His ${ordinal(n)} of the season: the suspensions keep coming.`,
+		]);
+	}
+	if (n === TECH_SUSPENSION_AT - 1) {
+		return `That's his ${ordinal(n)} of the season: one more and he sits a game.`;
+	}
+	return pickV(rng, [
+		`That's his ${ordinal(n)} technical of the season.`,
+		`His ${ordinal(n)} technical this year.`,
+		`He's up to ${n} technicals on the season.`,
+		...(n >= 10
+			? [`That's ${n} on the season, and he's starting to hear about it.`]
+			: []),
+	]);
+};
+
+const techContextLine = (rng: Rng, team: string, ctx: DisciplineCtx) => {
+	const rows: [number, string][] = [
+		[ctx.late ? 1.5 : 0, "A costly time to lose his composure."],
+		[
+			ctx.late ? 1 : 0,
+			`A free point in a close game: ${team} can't afford that.`,
+		],
+		[ctx.blowout ? 1 : 0, "Frustration boiling over in a game that got away."],
+		[
+			ctx.blowout ? 0.7 : 0,
+			"Nothing left to play for but pride, and the temper shows.",
+		],
+		[
+			ctx.playoffs ? 1 : 0,
+			"Playoff intensity, and the officials won't let it get out of hand.",
+		],
+		[ctx.rivalry ? 1 : 0, "There's no love lost between these two teams."],
+		[ctx.rivalry ? 0.7 : 0, "This rivalry has some heat to it tonight."],
+		[
+			ctx.home === true ? 0.8 : 0,
+			"The home crowd lets the officials hear about it.",
+		],
+		[ctx.home === true ? 0.6 : 0, "The boos rain down from the stands."],
+		[ctx.home === false ? 0.8 : 0, "The crowd loves that one."],
+		[
+			ctx.home === false ? 0.6 : 0,
+			"The fans let him hear it on the way back to the huddle.",
+		],
+		[ctx.hothead ? 0.8 : 0, "Not the first time his temper has cost his team."],
+	];
+	return pickW(rng, rows)?.[1] ?? "";
+};
+
 // A technical foul at a dead ball: on a player (p) or on the bench (p undefined). One free throw for the other team, possession unchanged
 export const technicalFoul = (
 	rng: Rng,
@@ -1335,18 +1418,53 @@ export const technicalFoul = (
 		afterDunk: boolean;
 		afterFoul: boolean;
 		shooter: FPlayer | undefined;
-	},
+	} & DisciplineCtx,
 ) => {
 	let call: string;
 	if (!p) {
-		call = pickV(rng, [
-			`Technical foul on the ${bare(team)} bench`,
-			`The ${bare(team)} coach is hit with a technical after a long word with the officials`,
-			`Technical foul on the ${bare(team)} coach for arguing the call`,
-			`The ${bare(team)} bench is warned, then given a technical`,
-			`The ${bare(team)} coach comes too far onto the floor and is given a technical`,
-			`Technical foul on the ${bare(team)} bench: the officials have heard enough`,
-		]);
+		const b = bare(team);
+		const rows: [number, string][] = [
+			[1, `Technical foul on the ${b} bench`],
+			[
+				1,
+				`The ${b} coach is hit with a technical after a long word with the officials`,
+			],
+			[1, `Technical foul on the ${b} coach for arguing the call`],
+			[0.7, `The ${b} bench is warned, then given a technical`],
+			[
+				0.7,
+				`The ${b} coach comes too far onto the floor and is given a technical`,
+			],
+			[
+				0.7,
+				`Technical foul on the ${b} bench: the officials have heard enough`,
+			],
+			[
+				0.6,
+				`The ${b} coach rips off his jacket in disgust and draws a technical`,
+			],
+			[
+				0.6,
+				`The ${b} coach steps out of the coaching box to argue and is T'd up`,
+			],
+			[
+				0.5,
+				`An assistant on the ${b} bench says something he shouldn't have: technical foul`,
+			],
+			[
+				opts.afterFoul ? 1.2 : 0,
+				`The ${b} coach can't believe that whistle and lets the official know: technical`,
+			],
+			[
+				0.5,
+				`The ${b} coach is given a technical, and you get the feeling he wanted it to fire up his team`,
+			],
+			[
+				0.4,
+				`Technical on the ${b} bench for standing during play after a warning`,
+			],
+		];
+		call = pickW(rng, rows)![1];
 	} else {
 		const n = p.name;
 		const rows: [number, string][] = [
@@ -1354,13 +1472,35 @@ export const technicalFoul = (
 			[1, `${n} is given a technical for complaining to the officials`],
 			[0.7, `${n} says a little too much to the referee: technical foul`],
 			[0.6, `Technical foul on ${n} for taunting`],
+			[
+				0.5,
+				`${n} stares down his defender and is called for taunting: technical foul`,
+			],
 			[0.5, `${n} picks up a technical for an exchange with his defender`],
+			[0.4, `${n} gets in the face of an opponent and draws a technical`],
 			[
 				opts.afterFoul ? 1.2 : 0,
 				`${n} can't believe the call and is hit with a technical`,
 			],
+			[
+				opts.afterFoul ? 0.8 : 0,
+				`${n} chases the official down the floor to argue and is T'd up`,
+			],
+			[
+				opts.afterFoul ? 0.7 : 0,
+				`${n} throws his arms up at the whistle: technical foul`,
+			],
 			[opts.afterDunk ? 1 : 0, `${n} hangs on the rim and draws a technical`],
+			[
+				opts.afterDunk ? 0.8 : 0,
+				`${n} stands over his man after the slam: technical foul for taunting`,
+			],
+			[
+				opts.afterDunk ? 0.6 : 0,
+				`${n} lets the other bench know about it after the dunk and draws a technical`,
+			],
 			[0.3, `${n} slams the ball down in frustration: technical foul`],
+			[0.3, `${n} punts the ball into the stands: technical foul`],
 			[0.6, `${n} keeps talking after the whistle and is given a technical`],
 			[0.5, `${n} waves off the official and draws a technical foul`],
 			[0.5, `Technical foul on ${n}: the official had warned him already`],
@@ -1372,22 +1512,42 @@ export const technicalFoul = (
 				0.3,
 				`${n} is called for a delay of game after an earlier warning: technical foul`,
 			],
+			[
+				0.3,
+				`${n} won't give the ball back to the official: delay of game, and that's a technical`,
+			],
+			[
+				0.3,
+				`${n} uses some colorful language within earshot of the referee: technical foul`,
+			],
+			[
+				opts.hothead ? 0.8 : 0,
+				`${n} loses his cool again and is given a technical`,
+			],
+			[
+				opts.late ? 0.6 : 0,
+				`${n} lets his emotions get the better of him at the worst time: technical foul`,
+			],
 		];
 		call = pickW(rng, rows)![1];
 	}
 	const second =
 		num >= 2
 			? p
-				? ` That's his second technical.`
-				: ` That's the second one on the bench.`
+				? ` ${pickV(rng, ["That's his second technical.", "And that's his second technical of the night.", "That's two technicals on him."])}`
+				: ` ${pickV(rng, ["That's the second one on the bench.", "That's two on the bench now."])}`
 			: "";
+	const season = p && num < 2 ? seasonTechNote(rng, opts.seasonNum) : "";
+	const ctxLine =
+		num < 2 && rng.random() < 0.45 ? techContextLine(rng, team, opts) : "";
 	const ft = opts.shooter
-		? ` ${opts.shooter.name} ${pickV(rng, ["will shoot the free throw", "goes to the line for one", "takes the technical free throw"])}.`
+		? ` ${opts.shooter.name} ${pickV(rng, ["will shoot the free throw", "goes to the line for one", "takes the technical free throw", "steps up for the technical free throw", "will shoot the technical"])}.`
 		: "";
-	return `${call}.${second}${ft}`;
+	return `${call}.${second}${season ? ` ${season}` : ""}${ctxLine ? ` ${ctxLine}` : ""}${ft}`;
 };
 
-// A flagrant foul: two free throws and the ball for the fouled team
+// A flagrant foul: two free throws and the ball for the fouled team. A flagrant 1 is unnecessary contact, a flagrant 2 unnecessary and
+// excessive contact (and an ejection, worded by the ejection event that follows)
 export const flagrantFoul = (
 	rng: Rng,
 	f: FPlayer,
@@ -1395,32 +1555,76 @@ export const flagrantFoul = (
 	tag: string,
 	level: 1 | 2,
 	ballTeam: string,
+	ctx: DisciplineCtx = {},
 ) => {
 	const n = f.name;
 	const s = shooter.name;
-	const play = pickV(rng, [
-		`${n} wraps up ${s} on the drive with no play on the ball`,
-		`${n} swings through and catches ${s} high`,
-		`${n} takes ${s} down hard in transition`,
-		`${n} shoves ${s} in the back on the way to the rim`,
-		`${n} undercuts ${s} as he goes up`,
-		`${n} grabs ${s} around the shoulders on the way up`,
-		`${n} follows through and hits ${s} in the head`,
-		`${n} throws ${s} to the floor on the rebound`,
-	]);
+	const plays: [number, string][] = [
+		[1, `${n} wraps up ${s} on the drive with no play on the ball`],
+		[1, `${n} swings through and catches ${s} high`],
+		[1, `${n} takes ${s} down hard in transition`],
+		[1, `${n} shoves ${s} in the back on the way to the rim`],
+		[1, `${n} undercuts ${s} as he goes up`],
+		[1, `${n} grabs ${s} around the shoulders on the way up`],
+		[1, `${n} follows through and hits ${s} in the head`],
+		[1, `${n} throws ${s} to the floor on the rebound`],
+		[0.8, `${n} clotheslines ${s} on the break`],
+		[0.8, `${n} hooks ${s} around the neck going to the basket`],
+		[0.7, `${n} comes across late and sends ${s} sprawling`],
+		[0.7, `${n} gives ${s} a two-handed shove in midair`],
+		[level === 2 ? 1 : 0, `${n} swings an elbow and connects with ${s}`],
+		[level === 2 ? 0.8 : 0, `${n} drives ${s} into the stanchion`],
+		[
+			level === 1 ? 0.8 : 0,
+			`${n} makes a play on the ball but goes through ${s} to get there`,
+		],
+		[
+			level === 1 ? 0.7 : 0,
+			`${n} reaches in late and catches ${s} across the face`,
+		],
+	];
+	const play = pickW(rng, plays)![1];
 	const call =
 		level === 2
 			? pickV(rng, [
 					"After a review, it's a flagrant 2",
 					"The officials go to the monitor and upgrade it to a flagrant 2",
 					"Flagrant foul, penalty 2",
+					"After a long look at the replay: unnecessary and excessive contact, flagrant 2",
+					"The officials rule it unnecessary and excessive: flagrant 2",
+					"It's reviewed, and it's the worst kind: a flagrant 2",
 				])
 			: pickV(rng, [
 					"After a review, it's a flagrant 1",
 					"The officials review it: flagrant foul, penalty 1",
 					"It's ruled a flagrant 1",
+					"After a look at the monitor: unnecessary contact, flagrant 1",
+					"The officials upgrade it to a flagrant 1 for unnecessary contact",
+					"Upon review, it's a flagrant 1",
 				]);
-	return `${play}. ${call} (${tag}). Two free throws for ${s}, and ${ballTeam} keep the ball.`;
+	const reactions: [number, string][] = [
+		[
+			level === 2 ? 1 : 0.3,
+			"Both benches are up, and the officials have to step in.",
+		],
+		[
+			level === 2 ? 0.8 : 0.3,
+			"Players from both teams come together before order is restored.",
+		],
+		[0.6, `${s} stays down for a moment before getting back up.`],
+		[0.5, `${s} has words for ${n} after that one.`],
+		[ctx.home === true ? 0.7 : 0, "The home fans are not happy with the call."],
+		[ctx.home === false ? 0.7 : 0, "The crowd wants more than a flagrant."],
+		[ctx.rivalry ? 0.8 : 0, "This rivalry just got a little more heated."],
+		[ctx.playoffs ? 0.8 : 0, "Tempers are running high in this playoff game."],
+		[
+			ctx.late ? 1 : 0,
+			"Two free throws and the ball at this stage of the game is a huge break.",
+		],
+		[ctx.hothead ? 0.7 : 0, `${n} has a reputation, and that won't help it.`],
+	];
+	const react = rng.random() < 0.5 ? pickW(rng, reactions) : null;
+	return `${play}. ${call} (${tag}).${react ? ` ${react[1]}` : ""} Two free throws for ${s}, and ${ballTeam} keep the ball.`;
 };
 
 export const ejectionText = (
@@ -1428,30 +1632,81 @@ export const ejectionText = (
 	p: FPlayer | undefined,
 	team: string,
 	reason: string,
+	ctx: DisciplineCtx = {},
 ) => {
+	const withCrowd = (x: string) => {
+		if (ctx.home === undefined || rng.random() >= 0.4) {
+			return x;
+		}
+		return `${x} ${pickV(
+			rng,
+			ctx.home
+				? [
+						"The home crowd boos the officials.",
+						"The home fans give him an ovation on his way out.",
+					]
+				: [
+						"The crowd waves goodbye.",
+						"The fans give him a sarcastic send-off.",
+					],
+		)}`;
+	};
 	if (!p) {
-		return pickV(rng, [
-			`The ${bare(team)} coach is ejected and heads to the locker room.`,
-			`Two technicals: the ${bare(team)} coach has been tossed.`,
-		]);
+		const b = bare(team);
+		return withCrowd(
+			pickV(rng, [
+				`The ${b} coach is ejected and heads to the locker room.`,
+				`Two technicals: the ${b} coach has been tossed.`,
+				`The ${b} coach gets his second technical and he's gone. An assistant will finish the game.`,
+				`That's two on the ${b} coach: ejected. He has a few last words on his way off the floor.`,
+				`The ${b} coach is tossed, and he takes his time leaving.`,
+			]),
+		);
 	}
 	const n = p.name;
 	if (reason === "techs") {
-		return pickV(rng, [
-			`${n} has been ejected after his second technical.`,
-			`Two technicals: ${n} is tossed and heads to the locker room.`,
-			`${n} gets his second technical and with it the rest of the night off: ejected.`,
-		]);
+		return withCrowd(
+			pickV(rng, [
+				`${n} has been ejected after his second technical.`,
+				`Two technicals: ${n} is tossed and heads to the locker room.`,
+				`${n} gets his second technical and with it the rest of the night off: ejected.`,
+				`That's two: ${n} is ejected. Teammates walk him to the tunnel.`,
+				`${n} is tossed after his second technical, still talking on his way out.`,
+				...(ctx.late
+					? [
+							`${n} is ejected with the game on the line. His team will have to finish without him.`,
+						]
+					: []),
+			]),
+		);
 	}
 	if (reason === "flagrants") {
-		return `${n} has been ejected: that's his second flagrant foul of the game.`;
+		return withCrowd(
+			pickV(rng, [
+				`${n} has been ejected: that's his second flagrant foul of the game.`,
+				`A second flagrant on ${n} means an automatic ejection.`,
+				`Two flagrants and ${n} is gone: ejected.`,
+			]),
+		);
 	}
-	return pickV(rng, [
-		`${n} has been ejected.`,
-		`${n} is ejected from the game and heads to the locker room.`,
-		`${n} is tossed.`,
-		`That is the end of the night for ${n}: ejected.`,
-	]);
+	if (reason === "flagrant2") {
+		return withCrowd(
+			pickV(rng, [
+				`The flagrant 2 comes with an automatic ejection: ${n} is done for the night.`,
+				`${n} is ejected for the flagrant 2 and heads to the locker room.`,
+				`That's an automatic ejection for ${n} on the flagrant 2, and he walks off to a chorus of noise.`,
+				`${n} is tossed for the flagrant 2, and the league office will likely take a look at it too.`,
+			]),
+		);
+	}
+	return withCrowd(
+		pickV(rng, [
+			`${n} has been ejected.`,
+			`${n} is ejected from the game and heads to the locker room.`,
+			`${n} is tossed.`,
+			`That is the end of the night for ${n}: ejected.`,
+		]),
+	);
 };
 
 export const technicalFreeThrow = (rng: Rng, p: FPlayer, made: boolean) =>

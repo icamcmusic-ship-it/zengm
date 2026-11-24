@@ -95,6 +95,7 @@ const TYPE_TO_CATEGORY: Record<LogEventType, NotificationCategoryOrSystem> = {
 	extension: "contracts",
 	tradeRequest: "players",
 	holdout: "contracts",
+	discipline: "players",
 	draftPickCondition: "trades",
 	draftStash: "draft",
 	capException: "contracts",

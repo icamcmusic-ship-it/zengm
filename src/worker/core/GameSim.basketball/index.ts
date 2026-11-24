@@ -719,6 +719,9 @@ class GameSim extends GameSimBase {
 	// Ejections of players and coaches, counted for the results (rivalry stories), which no longer read them from the play-by-play
 	numEjections = 0;
 	flagrants = new Map<PlayerGameSim, number>();
+	// Flagrant foul points by pid (1 for a flagrant 1, 2 for a flagrant 2), for league discipline (player/techDiscipline.ts)
+	flagrantPts = new Map<number, number>();
+	flagrant2s = new Map<number, number>();
 	// The realistic possession model (the realisticPossessions setting, see possessionModel.ts): a real shot clock, transition and
 	// half-court possessions, late-clock shots and violations, end-of-period clock management. When it is off, nothing here is used and no
 	// extra random numbers are drawn, so games play out exactly as before
@@ -1617,6 +1620,12 @@ class GameSim extends GameSimBase {
 						techCounts: {
 							techs: [...this.techs.values()].reduce((a, b) => a + b, 0),
 							ejections: this.numEjections,
+							...(this.flagrantPts.size > 0
+								? {
+										flagrantPts: Object.fromEntries(this.flagrantPts),
+										flagrant2s: Object.fromEntries(this.flagrant2s),
+									}
+								: {}),
 						},
 					}
 				: {}),
@@ -8743,6 +8752,13 @@ class GameSim extends GameSimBase {
 
 		const numFlagrants = (this.flagrants.get(fouler) ?? 0) + 1;
 		this.flagrants.set(fouler, numFlagrants);
+		this.flagrantPts.set(
+			fouler.id,
+			(this.flagrantPts.get(fouler.id) ?? 0) + level,
+		);
+		if (level === 2) {
+			this.flagrant2s.set(fouler.id, (this.flagrant2s.get(fouler.id) ?? 0) + 1);
+		}
 
 		const foulsNeededToFoulOut = this.ga.foulsNeededToFoulOut;
 		if (level === 2) {

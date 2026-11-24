@@ -244,6 +244,38 @@ test("an ejected player sits for the rest of the game", async () => {
 	assert.isTrue(seen >= 3, `ejections seen: ${seen}`);
 });
 
+test("flagrant points in the result match the flagrant fouls and the ff box score stat (league discipline)", async () => {
+	TECHNICAL_FOUL_RATES.flagrantPerPossession = 0.02;
+	TECHNICAL_FOUL_RATES.flagrant2 = 0.3;
+	const games = await simGames(7, 3);
+	let seen = 0;
+	for (const { events, result } of games) {
+		const pts = new Map<number, number>();
+		const f2s = new Map<number, number>();
+		for (const e of events) {
+			if (e.type === "flagrantFoul") {
+				seen += 1;
+				pts.set(e.pid, (pts.get(e.pid) ?? 0) + e.level);
+				if (e.level === 2) {
+					f2s.set(e.pid, (f2s.get(e.pid) ?? 0) + 1);
+				}
+			}
+		}
+		const tc = (result as any).techCounts;
+		assert.deepEqual(tc.flagrantPts ?? {}, Object.fromEntries(pts));
+		assert.deepEqual(tc.flagrant2s ?? {}, Object.fromEntries(f2s));
+		for (const t of result.team) {
+			for (const p of t.player) {
+				const ff = events.filter(
+					(e) => e.type === "flagrantFoul" && e.pid === p.id,
+				).length;
+				assert.strictEqual(p.stat.ff ?? 0, ff);
+			}
+		}
+	}
+	assert.isTrue(seen > 3, `flagrants seen: ${seen}`);
+});
+
 test("with the setting on, box scores, the live text and the stored play-by-play agree", async () => {
 	TECHNICAL_FOUL_RATES.techPerDeadBall = 0.02;
 	TECHNICAL_FOUL_RATES.flagrantPerPossession = 0.005;

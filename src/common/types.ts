@@ -1338,6 +1338,7 @@ export type LogEventType =
 	| "extension"
 	| "tradeRequest"
 	| "holdout"
+	| "discipline"
 	| "draftPickCondition"
 	| "draftStash"
 	| "capException";
@@ -1861,6 +1862,17 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Holding out (missing games) over his contract
 	holdout?: Holdout;
+
+	// League discipline for technical and flagrant fouls this regular season (player/techDiscipline.ts): technicals, flagrant points,
+	// fines in dollars, and the games left on (and served of) a suspension
+	discipline?: {
+		season: number;
+		tf: number;
+		fp: number;
+		fines: number;
+		suspension?: number;
+		served?: number;
+	};
 
 	customMoodItems?: {
 		amount: number;

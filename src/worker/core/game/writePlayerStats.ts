@@ -27,6 +27,10 @@ import {
 import { recordCoachDecisionGame } from "../staff/coachDecisions.ts";
 import { gamesMissed } from "../freeAgents/hardship.ts";
 import {
+	recordDiscipline,
+	serveSuspensionGame,
+} from "../player/techDiscipline.ts";
+import {
 	aiTreatment,
 	applyCareerInjuryLoss,
 	currentInjuryRecord,
@@ -438,6 +442,8 @@ const writePlayerStats = async (
 	let stopPlay = false;
 
 	const playoffs = g.get("phase") === PHASE.PLAYOFFS;
+	const regularSeason = g.get("phase") === PHASE.REGULAR_SEASON;
+	const discipline = __SPORT === "basketball" && !!g.get("technicalFouls");
 
 	const playersByPid = await idb.cache.players.getAllByKey();
 	const playersToSave = new Set<Player>();
@@ -558,6 +564,30 @@ const writePlayerStats = async (
 				) {
 					p2.injury.gamesMissed = gamesMissed(p2) + 1;
 					playersToSave.add(p2);
+				}
+
+				// League discipline (technical fouls setting): a suspended player who sat out served a game of it, then this game's
+				// technicals and flagrant points count toward the regular season's totals (fines, suspensions)
+				if (discipline && !allStarGame) {
+					if (p.injured && !p.stat.gp && serveSuspensionGame(p2)) {
+						playersToSave.add(p2);
+					}
+					if (regularSeason) {
+						const techCounts = (result as any).techCounts;
+						if (
+							await recordDiscipline(
+								p2,
+								{
+									tf: p.stat.tf ?? 0,
+									fp: techCounts?.flagrantPts?.[p.id] ?? 0,
+									flagrant2: techCounts?.flagrant2s?.[p.id] ?? 0,
+								},
+								conditions,
+							)
+						) {
+							playersToSave.add(p2);
+						}
+					}
 				}
 
 				// Only need to write stats if player got minutes, except for minAvailable in BBGM
