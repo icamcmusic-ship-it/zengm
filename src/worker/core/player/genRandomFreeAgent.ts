@@ -7,6 +7,7 @@ import { idb } from "../../db/index.ts";
 import name from "./name.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { randInt } from "../../../common/random.ts";
+import { ageNewPlayerFaces } from "../../util/faceAging.ts";
 
 const genRandomFreeAgent = async (): Promise<Player> => {
 	let minAge = 25;
@@ -50,6 +51,8 @@ const genRandomFreeAgent = async (): Promise<Player> => {
 		await develop(p, 0);
 		if (p.ratings[0].ovr <= 40) {
 			await idb.cache.players.add(p); // Create pid
+			// Face Aging: his face at his age now, not at the next preseason
+			await ageNewPlayerFaces([p]);
 			return p as Player;
 		}
 	}

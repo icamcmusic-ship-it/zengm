@@ -30,6 +30,7 @@ import { addContract, createContract } from "../contract/index.ts";
 import { updateCollegeArchive } from "./archive.ts";
 import { getRecruitingState, signCommitted } from "./recruiting.ts";
 import { getExpectations } from "./expectations.ts";
+import { ageNewPlayerFaces } from "../../util/faceAging.ts";
 import {
 	genCollegePlayer,
 	getTalentShare,
@@ -489,6 +490,8 @@ export const addRecruitingClass = async () => {
 		await player.updateValues(p);
 		await idb.cache.players.add(p as any);
 	}
+	// Face Aging: faces start at their age now, not at the next preseason
+	await ageNewPlayerFaces(recruits as any);
 };
 
 export const getRecruits = async () =>
@@ -776,6 +779,7 @@ export const doSigningDay = async (conditions: Conditions) => {
 			await enroll(p, t.tid);
 			await player.updateValues(p);
 			await idb.cache.players.add(p as any);
+			await ageNewPlayerFaces([p as any]);
 			row.openings -= 1;
 		}
 	}

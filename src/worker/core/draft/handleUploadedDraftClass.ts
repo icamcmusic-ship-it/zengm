@@ -6,6 +6,7 @@ import { last } from "../../../common/utils.ts";
 import { idb } from "../../db/index.ts";
 import { g, toUI } from "../../util/index.ts";
 import { draft, finances, player } from "../index.ts";
+import { ageNewPlayerFaces } from "../../util/faceAging.ts";
 
 const handleUploadedDraftClass = async ({
 	uploadedFile,
@@ -168,6 +169,9 @@ const handleUploadedDraftClass = async ({
 			await idb.cache.players.put(p);
 		}
 	}
+
+	// Face Aging: uploaded prospects' generated faces start young, like generated ones (aged to their age now)
+	await ageNewPlayerFaces(addedPlayers as any);
 
 	// "Top off" the draft class if not enough players imported
 	await draft.genPlayers(draftYear, scoutingLevel);
