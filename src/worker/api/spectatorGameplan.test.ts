@@ -7,6 +7,12 @@ import { idb } from "../db/index.ts";
 import { player, team } from "../core/index.ts";
 import { g, helpers } from "../util/index.ts";
 import api from "./index.ts";
+import { PRESETS } from "../../common/offEmphasis.ts";
+import {
+	coachEmphasis,
+	ensureTeamEmphasis,
+} from "../core/offEmphasis/index.ts";
+import { local } from "../util/index.ts";
 
 const setup = async () => {
 	resetG();
@@ -44,4 +50,31 @@ test("refused in spectator mode, allowed otherwise", async () => {
 	await api.main.updateDefScheme({ defScheme: "zone" });
 	assert.strictEqual((await idb.cache.players.get(pid))!.shotPlan, 1);
 	assert.strictEqual((await idb.cache.teams.get(0))!.defScheme, "zone");
+});
+
+test("the AI's dials while it runs the user's team, his manual ones kept", async () => {
+	await setup();
+	g.setWithoutSavingToDB("spectator", false);
+	const t = (await idb.cache.teams.get(0))!;
+	t.offEmphasis = {
+		mode: "manual",
+		e: PRESETS.postCentric,
+		set: { season: g.get("season"), day: 0 },
+	};
+	await idb.cache.teams.put(t);
+	assert.deepEqual((await ensureTeamEmphasis(t, 1)).e, PRESETS.postCentric);
+
+	const auto = await coachEmphasis(0, 1);
+	for (const mode of ["spectator", "autoPlay"]) {
+		g.setWithoutSavingToDB("spectator", mode === "spectator");
+		local.autoPlayUntil =
+			mode === "autoPlay" ? ({ season: 9999, phase: 0 } as any) : undefined;
+		const state = await ensureTeamEmphasis(t, 1);
+		assert.deepEqual(state.e, auto);
+		const stored = (await idb.cache.teams.get(0))!.offEmphasis!;
+		assert.strictEqual(stored.mode, "manual");
+		assert.deepEqual(stored.e, PRESETS.postCentric);
+	}
+	local.autoPlayUntil = undefined;
+	g.setWithoutSavingToDB("spectator", false);
 });

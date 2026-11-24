@@ -23,6 +23,7 @@ import { playTypeProfile, sumAdv } from "../../../common/advStats.ts";
 import type { Player, Team } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
+import { userRunsTeam } from "../../util/userRunsTeam.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { getCoachProfile } from "../staff/systems.ts";
 
@@ -115,30 +116,35 @@ const defaultState = (e: Emphasis): OffEmphasisTeam => ({ mode: "auto", e });
 
 // Refresh a team's dials: auto teams (every AI team, and the user's on Auto) follow the coach weekly and at every new season; on
 // Suggest the coach's proposal is refreshed and the dials stay. Returns the state (saved when changed)
+// A user team the AI runs (spectator mode, auto play) plays the coach's dials, while the user's own (his mode and manual dials) are
+// kept for when he takes it back: before, spectator mode switched him to Auto for good and auto play used his manual dials
 export const ensureTeamEmphasis = async (t: Team, day = 0) => {
 	const season = g.get("season");
 	const cur = t.offEmphasis;
+	const userTeam = g.get("userTids").includes(t.tid);
+	const aiRunsUserTeam = userTeam && !userRunsTeam(t.tid);
 	const stale =
 		!cur?.set || cur.set.season !== season || Math.abs(cur.set.day - day) >= 7;
-	if (cur && !stale) {
+	if (cur && !stale && (!aiRunsUserTeam || cur.mode === "auto")) {
 		return cur;
 	}
 	const auto = await coachEmphasis(t.tid, day);
-	const isUser = g.get("userTids").includes(t.tid) && !g.get("spectator");
 	let next: OffEmphasisTeam;
 	if (!cur) {
 		next = defaultState(auto);
-	} else if (cur.mode === "auto" || !isUser) {
-		next = { ...cur, mode: isUser ? cur.mode : "auto", e: auto };
+	} else if (cur.mode === "auto" || !userTeam) {
+		next = { ...cur, mode: userTeam ? cur.mode : "auto", e: auto };
 	} else if (cur.mode === "suggest") {
 		next = { ...cur, suggested: auto };
 	} else {
 		next = { ...cur };
 	}
-	next.set = { season, day };
-	t.offEmphasis = next;
-	await idb.cache.teams.put(t);
-	return next;
+	if (stale || !cur) {
+		next.set = { season, day };
+		t.offEmphasis = next;
+		await idb.cache.teams.put(t);
+	}
+	return aiRunsUserTeam ? { ...next, e: auto } : next;
 };
 
 // Before a day's games: each team's sim multipliers from its dials and the fit to the healthy players it dresses
