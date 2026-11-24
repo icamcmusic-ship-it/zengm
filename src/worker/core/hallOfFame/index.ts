@@ -579,6 +579,46 @@ const classEvent = (
 };
 
 /**
+ * The ballot was just turned off: from now on players are inducted when they retire (player.retire), so the retired players the
+ * ballot never got to (still waiting, or on it with votes left) would never be. Each of them who is worthy (madeHof, as at
+ * retirement) is inducted now, once. Players the vote already decided (inducted, dropped, ran out of years, veterans committee)
+ * are left as they are, as are players retired before the league started. Returns the pids inducted.
+ */
+export const catchUpHofAfterBallotOff = async (conditions: Conditions = {}) => {
+	if (__SPORT !== "basketball" || hofBallotOn() || isCollege()) {
+		return [];
+	}
+	const season = g.get("season");
+	const inducted: number[] = [];
+	for (
+		let retiredYear = g.get("startingSeason");
+		retiredYear <= season;
+		retiredYear++
+	) {
+		const players = await idb.merged.players.getAll({ retiredYear });
+		for (const p0 of players) {
+			if (p0.tid !== PLAYER.RETIRED || p0.hof || p0.hofBallot?.status) {
+				continue;
+			}
+			const { score, threshold } = hofScoreBasketball(p0);
+			if (!(score > threshold)) {
+				continue;
+			}
+			const p = (await idb.cache.players.get(p0.pid)) ?? p0;
+			await induct(
+				p,
+				season,
+				conditions,
+				`${playerLink(p)} was ${diedBy(p, season) ? "posthumously " : ""}inducted into the ${hofLink()}.`,
+			);
+			await idb.cache.players.put(p);
+			inducted.push(p.pid);
+		}
+	}
+	return inducted;
+};
+
+/**
  * The season's Hall of Fame business after the offseason's retirements: the ballot and the veterans committee (ballot on), and the
  * coaches and executives wing. Stores what happened on the season's awards row (awards.hof).
  */

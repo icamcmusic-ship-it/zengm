@@ -18,6 +18,7 @@ import { g } from "../../util/index.ts";
 import {
 	HOF_AWARD,
 	ballotLine,
+	catchUpHofAfterBallotOff,
 	clearHofBallotOnUnretire,
 	coachHofCase,
 	runHallOfFame,
@@ -26,6 +27,7 @@ import { hofWatchFor, projectHofScore } from "./watch.ts";
 import retire from "../player/retire.ts";
 import { hofScoreBasketball } from "../player/madeHof.basketball.ts";
 import { recomputedHof } from "../debug/recomputeHallOfFame.ts";
+import { league as leagueCore } from "../index.ts";
 
 // A retired player with `n` seasons of the same value (value = (dws + ows + ewa) / 2)
 const makePlayer = (
@@ -225,6 +227,46 @@ describe("ballot", () => {
 		assert.notInclude(p.hofStory?.speech.join(" ") ?? "", "I'm not much");
 		// Still waiting
 		assert.isUndefined((await idb.cache.players.get(41))!.hofBallot);
+	});
+
+	test("turning the ballot off inducts the worthy candidates it never got to, once", async () => {
+		// Still in his waiting period
+		const waiting = makePlayer(60, 15, 12, 2018);
+		// On the ballot, votes left
+		const pending = makePlayer(61, 12, 12, 2016);
+		pending.hofBallot = {
+			first: 2018,
+			votes: [60],
+			score: 140,
+			threshold: 120,
+		};
+		// The vote is done with him
+		const dropped = makePlayer(62, 15, 12, 2016);
+		dropped.hofBallot = {
+			first: 2019,
+			votes: [3],
+			score: 140,
+			threshold: 120,
+			status: "dropped",
+		};
+		const role = makePlayer(63, 2, 10, 2018);
+		await resetCache({ players: [waiting, pending, dropped, role] });
+
+		await leagueCore.setGameAttributes({ featureHofBallot: false });
+		for (const pid of [60, 61]) {
+			const p = (await idb.cache.players.get(pid))!;
+			assert.strictEqual(p.hof, 1, String(pid));
+			assert.isTrue(
+				p.awards.some((a) => a.type === HOF_AWARD && a.season === 2019),
+			);
+		}
+		assert.isUndefined((await idb.cache.players.get(62))!.hof);
+		assert.isUndefined((await idb.cache.players.get(63))!.hof);
+		// Once
+		assert.deepEqual(await catchUpHofAfterBallotOff(), []);
+		// Not while the ballot is on
+		g.setWithoutSavingToDB("featureHofBallot", true);
+		assert.deepEqual(await catchUpHofAfterBallotOff(), []);
 	});
 
 	test("retirement: inducted at once with the ballot off, not with it on", async () => {
