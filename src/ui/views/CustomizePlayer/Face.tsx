@@ -23,7 +23,7 @@ export const Face = ({
 	onChange: (face: string) => void;
 	randomizeFace: () => void;
 }) => {
-	let parsedFace;
+	let parsedFace: FaceConfig | undefined;
 	try {
 		parsedFace = JSON.parse(face);
 	} catch {}

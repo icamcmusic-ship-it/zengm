@@ -46,7 +46,9 @@ const setup = async () => {
 		await getNumPlayersTradedAwayNormalizedAll();
 	for (const p of expiring) {
 		const contract = p.contracts.at(-1)!;
-		contract.exp = season;
+		// Expiring this season (contracts are a start season and one amount per season)
+		contract.start = season;
+		contract.amounts = [contract.amounts[0]!];
 		p.value = Math.max(p.value, 50);
 		p.contractDemand = {
 			amount: g.get("minContract"),

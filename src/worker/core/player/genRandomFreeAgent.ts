@@ -52,7 +52,7 @@ const genRandomFreeAgent = async (): Promise<Player> => {
 		if (p.ratings[0].ovr <= 40) {
 			await idb.cache.players.add(p); // Create pid
 			// Face Aging: his face at his age now, not at the next preseason
-			await ageNewPlayerFaces([p]);
+			await ageNewPlayerFaces([p as Player]);
 			return p as Player;
 		}
 	}

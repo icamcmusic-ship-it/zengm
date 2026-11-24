@@ -155,10 +155,16 @@ export const validateAndParseScheduleCSV = (
 	// The checks across rows (a team twice on a day, counting the games already played; special days: one of each, alone on
 	// its day, no deadline once it passed, no All-Star Game when it's disabled or played), the same as the save's
 	// (setScheduleFromEditor), so errors show at import and not only when saving
-	const errorMessage = validateEditedSchedule([...completed, ...newSchedule], {
-		activeTids: new Set(teams.map((t) => t.tid)),
-		...rules,
-	});
+	const errorMessage = validateEditedSchedule(
+		[...completed, ...newSchedule].filter(
+			(game): game is Exclude<typeof game, { type: "placeholder" }> =>
+				game.type !== "placeholder",
+		),
+		{
+			activeTids: new Set(teams.map((t) => t.tid)),
+			...rules,
+		},
+	);
 	if (errorMessage !== undefined) {
 		throw new Error(errorMessage);
 	}
