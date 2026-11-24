@@ -86,8 +86,13 @@ const TeamLogo = ({
 		timeouts?: number;
 	};
 }) => {
+	// A fixed column that never shrinks: with a wide middle (long coach notes) a w-100 column was squeezed to nothing and the
+	// 120px logo spilled over the next column (the Game Log's games list)
 	return t.imgURL !== undefined && t.imgURL !== "" ? (
-		<div className="w-100 d-none d-lg-flex justify-content-center">
+		<div
+			className="d-none d-lg-flex justify-content-center flex-shrink-0"
+			style={{ width: 120 }}
+		>
 			<div>
 				<TeamNameLink
 					season={season}
@@ -1418,7 +1423,10 @@ export const BoxScoreWrapper = ({
 		<>
 			<div className="d-flex align-items-center">
 				<TeamLogo season={boxScore.season} t={t0} />
-				<div className="mx-auto flex-shrink-0 mb-2 mw-100">
+				<div
+					className="mx-auto flex-grow-1 mb-2 mw-100"
+					style={{ minWidth: 0 }}
+				>
 					{!live ? <HeadlineScore boxScore={boxScore} /> : null}
 					<DetailedScore
 						abbrev={abbrev}
