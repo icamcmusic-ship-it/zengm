@@ -336,7 +336,8 @@ import {
 	getEditedScheduleSpread,
 	getScheduleDayScale,
 } from "../core/season/scheduleDayScale.ts";
-import { validateEditedSchedule } from "../core/season/validateEditedSchedule.ts";
+import { validateEditedSchedule } from "../../common/validateEditedSchedule.ts";
+import { getEditedScheduleRules } from "../core/season/editedScheduleRules.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { agePlayerFace, faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
@@ -6804,12 +6805,7 @@ const setScheduleFromEditor = async ({
 	// Check the edited schedule before saving anything: the game loop assumes each team plays at most once a day and the
 	// All-Star Game and trade deadline are alone on their days
 	const scheduleBefore = await idb.cache.schedule.getAll();
-	const allStarGameSetting = g.get("allStarGame");
-	const allStarGameAllowed =
-		scheduleBefore.some((game) => game.homeTid === -1 && game.awayTid === -2) ||
-		(allStarGameSetting !== null &&
-			allStarGameSetting >= 0 &&
-			!(await idb.cache.allStars.get(g.get("season"))));
+	const rules = await getEditedScheduleRules();
 	const activeTids = new Set(
 		(await idb.cache.teams.getAll())
 			.filter((t) => !t.disabled)
@@ -6819,9 +6815,7 @@ const setScheduleFromEditor = async ({
 		schedule.filter((game) => game.type !== "placeholder"),
 		{
 			activeTids,
-			allStarGameAllowed,
-			// Another one would start the AFTER_TRADE_DEADLINE phase again (play.ts)
-			tradeDeadlineAllowed: g.get("phase") < PHASE.AFTER_TRADE_DEADLINE,
+			...rules,
 		},
 	);
 	if (errorMessage !== undefined) {

@@ -11,6 +11,7 @@ import { isCollege } from "../core/college/isCollege.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
+import { getEditedScheduleRules } from "../core/season/editedScheduleRules.ts";
 
 export const formatScheduleForEditor = (
 	scheduleRaw: ScheduleGameWithoutKey[],
@@ -134,6 +135,8 @@ export default defineView({
 				schedule,
 				teams: orderBy(teams, [(t) => t.seasonAttrs.abbrev]),
 				tradeDeadline: g.get("tradeDeadline"),
+				// For the CSV import's check, the same as the save's
+				...(await getEditedScheduleRules()),
 			};
 		}
 	},
