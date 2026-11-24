@@ -437,11 +437,23 @@ export const CONCEPTS: Concept[] = [
 ];
 
 // What a name says, in the order the name says it
-export const conceptsOf = (name: string) =>
-	CONCEPTS.map((c) => ({ c, at: name.search(c.re) }))
-		.filter((x) => x.at >= 0)
-		.sort((x, y) => x.at - y.at)
-		.map((x) => x.c);
+// (speed, same results: a name is read against every concept's pattern, and the archetype reading asks about the same few
+// hundred names over and over, so the answers are kept; a copy each time, so a caller can't change the kept one)
+const conceptsMemo = new Map<string, Concept[]>();
+export const conceptsOf = (name: string) => {
+	let out = conceptsMemo.get(name);
+	if (!out) {
+		out = CONCEPTS.map((c) => ({ c, at: name.search(c.re) }))
+			.filter((x) => x.at >= 0)
+			.sort((x, y) => x.at - y.at)
+			.map((x) => x.c);
+		if (conceptsMemo.size >= 20_000) {
+			conceptsMemo.clear();
+		}
+		conceptsMemo.set(name, out);
+	}
+	return out.slice();
+};
 
 // Hand-written descriptions for the 2K names that are nicknames rather than a string of concepts
 export const SPECIAL_DESCS: Record<string, string> = {
