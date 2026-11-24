@@ -160,9 +160,16 @@ export const genTeams = async (playersPerTeam = 15) => {
 	});
 };
 
-export const simulateGame = (seed: number) => {
+// settings: league settings for this game (e.g. simFixes, which the sim's charges come from)
+export const simulateGame = (
+	seed: number,
+	settings?: Record<string, unknown>,
+) => {
 	return withSeededRandom(seed, async () => {
 		await genTeams();
+		for (const [key, value] of Object.entries(settings ?? {})) {
+			g.setWithoutSavingToDB(key as any, value as any);
+		}
 		const teams = await loadTeams([0, 1], {});
 		const sim = new GameSim({
 			gid: seed,
@@ -255,8 +262,11 @@ export const playLive = (events: any[], boxScore: any) => {
 	return lines;
 };
 
-export const simulateLiveGame = async (seed: number) => {
-	const { result, events } = await simulateGame(seed);
+export const simulateLiveGame = async (
+	seed: number,
+	settings?: Record<string, unknown>,
+) => {
+	const { result, events } = await simulateGame(seed, settings);
 	const boxScore: any = makeLiveBoxScore(result, seed);
 	const lines = playLive(events, boxScore);
 	return { lines, boxScore, result };

@@ -38,12 +38,15 @@ import {
 	hasExpandedRatings,
 	isExpandedRatingKey,
 } from "../../../common/expandedRatings.ts";
-import { cutoffsAtOrBefore, getTieredBadgeCutoffs } from "./tieredBadges.ts";
+import {
+	cutoffsAtOrBefore,
+	getTieredBadgeCutoffs,
+	liveShownTiers,
+} from "./tieredBadges.ts";
 import { fuzzSubs, subRatingsOn } from "./subRatings.ts";
 import { isValidSubArray } from "../../../common/subRatings.ts";
 import {
 	MAX_TOKENS,
-	assignTiers,
 	badgeToken,
 	displayTiersOf,
 	entryForSeason,
@@ -582,18 +585,22 @@ const tieredTokensForRow = (pr: any, p: Player, row: any): string[] => {
 	const e = entryForSeason(p.badges2k, pr.season);
 	let t = e ? displayTiersOf(e) : undefined;
 	// (also his row from the draft, for the draft histories' "at the draft" column, against that season's cutoffs)
-	if (
-		!t &&
-		(((p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.STASHED) &&
-			pr === last(p.ratings)) ||
-			(p.ratings.length > 1 && pr === p.ratings[0]))
-	) {
+	const current =
+		(p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.STASHED) &&
+		pr === last(p.ratings);
+	if (!t && (current || (p.ratings.length > 1 && pr === p.ratings[0]))) {
 		const cutoffs =
 			p.tid === PLAYER.UNDRAFTED
 				? getTieredBadgeCutoffs()
 				: cutoffsAtOrBefore(pr.season);
 		if (cutoffs) {
-			t = assignTiers(row, row.ovr ?? 0, cutoffs).t;
+			// (with his traits as scouted, as on his player page, which reads this season's)
+			t = liveShownTiers(
+				p,
+				row,
+				current ? g.get("season") : pr.season,
+				cutoffs,
+			);
 		}
 	}
 	return t

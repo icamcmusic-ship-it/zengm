@@ -47,7 +47,9 @@ const BadgePill = ({ badge }: { badge: ParsedBadge }) => {
 						<p className="mb-2">{def.meaning}</p>
 						{effects ? (
 							<>
-								<div className="fw-bold">In games ({TIER_NAMES[tier]})</div>
+								<div className="fw-bold">
+									In games ({TIER_NAMES[tier]}, before league calibration)
+								</div>
 								<ul className="ps-3 mb-2">
 									{effects.map((e, i) => (
 										<li key={i}>
@@ -57,6 +59,9 @@ const BadgePill = ({ badge }: { badge: ParsedBadge }) => {
 								</ul>
 								<div className="text-body-secondary small mb-1">
 									Only when "2K Badge Effects in Sim" is on in League Extras.
+									Compared with a player without the badge: the sim re-centers
+									every event so league averages stay the same, so his edge over
+									an average player is a little smaller.
 								</div>
 							</>
 						) : (

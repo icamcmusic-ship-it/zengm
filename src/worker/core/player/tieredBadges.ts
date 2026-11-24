@@ -88,8 +88,16 @@ export const badgeRowOf = (
 };
 
 // The row as the user sees it (fuzzed ratings, traits as scouted), for the player page's progress
-const shownBadgeRow = (p: Player, pr: Record<string, any>, season: number) => {
-	const shown: Record<string, any> = { ...fuzzedSkillRow(pr as any, false, p) };
+const shownBadgeRow = (p: Player, pr: Record<string, any>, season: number) =>
+	withShownTraits(p, fuzzedSkillRow(pr as any, false, p), season);
+
+// A ratings row as shown plus his traits as scouted (the badge row of the player page and of the table pills)
+const withShownTraits = (
+	p: Player,
+	row: Record<string, any>,
+	season: number,
+) => {
+	const shown: Record<string, any> = { ...row };
 	const traits = traitsEnabled() ? getBadgeTraits(p as any, season) : undefined;
 	if (traits) {
 		for (const key of BADGE_TRAIT_KEYS) {
@@ -172,6 +180,21 @@ const saveCutoffs = async (cutoffs: TieredBadgeCutoffs) => {
 const prevTiers = (p: Player, season: number, display = false) => {
 	const e = entryForSeason(p.badges2k, season - 1);
 	return e ? (display ? displayTiersOf(e) : e.t) : undefined;
+};
+
+/**
+ * Live shown tiers for a row with no stored badges (a draft prospect, a stashed player, the draft histories' "at the draft" row): his
+ * ratings row as shown (player format's, fuzzed as the view asks) with his traits as scouted, the same reading as his player page's
+ * (tieredBadgesForPlayer), so the pills in tables and on his page agree.
+ */
+export const liveShownTiers = (
+	p: Player,
+	row: Record<string, any>,
+	season: number,
+	cutoffs: TieredBadgeCutoffs,
+) => {
+	const r = withShownTraits(p, row, season);
+	return assignTiers(r, r.ovr ?? 0, cutoffs, prevTiers(p, season, true)).t;
 };
 
 /**

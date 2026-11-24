@@ -8427,15 +8427,8 @@ class GameSim extends GameSimBase {
 			this.adv.turnover(p, this.advTransition, this.advPutbackTurnover(p));
 		}
 		this.noteDefensiveStop("tov", defender, p);
-		this.playByPlay.logEvent({
-			type: "offFoul",
-			t: this.o,
-			pid: p.id,
-			pidDefense: defender.id,
-			clock: this.t,
-			poss: this.eventPoss(),
-		});
-		this.doPf({ t: this.o, type: "offFoul", fouler: p });
+		// (doPf logs the offFoul event after recording the foul, so the play-by-play shows his foul count with this one)
+		this.doPf({ t: this.o, type: "offFoul", fouler: p, drawer: defender });
 		return "outOfBoundsOffense" as const;
 	}
 
@@ -8451,6 +8444,8 @@ class GameSim extends GameSimBase {
 					type: "pfNonShooting" | "offFoul";
 					shooter?: undefined;
 					fouler?: PlayerGameSim;
+					// offFoul: the defender who drew it
+					drawer?: PlayerGameSim;
 			  }
 			| {
 					t: TeamNum;
@@ -8463,14 +8458,23 @@ class GameSim extends GameSimBase {
 		const p = info.fouler ?? this.pickPlayer("fouling", t, 1);
 		this.recordStat(t, p, "pf");
 
-		// pfAndOne is handled in the shot event, offFoul by its own event
-		if (info.type !== "pfAndOne" && info.type !== "offFoul") {
+		// pfAndOne is handled in the shot event
+		if (info.type !== "pfAndOne") {
 			const baseLogInformation = {
 				t,
 				pid: p.id,
 				clock: this.t,
 			};
-			if (info.type === "pfNonShooting") {
+			if (info.type === "offFoul") {
+				if (info.drawer) {
+					this.playByPlay.logEvent({
+						...baseLogInformation,
+						type: "offFoul",
+						pidDefense: info.drawer.id,
+						poss: this.eventPoss(),
+					});
+				}
+			} else if (info.type === "pfNonShooting") {
 				this.playByPlay.logEvent({
 					...baseLogInformation,
 					type: info.type,
