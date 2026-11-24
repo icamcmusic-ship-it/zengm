@@ -28,7 +28,8 @@ import {
 	centerDevelopment,
 	egoTradeRequestMoodShift,
 	egoTradeRequestProbMult,
-	lockerRoomMood,
+	lockerRoomMoodFromSums,
+	lockerRoomWeight,
 	personalityTradeRequestProbMult,
 	workEthicZ,
 	AGING_CURVE_INFO,
@@ -328,18 +329,161 @@ export const getTraitDevelopment = (
 export const getEgoScore = (p: TraitPlayer) =>
 	scoreOne("ego", {}, getTraitSeeds(p).egoSeed);
 
-// The "Locker room" mood component for a player on (or considering) team tid, from his would-be teammates' egos. 0 when traits are off.
+type LockerRoomPlayer = TraitPlayer & {
+	pid: number;
+	value?: number;
+	valueNoPot?: number;
+};
+
+// His weight in the locker room: his current value (lockerRoomWeight)
+const lockerRoomValue = (p: LockerRoomPlayer) => p.valueNoPot ?? p.value ?? 0;
+
+type LockerRoomTeam = {
+	key: string;
+	// The roster it was worked out for: player objects, their stored ego seeds and values (compared by identity/value)
+	players: LockerRoomPlayer[];
+	egoSeeds: (number | undefined)[];
+	values: number[];
+	// Weight and ego z of each, and their sums
+	w: number[];
+	z: number[];
+	sumW: number;
+	sumWZ: number;
+};
+
+// perf: moodInfo runs for every player and team many times over (free agency: every free agent with every team, every day), and the
+// locker room is the same for all of them. Remembered per team, checked against the roster each time (same player objects in the same
+// order, as the cache hands them back until one is replaced or the roster changes, with the same stored ego seed and value) and the league,
+// season, phase and personality seed (which derive the seeds not stored yet), so it is never stale.
+let lockerRoomCache = new Map<number, LockerRoomTeam>();
+// (off: worked out every time, for the benchmark's comparison)
+let lockerRoomCacheOn = true;
+export const setLockerRoomCache = (on: boolean) => {
+	lockerRoomCacheOn = on;
+	lockerRoomCache = new Map();
+};
+
+const lockerRoomKey = () =>
+	`${Object.hasOwn(g, "lid") ? g.get("lid") : ""}|${g.get("season")}|${g.get("phase")}|${getPersonalityTraitSeed()}`;
+
+const buildLockerRoomTeam = (
+	key: string,
+	teammates: LockerRoomPlayer[],
+): LockerRoomTeam => {
+	const team: LockerRoomTeam = {
+		key,
+		players: teammates.slice(),
+		egoSeeds: teammates.map((p) => p.traits?.egoSeed),
+		values: teammates.map(lockerRoomValue),
+		w: [],
+		z: [],
+		sumW: 0,
+		sumWZ: 0,
+	};
+	for (const [i, p] of teammates.entries()) {
+		const w = lockerRoomWeight(team.values[i]!);
+		const z = traitZ(getEgoScore(p));
+		team.w.push(w);
+		team.z.push(z);
+		team.sumW += w;
+		team.sumWZ += w * z;
+	}
+	return team;
+};
+
+const getLockerRoomTeam = (
+	teammates: LockerRoomPlayer[],
+	tid: number | undefined,
+) => {
+	const key = lockerRoomKey();
+	if (tid === undefined || !lockerRoomCacheOn) {
+		return buildLockerRoomTeam(key, teammates);
+	}
+	const hit = lockerRoomCache.get(tid);
+	if (
+		hit &&
+		hit.key === key &&
+		hit.players.length === teammates.length &&
+		teammates.every(
+			(p, i) =>
+				hit.players[i] === p &&
+				hit.egoSeeds[i] === p.traits?.egoSeed &&
+				hit.values[i] === lockerRoomValue(p),
+		)
+	) {
+		return hit;
+	}
+	const team = buildLockerRoomTeam(key, teammates);
+	lockerRoomCache.set(tid, team);
+	return team;
+};
+
+/**
+ * The "Locker room" mood component for a player on (or considering) team tid, from his would-be teammates' egos, each weighted by his
+ * value share (lockerRoomWeight in common/playerTraits/ego.ts). teammates: the team's roster (he is left out if he is on it). Pass tid to
+ * use the per-team cache. 0 when traits are off.
+ */
 export const getLockerRoomMood = (
 	p: { pid: number },
-	teammates: TraitPlayer[],
+	teammates: LockerRoomPlayer[],
+	tid?: number,
 ) => {
 	if (!traitsEnabled()) {
 		return 0;
 	}
-	return lockerRoomMood(
-		teammates.filter((p2) => p2.pid !== p.pid).map((p2) => getEgoScore(p2)),
-	);
+	const team = getLockerRoomTeam(teammates, tid);
+	let n = team.players.length;
+	let sumW = team.sumW;
+	let sumWZ = team.sumWZ;
+	for (const [i, p2] of team.players.entries()) {
+		if (p2.pid === p.pid) {
+			n -= 1;
+			sumW -= team.w[i]!;
+			sumWZ -= team.w[i]! * team.z[i]!;
+		}
+	}
+	return lockerRoomMoodFromSums(n, sumW, sumWZ);
 };
+
+/**
+ * The teammates (not p himself) who pull his "Locker room" mood down the most, worst first, at most max of them: divas (ego below 50),
+ * by weight x ego z. Only those isVisible allows (the UI passes the user's trait visibility, so a hidden ego is never given away).
+ */
+export const getLockerRoomWorstEgos = <T extends LockerRoomPlayer>(
+	p: { pid: number },
+	teammates: T[],
+	tid: number | undefined,
+	isVisible: (p2: T) => boolean,
+	max = 2,
+): T[] => {
+	if (!traitsEnabled()) {
+		return [];
+	}
+	const team = getLockerRoomTeam(teammates, tid);
+	const candidates = team.players
+		.map((p2, i) => ({ p2: p2 as T, c: team.w[i]! * team.z[i]! }))
+		.filter(({ p2, c }) => c < 0 && p2.pid !== p.pid)
+		.sort((a, b) => a.c - b.c);
+	const output: T[] = [];
+	for (const { p2 } of candidates) {
+		if (output.length >= max) {
+			break;
+		}
+		if (isVisible(p2)) {
+			output.push(p2);
+		}
+	}
+	return output;
+};
+
+// Can the user see this player's ego exactly (God Mode, or a hidden trait known after three seasons)? For naming divas in the mood panel.
+export const isEgoKnownToUser = (
+	p: TraitPlayer & { pid: number },
+	scoutingLevel?: number,
+) =>
+	getPlayerTraitsForUI(p, { scoutingLevel })?.traits.find(
+		(t) => t.key === "ego",
+	)?.exact ?? false;
 
 // Loyalty, role acceptance and money vs winning, from the seed and age alone (no ratings part), cheap enough for mood, which runs often
 export const getPersonalityScores = (

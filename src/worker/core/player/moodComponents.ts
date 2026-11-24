@@ -379,6 +379,7 @@ const moodComponents = async (
 			components.lockerRoom = getLockerRoomMood(
 				p,
 				(await getTeamPlayers()) as any,
+				tid,
 			);
 		}
 	}
