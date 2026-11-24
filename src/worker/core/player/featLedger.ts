@@ -62,6 +62,19 @@ const saveLedger = (state: LedgerState) => {
 	});
 };
 
+// Retirement (player/retire.ts): his running streaks are over. Without this they would stay in the ledger for good (they only end
+// when he plays a game without them). Rows of the longest-streaks lists are kept.
+export const endRunningStreaks = (pid: number) => {
+	const s = Object.hasOwn(g, KEY)
+		? (g.get(KEY as any) as LedgerState | undefined)
+		: undefined;
+	if (!s || s.v !== 1 || !s.running[String(pid)]) {
+		return;
+	}
+	delete s.running[String(pid)];
+	saveLedger(s);
+};
+
 // Career highs as this league saw them (p.featHi). "Career high" is only claimed for a player whose every game was seen (tracking started
 // with his first game: w)
 type FeatHi = { w: boolean; pts: number; trb: number; ast: number };

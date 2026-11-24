@@ -18,7 +18,7 @@ import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import checkStatisticalFeat from "./checkStatisticalFeat.ts";
-import { getLedger, ledgerForView } from "./featLedger.ts";
+import { endRunningStreaks, getLedger, ledgerForView } from "./featLedger.ts";
 
 const line = (x: Partial<GameLine>): GameLine => ({
 	pts: 0,
@@ -241,6 +241,16 @@ describe("feat ledger in games", () => {
 			p2,
 		);
 		assert.strictEqual(getLedger().running["5"]!.p30!.n, 2);
+
+		// Retirement ends his running streaks; the longest-streaks rows stay
+		endRunningStreaks(5);
+		assert.isUndefined(getLedger().running["5"]);
+		assert.isTrue(getLedger().longest.p30!.some((r) => r.pid === 5));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		const saved = (await idb.cache.gameAttributes.get(
+			"featLedger" as any,
+		)) as any;
+		assert.isUndefined(saved.value.running["5"]);
 	});
 
 	test("off: nothing is stored", async () => {
