@@ -323,6 +323,16 @@ export const exPlayerCoaches = async (): Promise<CoachWithoutKey[]> => {
 				start: role,
 				startSeason: contractStartSeason(),
 				exPlayer: p.pid,
+				...(p.faceAging?.ba === undefined && p.retiredYear !== undefined
+					? {
+							exPlayerFace: {
+								ry: p.retiredYear,
+								...(p.faceAging?.gs !== undefined
+									? { gs: p.faceAging.gs }
+									: {}),
+							},
+						}
+					: {}),
 			},
 		};
 		for (const key of ["pace", "threes", "defense", "rotation"] as const) {

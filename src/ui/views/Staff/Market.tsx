@@ -340,6 +340,7 @@ export const Market = ({
 									colors={colors}
 									age={c.age}
 									lazy
+									player={c.faceAsPlayer}
 									seed={c.cid}
 									width={36}
 								/>

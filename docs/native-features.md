@@ -684,7 +684,10 @@ and at 40 px.
   on), _Age Retired Players_ (`faceAgingRetired`, off: on, every living retired player is aged each preseason too, which reads
   them all from the database; only those whose face or snapshots changed are written back) and _Style Events_ (`faceAgingStyleEvents`, on: see below).
 - **When:** once a season at the preseason (after development), and to catch faces up when a league is created and when a draft
-  class is generated (so prospects start young). Real-player image URLs are untouched; only generated faces age.
+  class is generated (so prospects start young). Players made at other times are aged when they're made too (`ageNewPlayerFaces`):
+  random free agents topping up rosters (`player/genRandomFreeAgent.ts`), college recruiting classes and walk-ons
+  (`college/offseason.ts`) and uploaded draft classes (`draft/handleUploadedDraftClass.ts`), so none looks his generated age
+  until the next preseason. Real-player image URLs are untouched; only generated faces age.
 - **How:** a pure function of the face as generated (his "adult" look), a per-player seed (pid) and his age; per-year draws are
   keyed by (pid, season). `src/common/faceAging.ts`, seeds in `src/common/faceSeed.ts`.
   1. _Hairline:_ about 40% of players keep a full head of hair. The rest have a tendency and an onset age (26-35); each year after
@@ -708,9 +711,23 @@ and at 40 px.
   isn't locked: a new player's face as the form made it, or one from _Randomize_ (made for his age), gets a clean aging state
   (`faceAging.b` from the face, no snapshots; for a randomized face any old snapshots go with the old face) and is aged to his
   age when saved (`freshFaceAging`, `faceAgingOnCustomize` in `worker/util/faceAging.ts`). Editing its hair, beard, lines,
-  fullness, headband or glasses before saving locks it as above.
+  fullness, headband or glasses before saving locks it as above. Only the aging fields count as an edit
+  (`extractAgingFields` compared), so a round trip through the external facesjs editor that reorders the JSON, drops team colours
+  or changes a part aging never touches (eyes, nose, ...) doesn't lock the face; and the fork's extras (`face.fork`: beard and dyed
+  hair colours) and `fork-*` part ids the editor drops come back from the face that was sent (`mergeEditorFace`, used by
+  `CustomizePlayer/Face.tsx`).
+- **Reset to generated face** (Customize Player, under _Allow aging_): puts his generated aging fields back on the face
+  (`applyAgingFields(face, base)`), clears the lock and, on save, ages him back to now; his face history is kept (this season's
+  snapshot is recorded again, complete relative to the snapshots before it). The generated fields are `faceAging.b` until an edit
+  replaces it; from then they're kept as `faceAging.g` (`generatedBase`). A face edited before `g` was kept has no button.
+  Editing the face again after pressing it counts as an edit.
 - **Relatives:** a new son or brother takes after his relative's face as generated (`faceAging.b` applied), not his aged one, so
-  he doesn't inherit a father's grey hair, lines or hairline (`player/addRelatives.ts`).
+  he doesn't inherit a father's grey hair, lines or hairline (`player/addRelatives.ts`). He gets a clean aging state for that face
+  and a **family seed** (`faceAging.gs`: his relative's own family seed, else the relative's pid), so hair loss and greying run in
+  the family (`familyFaceGenes`): 70% of the time his hair-loss tendency, widow's peak and onset (within two years) are the
+  family's, and independently 70% of the time his greying start (within two years) and span; everything else is his own.
+  Measured over 2,000 father/son pairs: a much better match on "loses a lot of hair" than strangers (`common/faceAging.test.ts`).
+  Faces without `gs` (every face from before, and unrelated players) keep exactly their genes.
 
 ### Style and life events
 
@@ -756,6 +773,13 @@ season). Never for an edited face. Measured over 3,000 seeds:
   (`h`, the first one complete): hair id and colour, hair behind the head, facial hair id and colour, the three line slots,
   smile line size, fatness, head shave, accessory and glasses. Typically a few hundred bytes per player. `faceForSeason`
   rebuilds any past season.
+- **Retired players' snapshots are sparse** (with _Age Retired Players_, they grey and fill out a little every year): a snapshot
+  for any visible change (a style, line, headband or glasses change, or fatness by 0.05 since the last snapshot), and the slow
+  greying only the first season after he retired and every 5th season after (`RETIRED_SNAPSHOT_EVERY`). Each snapshot is the
+  difference from what the snapshots so far add up to (`sparse` in `ageFaceForSeason`), so `faceForSeason` stays exact at
+  snapshot seasons; in between it shows the last snapshot (hair colour a few years less grey, fatness within 0.05, everything else
+  the same). His current face and "Now" are unaffected. About half the snapshots of a long retirement at _strong_ speed
+  (`worker/util/faceAging.test.ts`).
 - **No faces from before the draft:** draft prospects are still aged (they look young on their own pages), but no snapshot is
   stored while he's a prospect (`tid` undrafted); his first snapshot is complete. Snapshots stored by older versions for
   prospect seasons are ignored in display.
@@ -786,7 +810,18 @@ season). Never for an edited face. Measured over 3,000 seeds:
   they keep the current approach: drawn aged from their age when shown (same function, seeded by their id), nothing stored. The
   per-age draws use the age alone, so a coach looks the same all season and consistently older the next. With _Style Events_
   they get hairstyle and beard events (10% a season) and glasses with age; no headbands or goggles (they wear suits). With the
-  extra off they grey as before.
+  extra off they grey as before. The drawn face is memoized per face, age, settings and league salt (`StaffFace`).
+  - _Ex-player coaches_ (Coaching Staff Depth): stored with his generated face, and, for coaches made since
+    (`coach.tree.exPlayerFace`: the season he retired and his family seed), aged on as the player: his pid, birth year, retirement
+    and family genes (`StaffFace` `player`, from `formatCoach`'s `faceAsPlayer`), so the coach is the retired player a few years
+    on, in a suit. Older ex-player coaches keep staff aging. The coach page shows _Then and Now_: his prime face as a player, in
+    that season's jersey (`primeFace`), next to the coach today.
+  - _Scouts_ (Scouting Department page): generated as staff at their age (`generateFace({ staff: true, age })`), from the scout's
+    seed with Math.random swapped for the scout's own generator, once per scout (memoized by seed, age, league salt, New Face
+    Styles and gender: `seededFace` in `core/scoutingReports/index.ts`), not on every view update.
+  - Long staff lists (Coach Market tags, Front Offices) draw portraits lazily (`CoachPortrait` / `StaffFace` `lazy`).
+- **Roster face strip:** the roster page shows the roster's faces in table order above the table, drawn lazily, in that season's
+  jersey; for a past season's roster each face is as he looked that season (`faceAtSeason`, worker `views/roster.ts`).
 - **Beard and dyed hair colour:** facesjs draws everything in one hair colour. A face with `face.fork.beard` draws its facial hair from a
   derived part (`<id>~fb`, registered once per style, never listed) whose hair colour placeholder is facesjs' per-feature
   `$[faceShave]`, filled with the beard colour; dyed hair (`face.fork.hair`) does the same for the hair and hairBg (`~fd`). The stored face

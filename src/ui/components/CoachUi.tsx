@@ -13,7 +13,7 @@ import { COACH_RATING_NAMES } from "../../common/staff.ts";
 import type { CoachRatings } from "../../common/types.ts";
 import { helpers } from "../util/helpers.ts";
 import { HelpPopover } from "./HelpPopover.tsx";
-import { StaffFace } from "./StaffFace.tsx";
+import { StaffFace, type ExPlayerFace } from "./StaffFace.tsx";
 
 // The "What does this mean?" popover for a concept
 export const TermHelp = ({ term }: { term: CoachTerm }) => (
@@ -41,6 +41,7 @@ export const CoachPortrait = ({
 	colors,
 	face,
 	lazy,
+	player,
 	seed,
 	width,
 }: {
@@ -49,6 +50,7 @@ export const CoachPortrait = ({
 	face?: FaceConfig;
 	// Draw the face only once it scrolls into view (long lists)
 	lazy?: boolean;
+	player?: ExPlayerFace;
 	seed?: number | string;
 	width: number;
 }) => (
@@ -62,6 +64,7 @@ export const CoachPortrait = ({
 				colors={colors}
 				age={age}
 				lazy={lazy}
+				player={player}
 				seed={seed}
 			/>
 		) : null}

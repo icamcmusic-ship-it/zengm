@@ -39,6 +39,7 @@ import { RosterStashSection } from "../../components/DraftStash.tsx";
 import { useIsCollege } from "../../util/collegeMode.ts";
 import { classYearAbbrev } from "../../../common/college/constants.ts";
 import { TeamSeasonExportButton } from "../../components/TeamSeasonExport.tsx";
+import { PlayerPicture } from "../../components/PlayerPicture.tsx";
 
 const handleRelease = async (
 	p: View<"roster">["players"][number],
@@ -117,9 +118,46 @@ const handleRelease = async (
 	}
 };
 
+// The roster's faces in table order, as they looked that season (Face Aging), in that season's jersey. Drawn lazily: only the
+// ones scrolled into view
+const FaceStrip = ({
+	faceStrip,
+}: {
+	faceStrip: View<"roster">["faceStrip"];
+}) => {
+	if (faceStrip.players.length === 0) {
+		return null;
+	}
+	return (
+		<div
+			className="d-flex gap-2 mb-2 overflow-x-auto"
+			data-testid="roster-face-strip"
+		>
+			{faceStrip.players.map((p) => (
+				<a
+					key={p.pid}
+					href={helpers.leagueUrl(["player", p.pid])}
+					className="flex-shrink-0"
+					title={p.name}
+					style={{ width: 40, height: 60 }}
+				>
+					<PlayerPicture
+						colors={faceStrip.colors}
+						face={p.face}
+						imgURL={p.imgURL}
+						jersey={faceStrip.jersey}
+						lazy
+					/>
+				</a>
+			))}
+		</div>
+	);
+};
+
 const Roster = ({
 	coachDecisions,
 	editable,
+	faceStrip,
 	gmInfo,
 	luxuryTaxAmount,
 	maxRosterSize,
@@ -552,6 +590,8 @@ const Roster = ({
 					The AI will handle roster management in spectator mode.
 				</p>
 			) : null}
+
+			<FaceStrip faceStrip={faceStrip} />
 
 			<div className="mb-2">
 				<TeamSeasonExportButton

@@ -4,6 +4,8 @@ import { finances, player, season, team } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
 import type { Player, TeamSeasonAttr } from "../../common/types.ts";
+import { faceAtSeason } from "../util/faceAging.ts";
+import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
 import { defineView } from "../util/defineView.ts";
 import { addMood } from "./freeAgents.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
@@ -304,6 +306,7 @@ export default defineView({
 			let payroll: number | undefined;
 			let luxuryTaxAmount: number | undefined;
 			let minPayrollAmount: number | undefined;
+			let rawPlayers: Player[] = [];
 
 			if (inputs.season === g.get("season")) {
 				// Show players currently on the roster
@@ -311,6 +314,7 @@ export default defineView({
 					"playersByTid",
 					inputs.tid,
 				);
+				rawPlayers = playersAll;
 				payroll = await team.getPayroll(inputs.tid);
 				luxuryTaxAmount = finances.getLuxuryTaxAmount(
 					payroll,
@@ -375,6 +379,7 @@ export default defineView({
 					activeSeason: inputs.season,
 					statsTid: inputs.tid,
 				});
+				rawPlayers = playersAll;
 				players = await player.formatAll(playersAll, {
 					attrs,
 					ratings,
@@ -502,9 +507,37 @@ export default defineView({
 				}
 			}
 
+			// Face strip: the roster's faces in the order of the table, as they looked that season (Face Aging snapshots) in that
+			// season's jersey
+			const rawByPid = new Map(rawPlayers.map((p) => [p.pid, p]));
+			const stripTeam = await getTeamInfoBySeason(inputs.tid, inputs.season);
+			const current = inputs.season === g.get("season");
+			const faceStrip = {
+				colors: stripTeam?.colors,
+				jersey: stripTeam?.jersey,
+				players: players.flatMap((p) => {
+					const raw = rawByPid.get(p.pid);
+					if (!raw) {
+						return [];
+					}
+					return [
+						{
+							pid: raw.pid,
+							name: p.name as string,
+							imgURL: raw.imgURL,
+							face:
+								raw.imgURL || current || !raw.faceAging
+									? raw.face
+									: faceAtSeason(raw, inputs.season),
+						},
+					];
+				}),
+			};
+
 			return {
 				coachDecisions,
 				editable,
+				faceStrip,
 				gmInfo,
 				stash,
 				maxRosterSize: g.get("maxRosterSize"),

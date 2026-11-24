@@ -164,6 +164,7 @@ export const CompareModal = ({
 												face={a.face}
 												colors={colors}
 												age={a.age}
+												player={a.faceAsPlayer}
 												seed={a.cid}
 												width={40}
 											/>
@@ -182,6 +183,7 @@ export const CompareModal = ({
 											face={b.face}
 											colors={colors}
 											age={b.age}
+											player={b.faceAsPlayer}
 											seed={b.cid}
 											width={40}
 										/>

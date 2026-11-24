@@ -700,6 +700,7 @@ const Staff = ({
 											face={hc.face}
 											colors={colors}
 											age={hc.age}
+											player={hc.faceAsPlayer}
 											seed={hc.cid}
 											width={window.mobile ? 72 : 96}
 										/>
@@ -1067,6 +1068,7 @@ const Staff = ({
 													face={c.face}
 													colors={colors}
 													age={c.age}
+													player={c.faceAsPlayer}
 													seed={c.cid}
 													width={56}
 												/>

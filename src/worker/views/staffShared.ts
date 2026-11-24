@@ -222,6 +222,16 @@ export const formatCoach = (c: Coach, roleOverride?: CoachRole) => {
 		age: g.get("season") - c.born.year,
 		born: c.born,
 		face: c.face,
+		// An ex-player coach's face ages on as the player's (StaffFace)
+		faceAsPlayer:
+			c.tree?.exPlayerFace && c.tree.exPlayer !== undefined
+				? {
+						pid: c.tree.exPlayer,
+						born: c.born.year,
+						retiredYear: c.tree.exPlayerFace.ry,
+						familySeed: c.tree.exPlayerFace.gs,
+					}
+				: undefined,
 		tid: c.tid,
 		abbrev: teamAbbrev(c.tid),
 		role: c.role,
