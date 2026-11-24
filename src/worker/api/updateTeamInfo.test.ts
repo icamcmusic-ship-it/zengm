@@ -21,6 +21,7 @@ test("a team can't be disabled during the regular season (worker side, like the 
 
 	const newTeams = (await idb.cache.teams.getAll()).map((t) => ({
 		...t,
+		jersey: t.jersey ?? "",
 		disabled: t.tid === 0,
 	}));
 

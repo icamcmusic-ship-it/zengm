@@ -6776,12 +6776,15 @@ const setScheduleFromEditor = async ({
 			.filter((t) => !t.disabled)
 			.map((t) => t.tid),
 	);
-	const errorMessage = validateEditedSchedule(schedule, {
-		activeTids,
-		allStarGameAllowed,
-		// Another one would start the AFTER_TRADE_DEADLINE phase again (play.ts)
-		tradeDeadlineAllowed: g.get("phase") < PHASE.AFTER_TRADE_DEADLINE,
-	});
+	const errorMessage = validateEditedSchedule(
+		schedule.filter((game) => game.type !== "placeholder"),
+		{
+			activeTids,
+			allStarGameAllowed,
+			// Another one would start the AFTER_TRADE_DEADLINE phase again (play.ts)
+			tradeDeadlineAllowed: g.get("phase") < PHASE.AFTER_TRADE_DEADLINE,
+		},
+	);
 	if (errorMessage !== undefined) {
 		throw new Error(errorMessage);
 	}
