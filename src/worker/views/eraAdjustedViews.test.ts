@@ -141,7 +141,7 @@ describe("era-adjusted views", () => {
 			out.categories.find((c: any) => c.stat === stat);
 		// His regular season pro rows, each adjusted by its season's factor
 		const seasonRows = async (pid: number) => {
-			const p = (await idb.getCopy.players({ pid }, "noCopyCache"))!;
+			const p = (await idb.merged.players.get(pid))!;
 			return p.stats.filter(
 				(row) => !row.playoffs && !isPreDraftStatsRow(row, p.draft.year),
 			);

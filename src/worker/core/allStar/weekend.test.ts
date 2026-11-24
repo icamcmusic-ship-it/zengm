@@ -12,6 +12,8 @@ import prepareGame, { simContests } from "./prepareGame.ts";
 import { castVotes, selectFromVotes, slotsFor } from "./vote.ts";
 import { rankRuns, runCourse } from "./skills.ts";
 import { courtOf, traitsOf } from "./weekend.ts";
+import type { Player } from "../../../common/types.ts";
+import type { PlayerRatings } from "../../../common/types.basketball.ts";
 import {
 	allStarFacts,
 	allStarWeekendStory,
@@ -357,9 +359,9 @@ describe("All-Star weekend", () => {
 	});
 	test("contest traits follow the Player Traits setting and fill in missing seeds", () => {
 		resetG();
-		const p = player.generate(0, 25, g.get("season") - 4, true, 50);
+		const p = player.generate(0, 25, g.get("season") - 4, true, 50) as Player;
 		p.pid = 12;
-		const r = p.ratings.at(-1)!;
+		const r = p.ratings.at(-1) as PlayerRatings;
 
 		// Setting off: no traits, even with stored seeds
 		g.setWithoutSavingToDB("playerTraits", false);
