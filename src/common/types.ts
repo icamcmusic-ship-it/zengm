@@ -1712,6 +1712,8 @@ export type PlayerInjury = {
 	gamesRemaining: number;
 	type: string;
 	score?: number;
+	// Games his team has played while he was out with this injury (counted in game/writePlayerStats.ts; the hardship rule)
+	gamesMissed?: number;
 };
 
 // Only for legacy league files and the migration from before contracts were tracked

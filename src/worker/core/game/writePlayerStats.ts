@@ -24,6 +24,7 @@ import {
 	maybeSameBodyPart,
 } from "../player/injuryDepth.ts";
 import { recordCoachDecisionGame } from "../staff/coachDecisions.ts";
+import { gamesMissed } from "../freeAgents/hardship.ts";
 
 export const P_FATIGUE_DAILY_REDUCTION = 20;
 
@@ -93,6 +94,8 @@ const doInjury = async (
 			p2.injury.type = p.injury.type;
 		}
 	}
+	// Team games missed with this injury so far (counted in writePlayerStats, from his next game)
+	p2.injury.gamesMissed = 0;
 
 	if (neutralGames !== undefined) {
 		await recordInjury({
@@ -433,6 +436,18 @@ const writePlayerStats = async (
 				if (addNewStatsRow) {
 					player.addStatsRow(p2, g.get("season"), playoffs, nit);
 					psLatest = (nit ? p2.nitStats! : p2.stats).at(-1);
+				}
+
+				// Out injured for this game (his injury from before it): one more team game missed with it (the hardship rule)
+				if (
+					!allStarGame &&
+					p.injured &&
+					p2.injury.gamesRemaining > 0 &&
+					p2.injury.type !== "Healthy" &&
+					!p.stat.gp
+				) {
+					p2.injury.gamesMissed = gamesMissed(p2) + 1;
+					playersToSave.add(p2);
 				}
 
 				// Only need to write stats if player got minutes, except for minAvailable in BBGM
