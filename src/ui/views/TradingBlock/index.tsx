@@ -29,6 +29,10 @@ import { SafeHtml } from "../../components/SafeHtml.tsx";
 import { SaveTrade } from "../../components/SaveTrade.tsx";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { ActionButton } from "../../components/ActionButton.tsx";
+import {
+	FillsNeedToggle,
+	withFillsNeed,
+} from "../../components/Archetype/FillsNeed.tsx";
 
 // Players who asked to be traded are flagged, since AI teams know he wants out and offer less
 const withTradeRequestBadge = <T extends { value: ReactNode }>(
@@ -116,16 +120,19 @@ const OfferPlayers = ({
 			return {
 				key: p.pid,
 				data: [
-					wrappedPlayerNameLabels({
-						pid: p.pid,
-						injury: p.injury,
-						jerseyNumber: p.jerseyNumber,
-						skills: p.ratings.skills,
-						badges: p.ratings.badges,
-						firstName: p.firstName,
-						firstNameShort: p.firstNameShort,
-						lastName: p.lastName,
-					}),
+					withFillsNeed(
+						wrappedPlayerNameLabels({
+							pid: p.pid,
+							injury: p.injury,
+							jerseyNumber: p.jerseyNumber,
+							skills: p.ratings.skills,
+							badges: p.ratings.badges,
+							firstName: p.firstName,
+							firstNameShort: p.firstNameShort,
+							lastName: p.lastName,
+						}),
+						p.fillsNeeds,
+					),
 					p.ratings.pos,
 					p.age,
 					!challengeNoRatings ? p.ratings.ovr : null,
@@ -671,6 +678,13 @@ const TradingBlock = ({
 
 	const tradeOffersSwitch = useTradeOffersSwitch();
 
+	// Archetypes: only the offers with a player who fills a roster need
+	const [onlyNeeds, setOnlyNeeds] = useState(false);
+	const fillsNeed = (offer: OfferType) =>
+		offer.players.some((p) => p.fillsNeeds);
+	const numNeeds = state.offers.filter(fillsNeed).length;
+	const shownOffers = onlyNeeds ? state.offers.filter(fillsNeed) : state.offers;
+
 	if (spectator) {
 		return <p>You're not allowed to make trades in spectator mode.</p>;
 	}
@@ -877,7 +891,15 @@ const TradingBlock = ({
 			) : null}
 
 			{state.offers.length > 0 ? (
-				<div className="mt-3 mt-md-0">{tradeOffersSwitch.toggle}</div>
+				<div className="mt-3 mt-md-0">
+					{tradeOffersSwitch.toggle}
+					<FillsNeedToggle
+						className="mt-2"
+						count={numNeeds}
+						on={onlyNeeds}
+						onChange={setOnlyNeeds}
+					/>
+				</div>
 			) : null}
 
 			{tradeOffersSwitch.value === "table" ? (
@@ -944,14 +966,16 @@ const TradingBlock = ({
 							tradeInfo.dpids,
 						);
 					}}
-					handleRemove={handleRemove}
-					offers={state.offers}
+					handleRemove={(i) => {
+						handleRemove(state.offers.indexOf(shownOffers[i]!));
+					}}
+					offers={shownOffers}
 					salaryCap={salaryCap}
 					salaryCapType={salaryCapType}
 				/>
 			) : (
 				<>
-					{state.offers.map((offer, i) => {
+					{shownOffers.map((offer, i) => {
 						const picks = orderBy(offer.picks, ["round", "pick", "season"]);
 
 						return (
@@ -962,7 +986,7 @@ const TradingBlock = ({
 									handleNegotiate(offer.tid, offer.pids, offer.dpids);
 								}}
 								onRemove={() => {
-									handleRemove(i);
+									handleRemove(state.offers.indexOf(offer));
 								}}
 								salaryCap={salaryCap}
 								salaryCapType={salaryCapType}

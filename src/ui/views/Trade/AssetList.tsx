@@ -11,6 +11,11 @@ import { wrappedPlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
 import type { HandleToggle } from "./index.tsx";
 import { range } from "../../../common/utils.ts";
 import { SafeHtml } from "../../components/SafeHtml.tsx";
+import { useState } from "react";
+import {
+	FillsNeedToggle,
+	withFillsNeed,
+} from "../../components/Archetype/FillsNeed.tsx";
 
 type HandleBulk = (
 	type: "check" | "clear",
@@ -34,17 +39,20 @@ const genPlayerRows = (
 	challengeNoRatings: boolean,
 ) => {
 	return players.map((p) => {
-		const nameLabels = wrappedPlayerNameLabels({
-			pid: p.pid,
-			injury: p.injury,
-			jerseyNumber: p.jerseyNumber,
-			skills: p.ratings.skills,
-			badges: p.ratings.badges,
-			defaultWatch: p.watch,
-			firstName: p.firstName,
-			firstNameShort: p.firstNameShort,
-			lastName: p.lastName,
-		});
+		const nameLabels = withFillsNeed(
+			wrappedPlayerNameLabels({
+				pid: p.pid,
+				injury: p.injury,
+				jerseyNumber: p.jerseyNumber,
+				skills: p.ratings.skills,
+				badges: p.ratings.badges,
+				defaultWatch: p.watch,
+				firstName: p.firstName,
+				firstNameShort: p.firstNameShort,
+				lastName: p.lastName,
+			}),
+			p.fillsNeeds,
+		);
 		return {
 			key: p.pid,
 			data: [
@@ -197,8 +205,12 @@ const AssetList = ({
 		},
 	);
 
+	// Archetypes: only his players who fill a roster need (and the ones already in the trade)
+	const [onlyNeeds, setOnlyNeeds] = useState(false);
+	const numNeeds = roster.filter((p) => p.fillsNeeds).length;
+
 	const playerRows = genPlayerRows(
-		roster,
+		onlyNeeds ? roster.filter((p) => p.fillsNeeds || p.included) : roster,
 		handleToggle,
 		userOrOther,
 		stats,
@@ -238,6 +250,12 @@ const AssetList = ({
 						</Dropdown.Item>
 					</Dropdown.Menu>
 				</Dropdown>
+				<FillsNeedToggle
+					className="ms-2 mb-2 align-top"
+					count={numNeeds}
+					on={onlyNeeds}
+					onChange={setOnlyNeeds}
+				/>
 				<DataTable
 					className="datatable-negative-margin-top"
 					cols={playerCols}

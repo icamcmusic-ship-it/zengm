@@ -70,6 +70,32 @@ export const ArchetypeRosterPanel = ({
 							The rotation covers playmaking, spacing, defense and size.
 						</p>
 					)}
+					{data.lineup.starters.length + data.lineup.bench.length > 0 ? (
+						<div className="mb-2" data-testid="archetype-lineup-hints">
+							<strong>Lineup fit</strong>{" "}
+							<span className="text-body-secondary small">
+								(by roster order: the first five start, the next four are the
+								bench unit)
+							</span>
+							{(
+								[
+									["Starters", data.lineup.starters],
+									["Bench unit", data.lineup.bench],
+								] as const
+							).map(([title, hints]) =>
+								hints.length > 0 ? (
+									<div key={title}>
+										{title}:
+										<ul className="text-warning mb-0 ps-3">
+											{hints.map((h) => (
+												<li key={h.kind}>{h.text}</li>
+											))}
+										</ul>
+									</div>
+								) : null,
+							)}
+						</div>
+					) : null}
 					<div className="table-responsive">
 						<table className="table table-sm mb-0 w-auto">
 							<tbody>

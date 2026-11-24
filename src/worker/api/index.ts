@@ -355,6 +355,7 @@ import type {
 } from "../../common/staffDepth/types.ts";
 import * as draftStash from "../core/draftStash/index.ts";
 import { coachDecisionsOn } from "../core/staff/rolePromise.ts";
+import { getNeedsFinder } from "../core/player/archetypeNeeds.ts";
 import type {
 	CoachDelegation,
 	LineupPreset,
@@ -2721,6 +2722,8 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 		football: ["gp", "keyStats", "av"],
 		hockey: ["gp", "keyStats", "ops", "dps", "ps"],
 	} as const);
+	// Archetypes: the user's roster needs each player offered fills ("Fills a need")
+	const findNeeds = await getNeedsFinder();
 
 	// Take the pids and dpids in each offer and get the info needed to display the offer
 	return Promise.all(
@@ -2763,6 +2766,7 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 				playersAll = playersAll.filter(
 					(p) => pids.includes(p.pid) && !isUntradable(p).untradable,
 				);
+				const rawByPid = new Map(playersAll.map((p) => [p.pid, p]));
 				return addFirstNameShort(
 					await player.formatAll(playersAll, {
 						attrs: [
@@ -2783,7 +2787,14 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 						showRookies: true,
 						fuzz: true,
 					}),
-				);
+				).map((p) => {
+					const raw = rawByPid.get(p.pid);
+					const fillsNeeds = findNeeds && raw ? findNeeds(raw) : [];
+					return {
+						...p,
+						fillsNeeds: fillsNeeds.length > 0 ? fillsNeeds : undefined,
+					};
+				});
 			};
 
 			const payroll = await team.getPayroll(tid);

@@ -12,6 +12,11 @@ import {
 	type Rated,
 } from "../../common/archetypes/index.ts";
 import { last } from "../../common/utils.ts";
+import {
+	lineupHints,
+	type LineupHints,
+	type LineupPlayer,
+} from "../../common/archetypeFit.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import {
@@ -85,6 +90,8 @@ export type ArchetypeRoster = {
 	enabled: boolean;
 	composition: Composition;
 	players: ArchetypeRosterPlayer[];
+	// Hints for the starting five and the bench unit, by roster order (common/archetypeFit.ts)
+	lineup: LineupHints;
 };
 
 const EMPTY_COMPOSITION: Composition = {
@@ -101,15 +108,28 @@ export const archetypeRoster = async ({
 	tid: number;
 }): Promise<ArchetypeRoster> => {
 	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
-		return { enabled: false, composition: EMPTY_COMPOSITION, players: [] };
+		return {
+			enabled: false,
+			composition: EMPTY_COMPOSITION,
+			players: [],
+			lineup: { starters: [], bench: [] },
+		};
 	}
 	const norms = await getLeagueNorms();
 	const raw = await idb.cache.players.indexGetAll("playersByTid", tid);
 	const players: ArchetypeRosterPlayer[] = [];
 	const rated: Rated[] = [];
+	const inOrder: (LineupPlayer & { rosterOrder: number })[] = [];
 	for (const p of raw) {
 		const found = archetypeFor(p, norms);
 		const row = last(p.ratings) as any;
+		inOrder.push({
+			pid: p.pid,
+			name: `${p.firstName} ${p.lastName}`,
+			pos: row.pos,
+			archetypeId: found?.view.id,
+			rosterOrder: p.rosterOrder,
+		});
 		if (!found) {
 			continue;
 		}
@@ -134,7 +154,13 @@ export const archetypeRoster = async ({
 		});
 	}
 	players.sort((a, b) => b.ovr - a.ovr || a.pid - b.pid);
-	return { enabled: true, composition: compositionOf(rated), players };
+	inOrder.sort((a, b) => a.rosterOrder - b.rosterOrder || a.pid - b.pid);
+	return {
+		enabled: true,
+		composition: compositionOf(rated),
+		players,
+		lineup: lineupHints(inOrder),
+	};
 };
 
 export type ArchetypeTopPlayer = {
