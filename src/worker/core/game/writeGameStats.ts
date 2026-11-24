@@ -370,6 +370,13 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 			if (p0.injury.playingThrough) {
 				p.injury.playingThrough = true;
 			}
+			// Injury outlook: the estimate shown for him, and the game-time decision that let him play
+			if (p0.injury.spread !== undefined) {
+				p.injury.spread = p0.injury.spread;
+			}
+			if (p0.injury.gtd) {
+				p.injury.gtd = p0.injury.gtd;
+			}
 			if (p0.injuryAtStart) {
 				p.injuryAtStart = p0.injuryAtStart;
 			}

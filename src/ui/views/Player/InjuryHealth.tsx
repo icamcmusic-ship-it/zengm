@@ -1,13 +1,97 @@
 import { useState } from "react";
 import { toWorker } from "../../util/toWorker.ts";
 import type { HealthInfo } from "../../../worker/core/player/getHealthInfo.ts";
+import type { PlayerInjury } from "../../../common/types.ts";
+import {
+	gameTimeStatus,
+	injuryEstimateRange,
+	injuryOutlookText,
+} from "../../../common/injuryOutlook.ts";
+import { useLocal } from "../../util/local.ts";
+
+// (the same as player/injuryRecovery.ts's TREATMENT and TREATMENT_CHOICE_GAMES, kept here so the UI doesn't load worker code)
+const TREATMENT = { surgery: { duration: 1.15 }, rehab: { duration: 0.85 } };
+const TREATMENT_CHOICE_GAMES = 3;
 
 // Injury history grouped by body part, plus the injuryDepth setting's status for this player (minutes restriction, re-injury risk,
 // injury prone, load management)
-const InjuryHealth = ({ info, pid }: { info: HealthInfo; pid: number }) => {
+const InjuryHealth = ({
+	info,
+	injury,
+	pid,
+}: {
+	info: HealthInfo & { returnDay?: number };
+	injury: PlayerInjury;
+	pid: number;
+}) => {
 	const [loadManagement, setLoadManagement] = useState(info.loadManagement);
+	const { godMode } = useLocal(["godMode"]);
 
 	const status = [];
+
+	// Injury outlook (common/injuryOutlook.ts): the medical staff's estimate, when he should be back, games missed so far, treatment
+	if (injury.gamesRemaining > 0) {
+		const estimated =
+			gameTimeStatus(injury) !== undefined ||
+			injuryEstimateRange(injury) !== undefined;
+		status.push(
+			<li key="outlook">
+				<b>Outlook:</b> {injury.type}, {estimated ? "" : "out "}
+				{injuryOutlookText(injury)}
+				{godMode && estimated
+					? ` (God Mode: ${injuryOutlookText(injury, true)})`
+					: null}
+				{info.returnDay !== undefined
+					? `, expected back Day ${info.returnDay}`
+					: null}
+				{info.gamesMissed ? `, has missed ${info.gamesMissed} so far` : null}
+			</li>,
+		);
+		if (info.treatment) {
+			status.push(
+				<li key="treatment">
+					<b>Treatment:</b> {info.treatment === "surgery" ? "surgery" : "rehab"}
+					{info.canChooseTreatment ? (
+						<>
+							{" "}
+							(not decided yet: surgery keeps him out about{" "}
+							{Math.round(
+								100 *
+									(TREATMENT.surgery.duration / TREATMENT.rehab.duration - 1),
+							)}
+							% longer than rehab, but costs less athleticism and gives a
+							shorter re-injury window; surgery unless you choose within{" "}
+							{TREATMENT_CHOICE_GAMES} games)
+							<span className="ms-2">
+								<button
+									className="btn btn-sm btn-outline-secondary me-1"
+									onClick={async () => {
+										await toWorker("main", "setInjuryTreatment", {
+											pid,
+											treatment: "surgery",
+										});
+									}}
+								>
+									Surgery
+								</button>
+								<button
+									className="btn btn-sm btn-outline-secondary"
+									onClick={async () => {
+										await toWorker("main", "setInjuryTreatment", {
+											pid,
+											treatment: "rehab",
+										});
+									}}
+								>
+									Rehab
+								</button>
+							</span>
+						</>
+					) : null}
+				</li>,
+			);
+		}
+	}
 	if (info.enabled) {
 		if (info.restrictGames > 0) {
 			status.push(
@@ -71,7 +155,9 @@ const InjuryHealth = ({ info, pid }: { info: HealthInfo; pid: number }) => {
 						<tr>
 							<th>Body part</th>
 							<th title="Number of injuries">#</th>
-							<th title="Games missed">Games</th>
+							<th title="Games missed (the recorded length for injuries before the count was kept)">
+								Games
+							</th>
 							<th>Last</th>
 						</tr>
 					</thead>

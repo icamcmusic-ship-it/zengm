@@ -8,6 +8,11 @@ import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { wrappedCheckmarkOrCross } from "../components/CheckmarkOrCross.tsx";
 import { useLocal } from "../util/local.ts";
+import {
+	gameTimeStatus,
+	injuryEstimateRange,
+	injuryOutlookText,
+} from "../../common/injuryOutlook.ts";
 
 const Injuries = ({ injuries, season, stats, team }: View<"injuries">) => {
 	useTitleBar({
@@ -36,9 +41,12 @@ const Injuries = ({ injuries, season, stats, team }: View<"injuries">) => {
 
 	const {
 		challengeNoRatings,
+		godMode,
 		season: currentSeason,
 		userTid,
 	} = useLocal(["challengeNoRatings", "godMode", "season", "userTid"]);
+
+	const current = season === "current";
 
 	const cols = getCols([
 		"Name",
@@ -50,7 +58,8 @@ const Injuries = ({ injuries, season, stats, team }: View<"injuries">) => {
 		...stats.map((stat) => `stat:${stat}`),
 		"TypeInjury",
 		"Games",
-		"Playing Through?",
+		"Games Missed",
+		...(current ? ["Expected Return", "Playing Through?"] : []),
 		"Ovr Drop",
 		"Pot Drop",
 	]);
@@ -95,9 +104,59 @@ const Injuries = ({ injuries, season, stats, team }: View<"injuries">) => {
 				showRatings ? p.ratings.ovr : null,
 				showRatings ? p.ratings.pot : null,
 				...stats.map((stat) => helpers.roundStat(p.stats[stat], stat)),
-				p.type,
-				p.games,
-				wrappedCheckmarkOrCross({ hideCross: true, success: p.playingThrough }),
+				{
+					value: (
+						<>
+							{p.type}
+							{p.treatment || p.aggravated ? (
+								<span className="text-body-secondary">
+									{" "}
+									(
+									{[
+										p.treatment,
+										p.aggravated
+											? `re-aggravated${p.aggravated > 1 ? ` ${p.aggravated}x` : ""}`
+											: undefined,
+									]
+										.filter(Boolean)
+										.join(", ")}
+									)
+								</span>
+							) : null}
+						</>
+					),
+					searchValue: p.type,
+					sortValue: p.type,
+				},
+				// Current injuries: the medical staff's outlook (common/injuryOutlook.ts), exact in God Mode. Past ones: the recorded length
+				p.outlook
+					? {
+							value: (
+								<>
+									{injuryOutlookText(p.outlook)}
+									{godMode &&
+									(gameTimeStatus(p.outlook) ||
+										injuryEstimateRange(p.outlook)) ? (
+										<span className="text-body-secondary"> ({p.games})</span>
+									) : null}
+								</>
+							),
+							sortValue: p.games,
+						}
+					: p.games,
+				p.missed,
+				...(current
+					? [
+							{
+								value: p.returnDay === undefined ? null : `Day ${p.returnDay}`,
+								sortValue: p.returnDay ?? Infinity,
+							},
+							wrappedCheckmarkOrCross({
+								hideCross: true,
+								success: p.playingThrough,
+							}),
+						]
+					: []),
 				showRatings ? p.ovrDrop : null,
 				showRatings ? p.potDrop : null,
 			],
@@ -116,11 +175,19 @@ const Injuries = ({ injuries, season, stats, team }: View<"injuries">) => {
 				Hall of Fame are <span className="text-danger">highlighted in red</span>
 				.
 			</p>
+			{current ? (
+				<p>
+					Current injuries show the medical staff's estimate: a range for longer
+					injuries (narrower with a bigger health budget), and questionable
+					(plays half the time), doubtful (a quarter) or out for players a few
+					games away. <i>Missed</i> is games his team has played without him.
+				</p>
+			) : null}
 
 			{rows.length > 0 ? (
 				<DataTable
 					cols={cols}
-					defaultSort={[cols.length - 3, "asc"]}
+					defaultSort={[cols.findIndex((col) => col.title === "Games"), "desc"]}
 					defaultStickyCols={window.mobile ? 0 : 1}
 					name="Injuries"
 					pagination

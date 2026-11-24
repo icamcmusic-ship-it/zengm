@@ -15,6 +15,12 @@ import {
 	isInjuryDepthEnabled,
 	onHealed as injuryDepthOnHealed,
 } from "../player/injuryDepth.ts";
+import {
+	applyTreatmentReturnWindow,
+	finishInjuryRecord,
+	settleTreatment,
+} from "../player/injuryRecovery.ts";
+import { careerAgingOn } from "../player/careerAging.ts";
 
 // After the season has already started, free agents ask for a short contract. Very cheap players ask for the shortest possible contract, everyone else asks for an extra season.
 export const getInSeasonContractExp = (
@@ -204,12 +210,19 @@ const decreaseDemands = async () => {
 			if (injuryDepthEnabled) {
 				injuryDepthDailyTick(p);
 			}
+			// Surgery or rehab: no team to choose for him any more, so his current one stands
+			if (p.injury.treatmentOpen && p.injury.treatment) {
+				await settleTreatment(p, p.injury.treatment, careerAgingOn());
+			}
 			if (p.injury.gamesRemaining > 0) {
 				p.injury.gamesRemaining -= 1;
 			} else {
 				if (injuryDepthEnabled && p.injury.type !== "Healthy") {
 					injuryDepthOnHealed(p);
+					applyTreatmentReturnWindow(p, p.injury.treatment);
 				}
+				// Games he actually missed, on the injury's record
+				finishInjuryRecord(p);
 				p.injury = {
 					type: "Healthy",
 					gamesRemaining: 0,

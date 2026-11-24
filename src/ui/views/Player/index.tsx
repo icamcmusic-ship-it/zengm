@@ -441,7 +441,11 @@ const Player2 = ({
 				<div className="col-md-6 col-lg-4">
 					<HideableSection title="Injuries">
 						<Injuries injuries={player.injuries} showRatings={showRatings} />
-						<InjuryHealth info={player.healthInfo} pid={player.pid} />
+						<InjuryHealth
+							info={player.healthInfo}
+							injury={player.injury}
+							pid={player.pid}
+						/>
 					</HideableSection>
 				</div>
 				<div className="col-md-6 col-lg-8">

@@ -1,11 +1,32 @@
 import { DataTable } from "../../components/DataTable/index.tsx";
 import { getCols } from "../../../common/getCols.ts";
 
-const cols = getCols(["Year", "Type", "Games", "Ovr Drop", "Pot Drop"], {
-	Type: {
-		width: "100%",
+const cols = getCols(
+	["Year", "Type", "Games", "Games Missed", "Ovr Drop", "Pot Drop"],
+	{
+		Type: {
+			width: "100%",
+		},
 	},
-});
+);
+
+// Treatment, re-aggravations and setbacks of an injury on record
+const notes = (injury: {
+	aggravated?: number;
+	treatment?: string;
+	setbacks?: number;
+}) =>
+	[
+		injury.treatment,
+		injury.aggravated
+			? `re-aggravated${injury.aggravated > 1 ? ` ${injury.aggravated}x` : ""}`
+			: undefined,
+		injury.setbacks
+			? `${injury.setbacks} ${injury.setbacks === 1 ? "setback" : "setbacks"}`
+			: undefined,
+	]
+		.filter(Boolean)
+		.join(", ");
 
 const Injuries = ({
 	injuries,
@@ -17,6 +38,10 @@ const Injuries = ({
 		type: string;
 		ovrDrop?: number;
 		potDrop?: number;
+		missed?: number;
+		aggravated?: number;
+		treatment?: string;
+		setbacks?: number;
 	}[];
 	showRatings: boolean;
 }) => {
@@ -26,15 +51,20 @@ const Injuries = ({
 
 	const totals: {
 		games: number;
+		missed: number | undefined;
 		ovrDrop: number | undefined;
 		potDrop: number | undefined;
 	} = {
 		games: 0,
+		missed: undefined,
 		ovrDrop: undefined,
 		potDrop: undefined,
 	};
 	for (const injury of injuries) {
 		totals.games += injury.games;
+		if (injury.missed !== undefined) {
+			totals.missed = (totals.missed ?? 0) + injury.missed;
+		}
 		if (injury.ovrDrop !== undefined) {
 			if (totals.ovrDrop === undefined) {
 				totals.ovrDrop = 0;
@@ -64,8 +94,23 @@ const Injuries = ({
 							sortValue: i,
 							value: injury.season,
 						},
-						injury.type,
+						{
+							value: (
+								<>
+									{injury.type}
+									{notes(injury) ? (
+										<span className="text-body-secondary">
+											{" "}
+											({notes(injury)})
+										</span>
+									) : null}
+								</>
+							),
+							searchValue: injury.type,
+							sortValue: injury.type,
+						},
 						injury.games,
+						injury.missed,
 						showRatings ? injury.ovrDrop : null,
 						showRatings ? injury.potDrop : null,
 					],
@@ -76,6 +121,7 @@ const Injuries = ({
 					"Total",
 					null,
 					totals.games,
+					totals.missed,
 					showRatings ? totals.ovrDrop : null,
 					showRatings ? totals.potDrop : null,
 				],

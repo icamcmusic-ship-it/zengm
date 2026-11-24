@@ -1,5 +1,4 @@
-import { careerAgingOn, injuryAthleticLoss } from "../player/careerAging.ts";
-import { syncLatestSubs, tiltRowSubKeys } from "../player/subRatings.ts";
+import { careerAgingOn } from "../player/careerAging.ts";
 import { isNitGame } from "../college/postseason.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { finances, player } from "../index.ts";
@@ -25,6 +24,26 @@ import {
 } from "../player/injuryDepth.ts";
 import { recordCoachDecisionGame } from "../staff/coachDecisions.ts";
 import { gamesMissed } from "../freeAgents/hardship.ts";
+import {
+	aiTreatment,
+	applyCareerInjuryLoss,
+	currentInjuryRecord,
+	finishInjuryRecord,
+	getExpectedReturnDayFinder,
+	isTreatmentInjury,
+	returnDayText,
+	scaleForTreatment,
+	setPotAfterInjury,
+	TREATMENT,
+	TREATMENT_CHOICE_GAMES,
+	userDecidesTreatment,
+} from "../player/injuryRecovery.ts";
+import {
+	formatInjuryRange,
+	injuryEstimateRange,
+	injurySpread,
+} from "../../../common/injuryOutlook.ts";
+import type { InjuryTreatment } from "../../../common/types.ts";
 
 export const P_FATIGUE_DAILY_REDUCTION = 20;
 
@@ -40,34 +59,7 @@ const DERIVED_MAX_STATS = bySport({
 
 const gameOrWeek = bySport({ default: "game", football: "week" });
 
-// After an injury's ratings loss: pot goes down by what ovr lost, not by a new (noisy) estimate, so it can't go up and stays the same
-// when ovr didn't drop
-type PotRatings = {
-	ovr: number;
-	pot: number;
-	ovrs?: Record<string, number>;
-	pots?: Record<string, number>;
-};
-export const setPotAfterInjury = (
-	prevRatings: PotRatings,
-	newRatings: PotRatings,
-) => {
-	newRatings.pot =
-		prevRatings.pot - Math.max(0, prevRatings.ovr - newRatings.ovr);
-	if (newRatings.pots && prevRatings.pots) {
-		for (const pos of Object.keys(newRatings.pots)) {
-			const prevPot = prevRatings.pots[pos];
-			if (prevPot !== undefined) {
-				newRatings.pots[pos] =
-					prevPot -
-					Math.max(
-						0,
-						(prevRatings.ovrs?.[pos] ?? 0) - (newRatings.ovrs?.[pos] ?? 0),
-					);
-			}
-		}
-	}
-};
+export { setPotAfterInjury };
 
 const doInjury = async (
 	p: any,
@@ -79,6 +71,11 @@ const doInjury = async (
 	const healthLevel = await finances.getLevelLastThree("health", {
 		tid: p2.tid,
 	});
+
+	// His injury before this one (he was playing through it, if any)
+	const prevInjury = p2.injury;
+	const prevRecord = currentInjuryRecord(p2);
+	const prevMissed = gamesMissed(p2);
 
 	// Front Office Budget: Medical's faster recovery for older players, and the duration at an average budget for the season review
 	let neutralGames: number | undefined;
@@ -123,8 +120,51 @@ const doInjury = async (
 			p2.injury.type = p.injury.type;
 		}
 	}
-	// Team games missed with this injury so far (counted in writePlayerStats, from his next game)
-	p2.injury.gamesMissed = 0;
+	const reaggravated = reaggravateExtraDays !== undefined;
+	if (reaggravated) {
+		// The same injury goes on: its count of games missed, its outlook and its treatment carry over
+		p2.injury.gamesMissed = prevMissed;
+		for (const key of ["spread", "treatment", "treatmentOpen"] as const) {
+			if (prevInjury[key] !== undefined) {
+				(p2.injury as any)[key] = prevInjury[key];
+			}
+		}
+	} else {
+		// A new injury replaces the one he was playing through: that one is over
+		if (prevInjury.gamesRemaining > 0) {
+			finishInjuryRecord({ injury: prevInjury, injuries: p2.injuries ?? [] });
+		}
+		// Team games missed with this injury so far (counted in writePlayerStats, from his next game)
+		p2.injury.gamesMissed = 0;
+	}
+
+	// Injury outlook (Injury Depth): the medical staff's estimate, and surgery or rehab for a major injury
+	let treatment: InjuryTreatment | undefined;
+	if (!reaggravated && isInjuryDepthEnabled() && p2.tid >= 0) {
+		p2.injury.spread = injurySpread(healthLevel);
+		if (isTreatmentInjury(p2.injury.type, p2.injury.gamesRemaining)) {
+			if (userDecidesTreatment(p2.tid, local.autoPlayUntil !== undefined)) {
+				// Surgery unless he chooses otherwise (player page) before the choice runs out
+				treatment = "surgery";
+				p2.injury.treatmentOpen = true;
+			} else {
+				const t = await idb.cache.teams.get(p2.tid);
+				treatment = aiTreatment(t?.strategy);
+			}
+			const before = p2.injury.gamesRemaining;
+			p2.injury.gamesRemaining = scaleForTreatment(
+				before,
+				undefined,
+				treatment,
+			);
+			p2.injury.treatment = treatment;
+			if (neutralGames !== undefined) {
+				neutralGames = Math.round(
+					(neutralGames * p2.injury.gamesRemaining) / before,
+				);
+			}
+		}
+	}
 
 	if (neutralGames !== undefined) {
 		await recordInjury({
@@ -147,6 +187,7 @@ const doInjury = async (
 		type: p2.injury.type,
 		gamesRemaining: p2.injury.gamesRemaining,
 		newThisGame: true,
+		...(p2.injury.spread !== undefined ? { spread: p2.injury.spread } : {}),
 	};
 
 	if (p2.injury.gamesRemaining <= 1) {
@@ -157,20 +198,52 @@ const doInjury = async (
 		// Not sure why this is needed, but some users had problems
 		p2.injuries = [];
 	}
-	p2.injuries.push({
-		season: g.get("season"),
-		games: p2.injury.gamesRemaining,
-		type: p2.injury.type,
-	});
+	if (reaggravated && prevRecord) {
+		// The same injury, longer: its record is extended, not a new one
+		prevRecord.games += reaggravateExtraDays!;
+		prevRecord.aggravated = (prevRecord.aggravated ?? 0) + 1;
+	} else {
+		p2.injuries.push({
+			season: g.get("season"),
+			games: p2.injury.gamesRemaining,
+			type: p2.injury.type,
+			...(treatment ? { treatment } : {}),
+		});
+	}
 	let stopPlay = false;
 	// Games he'll miss: the countdown also runs at the end of today, so one less than gamesRemaining (the injured list and the event
 	// log both say this)
 	const gamesOut = p2.injury.gamesRemaining - 1;
 	const gamesOutText = `${gamesOut} ${gamesOut === 1 ? gameOrWeek : `${gameOrWeek}s`}`;
-	const injuryText = `${p.pos} <a href="${helpers.leagueUrl([
+	// Injury outlook: the medical staff's estimate instead of the exact games ("day-to-day", "2-4 weeks"), and when he should be back
+	let outText =
+		gamesOut > 0 ? `out for ${gamesOutText}` : `back next ${gameOrWeek}`;
+	let listText = gamesOutText;
+	if (p2.injury.spread !== undefined && gamesOut > 0) {
+		const outlook = { ...p2.injury, newThisGame: true };
+		const range = injuryEstimateRange(outlook);
+		if (range) {
+			listText = formatInjuryRange(range.lo, range.hi);
+			outText = `out an estimated ${listText}`;
+			const returnDay = returnDayText(
+				(await getExpectedReturnDayFinder())(p2.tid, p2.injury.gamesRemaining),
+			);
+			if (returnDay !== undefined) {
+				outText += `, expected back ${returnDay}`;
+			}
+		} else {
+			listText = "day-to-day";
+			outText = "day-to-day";
+		}
+		if (p2.injury.treatment && !reaggravated) {
+			outText += p2.injury.treatment === "surgery" ? ", surgery" : ", rehab";
+		}
+	}
+	const playerLinkHtml = `<a href="${helpers.leagueUrl([
 		"player",
 		p2.pid,
-	])}">${p2.firstName} ${p2.lastName}</a> - ${p2.injury.type}, ${gamesOutText}`;
+	])}">${p2.firstName} ${p2.lastName}</a>`;
+	const injuryText = `${p.pos} ${playerLinkHtml} - ${p2.injury.type}, ${listText}`;
 
 	if (g.get("userTid") === p2.tid) {
 		if (p2.injury.gamesRemaining > 1) {
@@ -248,9 +321,7 @@ const doInjury = async (
 				reaggravateExtraDays === undefined
 					? "was injured"
 					: `reaggravated ${helpers.pronoun(g.get("gender"), "his")} injury`
-			}! (${p2.injury.type}, ${
-				gamesOut > 0 ? `out for ${gamesOutText}` : `back next ${gameOrWeek}`
-			})`,
+			}! (${p2.injury.type}, ${outText})`,
 			showNotification: false,
 			pids: [p2.pid],
 			tids: [p2.tid],
@@ -258,6 +329,22 @@ const doInjury = async (
 		},
 		conditions,
 	);
+
+	// The user's call: surgery or rehab (player page)
+	if (p2.injury.treatmentOpen && !reaggravated) {
+		logEvent(
+			{
+				type: "injured",
+				text: `${playerLinkHtml} (${p2.injury.type}): surgery or rehab? Surgery keeps him out longer but costs less athleticism and re-injury risk; rehab gets him back sooner. Choose on his player page within ${TREATMENT_CHOICE_GAMES} ${gameOrWeek}s, or it's surgery.`,
+				showNotification: true,
+				persistent: true,
+				saveToDb: false,
+				pids: [p2.pid],
+				tids: [p2.tid],
+			},
+			conditions,
+		);
+	}
 
 	// Some chance of a loss of athleticism from serious injuries
 	// 100 game injury: 67% chance of losing between 0 and 10 of spd, jmp, endu
@@ -273,59 +360,37 @@ const doInjury = async (
 
 	// A reaggravated injury already took its ratings loss when it first happened (its type and length are copied from it),
 	// so it doesn't take another one
-	const reaggravated = reaggravateExtraDays !== undefined;
-
-	// Career Aging: a bounded, seeded loss from major injuries (and a smaller one from other long ones) instead
-	const careerLoss =
-		careerAgingOn() && !reaggravated
-			? injuryAthleticLoss({
-					pid: p2.pid,
-					type: p2.injury.type,
-					games: p2.injury.gamesRemaining,
-					age: g.get("season") - p2.born.year,
-					season: g.get("season"),
-					n: p2.injuries.length,
-					seed: g.get("playerTraitsSeed") ?? 0,
-				})
-			: undefined;
-
-	if (
-		careerLoss
-			? !last(p2.ratings).locked
-			: !reaggravated &&
-				gamesRemainingNormalized > 25 &&
-				!careerAgingOn() &&
-				Math.random() < gamesRemainingNormalized / 82 &&
-				!last(p2.ratings).locked
+	if (careerAgingOn()) {
+		// Career Aging: a bounded, seeded loss from major injuries (and a smaller one from other long ones) instead, scaled by the
+		// treatment. While the user can still choose the treatment, it's taken when that is settled (player/injuryRecovery.ts)
+		if (!reaggravated && !p2.injury.treatmentOpen) {
+			ratingsLoss = await applyCareerInjuryLoss(
+				p2,
+				p2.injuries.length - 1,
+				treatment ? TREATMENT[treatment].loss : 1,
+			);
+		}
+	} else if (
+		!reaggravated &&
+		gamesRemainingNormalized > 25 &&
+		Math.random() < gamesRemainingNormalized / 82 &&
+		!last(p2.ratings).locked
 	) {
 		ratingsLoss = true;
 
 		player.addRatingsRow(p2, undefined, p2.injuries.length - 1);
 		const newRatings = last(p2.ratings);
 
-		if (careerLoss) {
-			for (const [rating, loss] of Object.entries(careerLoss.loss)) {
-				(newRatings as any)[rating] = player.limitRating(
-					(newRatings as any)[rating] - loss,
-				);
-			}
-			// Matching subs: the bases' subs follow (in develop below), and max vertical goes more than standing reach
-			if (careerLoss.jmpTilt > 0) {
-				syncLatestSubs(p2 as any);
-				tiltRowSubKeys(p2 as any, newRatings, ["stj"], careerLoss.jmpTilt);
-			}
-		} else {
-			const ratingsToNerf = bySport({
-				baseball: ["spd", "endu", "hpw", "thr", "ppw"],
-				basketball: ["spd", "endu", "jmp"],
-				football: ["spd", "endu", "thp"],
-				hockey: ["spd", "endu"],
-			});
-			for (const rating of ratingsToNerf) {
-				(newRatings as any)[rating] = player.limitRating(
-					(newRatings as any)[rating] - randInt(1, 20),
-				);
-			}
+		const ratingsToNerf = bySport({
+			baseball: ["spd", "endu", "hpw", "thr", "ppw"],
+			basketball: ["spd", "endu", "jmp"],
+			football: ["spd", "endu", "thp"],
+			hockey: ["spd", "endu"],
+		});
+		for (const rating of ratingsToNerf) {
+			(newRatings as any)[rating] = player.limitRating(
+				(newRatings as any)[rating] - randInt(1, 20),
+			);
 		}
 
 		// Update ovr and pot

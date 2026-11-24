@@ -39,6 +39,7 @@ import * as college from "../college/index.ts";
 import { pruneSeasonLineups } from "../player/advStatsStorage.ts";
 import { addStashSeasons } from "../draftStash/index.ts";
 import { runHallOfFame } from "../hallOfFame/index.ts";
+import { finishInjuryRecord } from "../player/injuryRecovery.ts";
 
 const INFLATION_GAME_ATTRIBUTES = [
 	"salaryCap",
@@ -500,6 +501,8 @@ const newPhaseBeforeDraft = async (
 				const numGames = defaultGameAttributes.numGames[0].value;
 				// This doesn't use g.get("numGames") because that would unfairly make injuries last longer if it was lower - if anything injury duration should be modulated based on that, but oh well
 				if (p.injury.gamesRemaining <= numGames) {
+					// Games he actually missed, on the injury's record
+					finishInjuryRecord(p);
 					p.injury = {
 						type: "Healthy",
 						gamesRemaining: 0,

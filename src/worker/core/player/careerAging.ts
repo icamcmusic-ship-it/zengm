@@ -12,6 +12,8 @@ import {
 	type TraitDevelopment,
 } from "../../../common/playerTraits/development.ts";
 import { g } from "../../util/index.ts";
+import { defaultInjuries } from "../../util/defaultInjuries.ts";
+import { injuryBodyPart } from "../../../common/injuryBodyPart.ts";
 import {
 	getContractExp,
 	getCurrentContract,
@@ -350,6 +352,38 @@ export const MAJOR_INJURIES: Record<string, number> = {
 	"Fractured Neck": 0.8,
 };
 
+// Custom injury names (a league's own injury list) aren't in MAJOR_INJURIES: one is major when it's a tear, rupture, fracture,
+// dislocation or herniation of the knee, ankle, foot, leg or back, or any injury there of 60+ games, with a severity by its length
+const MAJOR_BODY_PARTS = new Set(["Knee", "Ankle", "Foot", "Leg", "Back"]);
+const MAJOR_KEYWORDS =
+	/\b(torn|tear|ruptured?|rupture|fractured?|fracture|broken|dislocated?|herniated?|acl|achilles)\b/i;
+let stockNames: Set<string> | undefined;
+
+/**
+ * Severity of a major injury (MAJOR_INJURIES), undefined if it isn't one. Stock names come from the table; other names (custom injury
+ * lists) by keywords, body part and length.
+ */
+export const majorInjurySeverity = (
+	type: string,
+	games: number,
+): number | undefined => {
+	const sev = MAJOR_INJURIES[type];
+	if (sev !== undefined) {
+		return sev;
+	}
+	stockNames ??= new Set(defaultInjuries.map((row) => row.name));
+	if (stockNames.has(type)) {
+		return;
+	}
+	if (!MAJOR_BODY_PARTS.has(injuryBodyPart(type))) {
+		return;
+	}
+	if ((MAJOR_KEYWORDS.test(type) && games >= 20) || games >= 60) {
+		return clamp(games / 100, 0.5, 1);
+	}
+	return;
+};
+
 // Chance of "never the same" at severity 1, 30 or older (younger players: 2/3 of it)
 export const NEVER_THE_SAME = 0.07;
 
@@ -383,7 +417,8 @@ export const injuryAthleticLoss = ({
 	n: number;
 	seed: number | string;
 }): InjuryLoss | undefined => {
-	let sev = MAJOR_INJURIES[type];
+	const major = majorInjurySeverity(type, games);
+	let sev = major;
 	if (sev === undefined) {
 		if (games <= 25) {
 			return;
@@ -398,7 +433,7 @@ export const injuryAthleticLoss = ({
 		endu: sev * ageF * rng.uniform(1, 7),
 	};
 	const neverSame =
-		MAJOR_INJURIES[type] !== undefined &&
+		major !== undefined &&
 		rng.random() < NEVER_THE_SAME * sev * (age >= 30 ? 1 : 2 / 3);
 	if (neverSame) {
 		loss.spd! += rng.uniform(4, 8);
@@ -506,7 +541,8 @@ export const careerRetireFactors = ({
 
 	// Injuries: a major one this season, or still a long way from healthy
 	const injured = (p.injuries ?? []).some(
-		(x) => x.season === season && MAJOR_INJURIES[x.type] !== undefined,
+		(x) =>
+			x.season === season && majorInjurySeverity(x.type, x.games) !== undefined,
 	);
 	if (injured && age >= 32) {
 		mult *= 1.4;

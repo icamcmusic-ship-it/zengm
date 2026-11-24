@@ -27,6 +27,19 @@ import {
 	onHealed as injuryDepthOnHealed,
 	setSimDay as injuryDepthSetSimDay,
 } from "../player/injuryDepth.ts";
+import {
+	applyInjuryCourse,
+	applyTreatmentReturnWindow,
+	finishInjuryRecord,
+	settleTreatment,
+	TREATMENT_CHOICE_GAMES,
+	userDecidesTreatment,
+} from "../player/injuryRecovery.ts";
+import { careerAgingOn } from "../player/careerAging.ts";
+import {
+	formatInjuryRange,
+	injuryEstimateRange,
+} from "../../../common/injuryOutlook.ts";
 import updatePlayoffSeries from "./updatePlayoffSeries.ts";
 import writeGameStats from "./writeGameStats.ts";
 import { recordRivalryGames } from "../../util/rivalryStories.ts";
@@ -286,6 +299,37 @@ const play = async (
 				if (dayTick && p.injury.gamesRemaining > 0) {
 					p.injury.gamesRemaining -= 1;
 					changed = true;
+
+					// Injury outlook: now and then a setback or an early return (seeded, the same size either way)
+					if (p.injury.gamesRemaining > 0) {
+						const delta = applyInjuryCourse(p, g.get("season"));
+						if (delta > 0) {
+							const range = injuryEstimateRange(p.injury);
+							logEvent(
+								{
+									type: "injured",
+									text: `${last(p.ratings).pos} <a href="${helpers.leagueUrl(["player", p.pid])}">${p.firstName} ${p.lastName}</a> suffered a setback in ${helpers.pronoun(g.get("gender"), "his")} recovery (${p.injury.type}${range ? `, now out an estimated ${formatInjuryRange(range.lo, range.hi)}` : ""}).`,
+									showNotification: false,
+									pids: [p.pid],
+									tids: [p.tid],
+									score: p.injury.score ?? 0,
+								},
+								conditions,
+							);
+						}
+					}
+				}
+
+				// Surgery or rehab: the user's choice runs out (surgery) after a few games, or the game decides for him
+				if (
+					p.injury.treatmentOpen &&
+					p.injury.treatment &&
+					((p.injury.gamesMissed ?? 0) >= TREATMENT_CHOICE_GAMES ||
+						p.injury.gamesRemaining <= 0 ||
+						!userDecidesTreatment(p.tid, local.autoPlayUntil !== undefined))
+				) {
+					await settleTreatment(p, p.injury.treatment, careerAgingOn());
+					changed = true;
 				}
 
 				if (
@@ -308,9 +352,13 @@ const play = async (
 				// Is it already over?
 				if (p.injury.type !== "Healthy" && p.injury.gamesRemaining <= 0) {
 					const score = p.injury.score;
+					const treatment = p.injury.treatment;
 					if (injuryDepthEnabled) {
 						injuryDepthOnHealed(p);
+						applyTreatmentReturnWindow(p, treatment);
 					}
+					// Games he actually missed, on the injury's record
+					finishInjuryRecord(p);
 					p.injury = {
 						type: "Healthy",
 						gamesRemaining: 0,

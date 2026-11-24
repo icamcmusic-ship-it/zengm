@@ -5,6 +5,7 @@ import type {
 	Contract,
 	ContractTerms,
 	FlatContractInfo,
+	InjuryTreatment,
 	PlayerStatAttr,
 } from "../../common/types.ts";
 import {
@@ -306,6 +307,11 @@ import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
 import updateSubRatingsForLeague from "../core/player/updateSubRatingsForLeague.ts";
 import { ensureSubs } from "../core/player/subRatings.ts";
+import {
+	finishInjuryRecord,
+	settleTreatment,
+} from "../core/player/injuryRecovery.ts";
+import { careerAgingOn } from "../core/player/careerAging.ts";
 import {
 	ensureTieredBadges,
 	refreshTieredBadgesFor,
@@ -686,6 +692,9 @@ const clearInjuries = async (pids: number[] | "all") => {
 	).filter((p) => p.injury.gamesRemaining > 0);
 
 	for (const p of players) {
+		// Games he actually missed, on the injury's record
+		finishInjuryRecord(p);
+
 		// Adjust injuries log
 		const lastInjuriesEntry = p.injuries.at(-1);
 		if (lastInjuriesEntry?.type === p.injury.type) {
@@ -5437,6 +5446,29 @@ const setLoadManagement = async ({
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 };
 
+// Surgery or rehab for a major injury on the user's team, while the choice is open (player/injuryRecovery.ts)
+const setInjuryTreatment = async ({
+	pid,
+	treatment,
+}: {
+	pid: number;
+	treatment: InjuryTreatment;
+}) => {
+	const p = await idb.cache.players.get(pid);
+	if (
+		!p ||
+		!p.injury.treatmentOpen ||
+		!g.get("userTids").includes(p.tid) ||
+		(treatment !== "surgery" && treatment !== "rehab")
+	) {
+		return;
+	}
+	await settleTreatment(p, treatment, careerAgingOn());
+	await idb.cache.players.put(p);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	await recomputeLocalUITeamOvrs();
+};
+
 const updatePlayThroughInjuries = async ({
 	tid,
 	value,
@@ -6471,6 +6503,10 @@ const upsertCustomizedPlayer = async (
 			if (editedInjuryType) {
 				// Adjust prevInjuriesEntry, since that old injury no longer applies and it healed prematurely
 				if (lastInjuriesEntry) {
+					finishInjuryRecord({
+						injury: prevPlayer.injury,
+						injuries: p.injuries,
+					});
 					lastInjuriesEntry.games -= prevPlayer.injury.gamesRemaining;
 					if (lastInjuriesEntry.games <= 0) {
 						// Injury was edited before any days were simmed
@@ -6478,10 +6514,18 @@ const upsertCustomizedPlayer = async (
 					}
 				}
 
+				// A new injury: its own count of games missed, and no outlook or treatment carried over from the old one (an injury
+				// made by hand shows its exact games)
+				delete p.injury.spread;
+				delete p.injury.treatment;
+				delete p.injury.treatmentOpen;
+				delete p.injury.score;
 				if (p.injury.type === "Healthy") {
+					delete p.injury.gamesMissed;
 					// Injury Depth: healed outright, so no minutes restriction or return period either
 					delete p.health;
 				} else {
+					p.injury.gamesMissed = 0;
 					p.injuries.push({
 						season: g.get("season"),
 						games: p.injury.gamesRemaining,
@@ -6498,8 +6542,31 @@ const upsertCustomizedPlayer = async (
 						// Injury was edited before any days were simmed
 						p.injuries.pop();
 					}
+				} else if (p.injury.type !== "Healthy" && p.injury.gamesRemaining > 0) {
+					// An injury with no record (from before records were kept, or made healthy by hand with games left): record it
+					p.injury.gamesMissed ??= 0;
+					p.injuries.push({
+						season: g.get("season"),
+						games: p.injury.gamesRemaining,
+						type: p.injury.type,
+					});
 				}
 			}
+		}
+	} else if (p.injury.type !== "Healthy" && p.injury.gamesRemaining > 0) {
+		// A new player created injured: his injury goes on record too
+		p.injuries ??= [];
+		const lastEntry = p.injuries.at(-1);
+		if (
+			lastEntry?.type !== p.injury.type ||
+			lastEntry.season !== g.get("season")
+		) {
+			p.injury.gamesMissed = 0;
+			p.injuries.push({
+				season: g.get("season"),
+				games: p.injury.gamesRemaining,
+				type: p.injury.type,
+			});
 		}
 	}
 
@@ -7104,6 +7171,7 @@ const api = {
 		updateOptions,
 		updatePlayThroughInjuries,
 		setLoadManagement,
+		setInjuryTreatment,
 		draftLotteryWhatIf,
 		updatePlayerWatch,
 		updatePlayersWatch,

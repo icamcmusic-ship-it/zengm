@@ -296,7 +296,11 @@ export const getTeamAwardContexts = async (
 				numGames,
 				(p.injuries ?? [])
 					.filter((injury) => injury.season === season)
-					.reduce((sum, injury) => sum + Math.max(0, injury.games), 0),
+					// (games missed: the stored count once an injury is over)
+					.reduce(
+						(sum, injury) => sum + Math.max(0, injury.missed ?? injury.games),
+						0,
+					),
 			);
 			if (injuryGames > 0) {
 				const totalGp = rows.reduce((sum, row) => sum + (row.gp ?? 0), 0);

@@ -10,6 +10,7 @@ import { bySport } from "../../common/sportFunctions.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import { getExpectedReturnDayFinder } from "../core/player/injuryRecovery.ts";
 
 const processInputs = (params: RouteParams<"injuries">) => {
 	let season: number | "current";
@@ -53,6 +54,12 @@ export default defineView({
 				[...stats, "jerseyNumber"],
 			);
 
+			// Injury outlook: when he's expected back (current season), from the schedule
+			const findReturnDay =
+				inputs.season === "current"
+					? await getExpectedReturnDayFinder()
+					: undefined;
+
 			const injuries = [];
 			for (const p of players) {
 				if (inputs.season === "current") {
@@ -62,6 +69,13 @@ export default defineView({
 							...p,
 							type: p.injury.type,
 							games: p.injury.gamesRemaining,
+							// Only for this injury's record (its outlook, treatment, re-aggravations)
+							outlook: p.injury,
+							returnDay: findReturnDay?.(p.tid, p.injury.gamesRemaining),
+							missed: p.injury.gamesMissed,
+							aggravated:
+								injury?.type === p.injury.type ? injury.aggravated : undefined,
+							treatment: p.injury.treatment,
 							ovrDrop: injury?.ovrDrop,
 							potDrop: injury?.potDrop,
 							playingThrough: false,
@@ -74,6 +88,11 @@ export default defineView({
 								...p,
 								type: injury.type,
 								games: injury.games,
+								outlook: undefined,
+								returnDay: undefined,
+								missed: injury.missed,
+								aggravated: injury.aggravated,
+								treatment: injury.treatment,
 								ovrDrop: injury.ovrDrop,
 								potDrop: injury.potDrop,
 								playingThrough: false,

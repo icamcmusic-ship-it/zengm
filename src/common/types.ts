@@ -1714,6 +1714,34 @@ export type PlayerInjury = {
 	score?: number;
 	// Games his team has played while he was out with this injury (counted in game/writePlayerStats.ts; the hardship rule)
 	gamesMissed?: number;
+	// Injury outlook (basketball, with Injury Depth; common/injuryOutlook.ts): the medical staff's uncertainty (fraction of the games
+	// left), set when he got hurt. With it: an estimate range instead of the exact games, setbacks and early returns, and game-time
+	// decisions when he's 1-3 games away
+	spread?: number;
+	// Major injuries (player/injuryRecovery.ts): surgery or rehab, and whether the user can still change it
+	treatment?: InjuryTreatment;
+	treatmentOpen?: true;
+	// Only in the game sim's copy and its box score: he was questionable/doubtful and the game-time decision let him play
+	gtd?: "Q" | "D";
+};
+
+export type InjuryTreatment = "surgery" | "rehab";
+
+export type PlayerInjuryRecord = {
+	season: number;
+	// Games he was expected to miss when hurt (gamesRemaining then, so one more than the games out), extended by re-aggravations
+	games: number;
+	type: string;
+	ovrDrop?: number;
+	potDrop?: number;
+	// Team games he actually missed with it, stored when it's over (from the gamesMissed counter). Missing for older records and
+	// injuries not over yet
+	missed?: number;
+	// Times he re-aggravated it (the same record is extended instead of a new one)
+	aggravated?: number;
+	treatment?: InjuryTreatment;
+	// Setbacks during the recovery
+	setbacks?: number;
 };
 
 // Only for legacy league files and the migration from before contracts were tracked
@@ -1875,13 +1903,7 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	collegeHof?: number;
 	imgURL: string;
 	injury: PlayerInjury;
-	injuries: {
-		season: number;
-		games: number;
-		type: string;
-		ovrDrop?: number;
-		potDrop?: number;
-	}[];
+	injuries: PlayerInjuryRecord[];
 	// injuryDepth setting: state after returning from an injury
 	health?: PlayerHealth;
 	// injuryDepth setting: rest this player on the second night of back-to-backs

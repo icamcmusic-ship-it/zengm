@@ -722,27 +722,35 @@ export const getNewsFacts = async (
 		}
 		// Medical desk
 		if (isCurrent && p.tid >= 0 && edition !== "preseason") {
+			// (games missed: the stored count once an injury is over)
 			const seasonGames = seasonInjuries.reduce(
-				(sum, inj) => sum + inj.games,
+				(sum, inj) => sum + (inj.missed ?? inj.games),
 				0,
 			);
 			if (seasonGames > 0) {
 				teamGamesLost.set(p.tid, (teamGamesLost.get(p.tid) ?? 0) + seasonGames);
 			}
 			const last = seasonInjuries.at(-1);
-			if (p.injury.gamesRemaining === 0 && last && last.games >= 8) {
+			if (
+				p.injury.gamesRemaining === 0 &&
+				last &&
+				(last.missed ?? last.games) >= 8
+			) {
 				medical.returns.push({
 					pid: p.pid,
 					name,
 					tid: p.tid,
 					type: last.type,
-					games: last.games,
+					games: last.missed ?? last.games,
 				});
 			}
 			const recent = (p.injuries ?? []).filter(
 				(inj) => inj.season > season - 3,
 			);
-			const recentGames = recent.reduce((sum, inj) => sum + inj.games, 0);
+			const recentGames = recent.reduce(
+				(sum, inj) => sum + (inj.missed ?? inj.games),
+				0,
+			);
 			if (recent.length >= 3 || recentGames >= 40) {
 				medical.fragile.push({
 					pid: p.pid,

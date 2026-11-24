@@ -46,6 +46,7 @@ import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
 import { getGroupPrefix } from "../core/awards/prefixes.ts";
 import type { LeagueUrlParts } from "../../ui/router/types.ts";
 import { getHealthInfo } from "../core/player/getHealthInfo.ts";
+import { getExpectedReturnDayFinder } from "../core/player/injuryRecovery.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import { getRealComps } from "../core/draft/realComps.ts";
@@ -250,7 +251,17 @@ export const getPlayer = async <
 			: undefined,
 
 		// Injury history by body part, and the injuryDepth setting's state (see core/player/injuryDepth.ts)
-		healthInfo: getHealthInfo(pRaw),
+		healthInfo: {
+			...getHealthInfo(pRaw),
+			// Injury outlook: when he's expected back, from the schedule
+			returnDay:
+				pRaw.injury.gamesRemaining > 0
+					? (await getExpectedReturnDayFinder())(
+							pRaw.tid,
+							pRaw.injury.gamesRemaining,
+						)
+					: undefined,
+		},
 
 		// Frozen Pre-draft Ranks setting: his rank on the scouts' list when his class's draft started, and the overall pick he went at
 		preDraftRankInfo: await preDraftRankInfo(pRaw),
