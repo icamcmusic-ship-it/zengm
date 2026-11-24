@@ -1,6 +1,6 @@
 // Spectator mode (or auto play) turned on during RESIGN_PLAYERS: the user's open re-signing negotiations get the AI's decision
 // (re-signed or released) right away, instead of all of them walking at free agency
-import { afterEach, assert, beforeEach, test } from "vitest";
+import { afterEach, assert, test } from "vitest";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { makeSeededRandom } from "../../../common/random.ts";

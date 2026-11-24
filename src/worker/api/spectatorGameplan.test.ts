@@ -37,8 +37,8 @@ test("refused in spectator mode, allowed otherwise", async () => {
 		let error: Error | undefined;
 		try {
 			await call();
-		} catch (error2) {
-			error = error2 as Error;
+		} catch (error_) {
+			error = error_ as Error;
 		}
 		assert.match(error?.message ?? "", /spectator/);
 	}
