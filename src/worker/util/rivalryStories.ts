@@ -290,16 +290,11 @@ export const pruneRivalryLog = async (
 	fullSeasons: number = RIVALRY_LOG_FULL_SEASONS,
 ) => {
 	const cutoff = g.get("season") - fullSeasons;
-	const seasons: number[] = [];
-	// Keys only, one per season
-	let cursor = await idb.league
-		.transaction("rivalryGames")
-		.store.index("season")
-		.openKeyCursor(IDBKeyRange.upperBound(cutoff, true), "nextunique");
-	while (cursor) {
-		seasons.push(cursor.key);
-		cursor = await cursor.continue();
-	}
+	// The logged seasons before the cutoff: every logged game's season has a row in rivalrySeasons (writeRecords), so its keys
+	// are the list (an index key cursor isn't available on every store wrapper)
+	const seasons = (await idb.league
+		.transaction("rivalrySeasons")
+		.store.getAllKeys(IDBKeyRange.upperBound(cutoff, true))) as number[];
 	if (seasons.length === 0) {
 		return 0;
 	}

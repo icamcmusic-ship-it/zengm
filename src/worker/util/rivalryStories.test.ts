@@ -143,7 +143,12 @@ describe("rivalry stories in a league", () => {
 				const box = gm.teams
 					.flatMap((t) => t.players as any[])
 					.find((x) => x.pid === p.pid);
-				assert.strictEqual(p.name, box.name);
+				// Names are looked up when the log is read: his name now, which may have gained a suffix since (a son made him
+				// "Sr."), while the box score keeps the name of the day
+				assert.isTrue(
+					p.name === box.name || p.name.startsWith(`${box.name} `),
+					`${p.name} vs ${box.name}`,
+				);
 			}
 			assert.strictEqual(
 				Math.max(
