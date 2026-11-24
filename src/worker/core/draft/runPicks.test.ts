@@ -3,7 +3,7 @@ import { PLAYER } from "../../../common/constants.ts";
 import { mockIDBLeague } from "../../../test/helpers.ts";
 import { draft } from "../index.ts";
 import { idb } from "../../db/index.ts";
-import { g } from "../../util/index.ts";
+import { g, local } from "../../util/index.ts";
 import { getDraftTids, loadTeamSeasons } from "./testHelpers.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 
@@ -117,3 +117,39 @@ test("then allow the user to draft in the second round", () => throughStep(4));
 
 test("when called again after the user drafts, should draft more players to finish the draft", () =>
 	throughStep(5));
+
+test("spectator mode and auto play: the user's team drafts like an AI team, not by true value", async () => {
+	for (const mode of ["spectator", "autoPlay"] as const) {
+		await setUp();
+		if (mode === "spectator") {
+			g.setWithoutSavingToDB("spectator", true);
+		} else {
+			local.autoPlayUntil = {
+				reject: () => {},
+				resolve: () => {},
+				phase: 0,
+				season: g.get("season") + 1,
+				start: 0,
+			};
+		}
+		try {
+			// One pick at a time through the user's last pick (the end of the draft would start the next phase)
+			while (
+				(await draft.getOrder()).some((dp) => dp.tid === g.get("userTid"))
+			) {
+				await draft.runPicks({ type: "onePick" });
+			}
+		} finally {
+			g.setWithoutSavingToDB("spectator", false);
+			local.autoPlayUntil = undefined;
+		}
+		const drafted = (
+			await idb.cache.players.indexGetAll("playersByTid", g.get("userTid"))
+		).filter((p) => p.draft.year === g.get("season"));
+		assert.isAbove(drafted.length, 0, mode);
+		for (const p of drafted) {
+			assert.isDefined(p.draft.why, mode);
+			assert.notDeepEqual(p.draft.why, ["Auto draft: best available"], mode);
+		}
+	}
+});

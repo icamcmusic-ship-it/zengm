@@ -28,7 +28,7 @@ import {
 	processNewDraftClasses,
 	toCollegeProspect,
 } from "./generateCollegeStats.ts";
-import { getClassShapeInfo } from "./classShape.ts";
+import { getClassShapeInfo, toStoryProspect } from "./classShape.ts";
 import { pickStory } from "../../../common/collegeStats/career.ts";
 import {
 	clampSeed,
@@ -471,5 +471,30 @@ describe("draft class shapes", () => {
 		for (const p of players.filter((p) => !p.draftClassShapeInjury)) {
 			assert.isUndefined(toCollegeProspect(p, SEASON).injuryHistory);
 		}
+	});
+});
+
+describe("toStoryProspect", () => {
+	test("an undrafted prospect is read as the scouts see him (fuzzed ovr/pot, valueFuzz), a drafted player as he is", () => {
+		resetG();
+		const p = {
+			pid: 1,
+			tid: PLAYER.UNDRAFTED,
+			firstName: "A",
+			lastName: "B",
+			born: { year: SEASON - 19, loc: "USA" },
+			college: "",
+			value: 70,
+			valueFuzz: 60,
+			ratings: [{ ovr: 50, pot: 60, fuzz: -5, pos: "C" }],
+		} as unknown as Player;
+		const fuzzed = toStoryProspect(p, SEASON);
+		assert.strictEqual(fuzzed.ovr, 45);
+		assert.strictEqual(fuzzed.pot, 55);
+		assert.strictEqual(fuzzed.value, 60);
+		const drafted = toStoryProspect({ ...p, tid: 0 } as Player, SEASON);
+		assert.strictEqual(drafted.ovr, 50);
+		assert.strictEqual(drafted.pot, 60);
+		assert.strictEqual(drafted.value, 70);
 	});
 });

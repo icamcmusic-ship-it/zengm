@@ -177,7 +177,10 @@ export default defineView({
 
 		const { season: ncaa, players } = built;
 		const prospectsBySchool: Record<string, CollegeProspectInfo[]> = {};
-		for (const p of players.sort((a, b) => b.value - a.value)) {
+		// Best first as the user's scouts see a prospect (valueFuzz), never his true value
+		const shownValue = (p: (typeof players)[number]) =>
+			p.tid === PLAYER.UNDRAFTED ? p.valueFuzz : p.value;
+		for (const p of players.sort((a, b) => shownValue(b) - shownValue(a))) {
 			const school = p.collegeSeason!.school;
 			(prospectsBySchool[school] ??= []).push(prospectInfo(p, season));
 		}

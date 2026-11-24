@@ -51,6 +51,17 @@ export const hofBallotWait = () => {
 		: HOF_DEFAULT_WAIT;
 };
 
+// A player coming out of retirement (every un-retire path): his ballot record is forgotten unless he was inducted (by the vote
+// or the veterans committee), so when he retires again he is screened afresh and gets a new 10-year window. Kept, a ballot whose
+// window had run out while he played was skipped every season with no status, so he was never inducted nor sent to the
+// veterans committee. A Hall of Famer stays one (p.hof) and keeps his record, and is never inducted twice
+export const clearHofBallotOnUnretire = (p: Pick<Player, "hofBallot">) => {
+	const status = p.hofBallot?.status;
+	if (p.hofBallot && status !== "inducted" && status !== "veterans") {
+		delete p.hofBallot;
+	}
+};
+
 const playerName = (p: { firstName: string; lastName: string }) =>
 	`${p.firstName} ${p.lastName}`;
 
@@ -81,6 +92,9 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 // "first ballot, 93.5%" / "4th year, 77.0%" / "veterans committee"
 export const ballotLine = (
 	hofBallot: Player["hofBallot"],
+	// The season of his latest vote (his induction): his year is counted as the ballot counts it (season - first + 1, which
+	// is more than his number of votes when the ballot was off for a while). Without it, his number of votes
+	lastVoteSeason?: number,
 ): string | undefined => {
 	if (!hofBallot) {
 		return;
@@ -92,7 +106,10 @@ export const ballotLine = (
 	if (pct === undefined) {
 		return;
 	}
-	const year = hofBallot.votes.length;
+	const year =
+		lastVoteSeason !== undefined
+			? lastVoteSeason - hofBallot.first + 1
+			: hofBallot.votes.length;
 	const yearText =
 		year === 1 ? "first ballot" : `${helpers.ordinal(year)} year`;
 	return `${yearText}, ${pct.toFixed(1)}%`;

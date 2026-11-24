@@ -227,6 +227,9 @@ export const hofWatchFor = (
 				status: "notWorthy",
 			};
 		}
+		// The season of the next ballot: this one's runs after the playoffs (start of the draft lottery phase)
+		const nextBallot =
+			g.get("phase") >= PHASE.DRAFT_LOTTERY ? season + 1 : season;
 		const ballot = p.hofBallot;
 		if (ballot?.status) {
 			return {
@@ -240,13 +243,14 @@ export const hofWatchFor = (
 			};
 		}
 		if (ballot) {
-			const year = ballot.votes.length + 1;
+			// His year on the next ballot, counted as the ballot counts it (runBallot)
+			const year = nextBallot - ballot.first + 1;
 			return {
 				score,
 				threshold,
 				projected: score,
 				chance:
-					ballot.first + HOF_MAX_YEARS <= season
+					ballot.first + HOF_MAX_YEARS <= nextBallot
 						? 0
 						: ballotChance({
 								pid: p.pid,
@@ -259,7 +263,11 @@ export const hofWatchFor = (
 			};
 		}
 		const eligible = p.retiredYear + hofBallotWait();
-		if (ratio < HOF_SCREEN_RATIO || eligible < season - HOF_MAX_YEARS) {
+		// The ballot screens new candidates eligible in the last 10 seasons (runBallot: retired season - wait - 9 or later)
+		if (
+			ratio < HOF_SCREEN_RATIO ||
+			eligible < nextBallot - (HOF_MAX_YEARS - 1)
+		) {
 			return {
 				score,
 				threshold,
@@ -274,7 +282,7 @@ export const hofWatchFor = (
 			projected: score,
 			chance: ballotChance({ pid: p.pid, ratio, year: 1 }),
 			status: "waiting",
-			eligible: Math.max(eligible, season + 1),
+			eligible: Math.max(eligible, nextBallot),
 		};
 	}
 

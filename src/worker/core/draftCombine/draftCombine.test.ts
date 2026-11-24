@@ -173,6 +173,35 @@ describe("draft combine", () => {
 		}
 	});
 
+	test("invites and the drill order follow the scouted ratings, never the true ones", async () => {
+		const [players] = await genClasses(1);
+		g.setWithoutSavingToDB("featureLotteryNight", true);
+		g.setWithoutSavingToDB("season", 2026);
+		g.setWithoutSavingToDB("phase", PHASE.DRAFT_LOTTERY);
+		const before = await getClassCombine(2026, players!);
+		// Move true ratings and fuzz in opposite directions, so what the scouts see stays the same
+		const moved = players!.map((p) => {
+			const copy = structuredClone(p);
+			const r = copy.ratings.at(-1)! as any;
+			const shift = copy.pid % 2 === 0 ? 6 : -6;
+			const seen = (x: number) => Math.round(Math.min(100, Math.max(0, x)));
+			const ovr = seen(r.ovr + (r.fuzz ?? 0));
+			const pot = seen(r.pot + (r.fuzz ?? 0));
+			r.ovr += shift;
+			r.pot += shift;
+			r.fuzz = (r.fuzz ?? 0) - shift;
+			assert.strictEqual(seen(r.ovr + r.fuzz), ovr);
+			assert.strictEqual(seen(r.pot + r.fuzz), pot);
+			return copy;
+		});
+		const after = await getClassCombine(2026, moved);
+		assert.deepEqual(
+			after.players.map((p) => p.pid),
+			before.players.map((p) => p.pid),
+		);
+		assert.deepEqual([...after.invited], [...before.invited]);
+	});
+
 	test("no combine in a league without a draft (free agent rookies, or zero draft rounds)", async () => {
 		const [players] = await genClasses(1);
 		for (const p of players!) {

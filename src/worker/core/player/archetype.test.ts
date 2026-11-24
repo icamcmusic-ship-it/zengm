@@ -179,6 +179,39 @@ describe("stored archetypes", () => {
 		);
 	});
 
+	test("scouting fuzz: a prospect's tier and upside are read from his scouted ovr/pot, not the true ones", async () => {
+		const norms = await getLeagueNorms();
+		for (let i = 0; i < 30; i++) {
+			const prospect = player.generate(
+				PLAYER.UNDRAFTED,
+				19,
+				season,
+				false,
+				DEFAULT_LEVEL,
+			) as any;
+			prospect.pid = 1000 + i;
+			const prow = last(prospect.ratings) as any;
+			// Scouted across the elite tier line (ovr 58): 54 seen as 62, 61 seen as 53
+			prow.fuzz = i % 2 === 0 ? 8 : -8;
+			prow.ovr = prow.fuzz > 0 ? 54 : 61;
+			prow.pot = prow.ovr + 6;
+			const fuzzed = classifyPlayer(prospect, norms)!;
+			// The same prospect with what the scouts see as his true ratings (no fuzz): the same reading
+			const shown = ratingsForArchetype(prospect)!;
+			const copy = structuredClone(prospect);
+			const crow = last(copy.ratings) as any;
+			for (const [key, value] of Object.entries(shown)) {
+				if (key !== "hgt" && typeof value === "number") {
+					crow[key] = value;
+				}
+			}
+			crow.ovr = player.fuzzRating(prow.ovr, prow.fuzz);
+			crow.pot = player.fuzzRating(prow.pot, prow.fuzz);
+			crow.fuzz = 0;
+			assert.deepEqual(classifyPlayer(copy, norms), fuzzed, `prospect ${i}`);
+		}
+	});
+
 	test("sweep20: the traits a reading uses don't depend on a page having formatted players first", async () => {
 		g.setWithoutSavingToDB("playerTraits", true);
 		g.setWithoutSavingToDB("budget", false);

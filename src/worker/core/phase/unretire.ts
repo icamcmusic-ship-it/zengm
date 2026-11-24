@@ -8,6 +8,7 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import player from "../player/index.ts";
+import { clearHofBallotOnUnretire } from "../hallOfFame/index.ts";
 
 // Basketball ratings that can be raised (hgt never changes)
 export const UNRETIRE_RATING_KEYS = [
@@ -147,6 +148,7 @@ const unretirePlayer = async (
 	await player.updateValues(p);
 
 	p.retiredYear = Infinity;
+	clearHofBallotOnUnretire(p);
 	(p as Player & { unretired?: number }).unretired = season;
 	player.addToFreeAgents(p, {});
 	await idb.cache.players.put(p);

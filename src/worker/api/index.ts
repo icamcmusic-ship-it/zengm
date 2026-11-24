@@ -55,6 +55,7 @@ import {
 	season,
 } from "../core/index.ts";
 import * as staff from "../core/staff/index.ts";
+import { clearHofBallotOnUnretire } from "../core/hallOfFame/index.ts";
 import * as ownerOffice from "../core/ownerOffice/index.ts";
 import { overrideMandate } from "../core/ownerOffice/owner.ts";
 import * as commercial from "../core/commercial/index.ts";
@@ -6320,6 +6321,8 @@ const upsertCustomizedPlayer = async (
 		if (g.get("season") - last(p.ratings).season > 0) {
 			player.addRatingsRow(p);
 		}
+		// Hall of Fame ballot: a fresh one when he retires again (unless he was inducted)
+		clearHofBallotOnUnretire(p);
 	}
 
 	// If player is now retired, check HoF eligibility
