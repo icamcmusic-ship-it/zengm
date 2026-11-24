@@ -1,7 +1,11 @@
 import { assert, beforeEach, test } from "vitest";
 import { g } from "../../util/index.ts";
 import { resetG } from "../../../test/helpers.ts";
-import { pastInjuryLoss } from "./pastInjuries.ts";
+import { pastInjuriesPerSeason, pastInjuryLoss } from "./pastInjuries.ts";
+import {
+	defaultGameAttributes,
+	NEW_LEAGUE_INJURY_RATE,
+} from "../../../common/defaultGameAttributes.ts";
 
 beforeEach(() => {
 	resetG();
@@ -57,4 +61,20 @@ test("a ten-season career loses a little athleticism, only athletic ratings", ()
 			}
 		}
 	}
+});
+
+test("scaled by the league's injury rate: twice the rate, about twice the injuries", () => {
+	assert.strictEqual(pastInjuriesPerSeason(), 1);
+	const stock = meanLoss("spd", false);
+	g.setWithoutSavingToDB("injuryRate", NEW_LEAGUE_INJURY_RATE);
+	assert.closeTo(
+		pastInjuriesPerSeason(),
+		NEW_LEAGUE_INJURY_RATE / defaultGameAttributes.injuryRate,
+		1e-9,
+	);
+	const doubled = meanLoss("spd", false);
+	assert.isAbove(doubled, 1.5 * stock);
+	assert.isBelow(doubled, 2.5 * stock);
+	g.setWithoutSavingToDB("injuryRate", 0);
+	assert.deepEqual(pastInjuryLoss("x", ages(20, 29), 2030), {});
 });

@@ -24,6 +24,7 @@ import {
 	maybeSameBodyPart,
 } from "../player/injuryDepth.ts";
 import { recordCoachDecisionGame } from "../staff/coachDecisions.ts";
+import { gamesMissed } from "../freeAgents/hardship.ts";
 
 export const P_FATIGUE_DAILY_REDUCTION = 20;
 
@@ -38,6 +39,35 @@ const DERIVED_MAX_STATS = bySport({
 });
 
 const gameOrWeek = bySport({ default: "game", football: "week" });
+
+// After an injury's ratings loss: pot goes down by what ovr lost, not by a new (noisy) estimate, so it can't go up and stays the same
+// when ovr didn't drop
+type PotRatings = {
+	ovr: number;
+	pot: number;
+	ovrs?: Record<string, number>;
+	pots?: Record<string, number>;
+};
+export const setPotAfterInjury = (
+	prevRatings: PotRatings,
+	newRatings: PotRatings,
+) => {
+	newRatings.pot =
+		prevRatings.pot - Math.max(0, prevRatings.ovr - newRatings.ovr);
+	if (newRatings.pots && prevRatings.pots) {
+		for (const pos of Object.keys(newRatings.pots)) {
+			const prevPot = prevRatings.pots[pos];
+			if (prevPot !== undefined) {
+				newRatings.pots[pos] =
+					prevPot -
+					Math.max(
+						0,
+						(prevRatings.ovrs?.[pos] ?? 0) - (newRatings.ovrs?.[pos] ?? 0),
+					);
+			}
+		}
+	}
+};
 
 const doInjury = async (
 	p: any,
@@ -93,6 +123,8 @@ const doInjury = async (
 			p2.injury.type = p.injury.type;
 		}
 	}
+	// Team games missed with this injury so far (counted in writePlayerStats, from his next game)
+	p2.injury.gamesMissed = 0;
 
 	if (neutralGames !== undefined) {
 		await recordInjury({
@@ -131,12 +163,14 @@ const doInjury = async (
 		type: p2.injury.type,
 	});
 	let stopPlay = false;
+	// Games he'll miss: the countdown also runs at the end of today, so one less than gamesRemaining (the injured list and the event
+	// log both say this)
+	const gamesOut = p2.injury.gamesRemaining - 1;
+	const gamesOutText = `${gamesOut} ${gamesOut === 1 ? gameOrWeek : `${gameOrWeek}s`}`;
 	const injuryText = `${p.pos} <a href="${helpers.leagueUrl([
 		"player",
 		p2.pid,
-	])}">${p2.firstName} ${p2.lastName}</a> - ${p2.injury.type}, ${
-		p2.injury.gamesRemaining - 1
-	} ${p2.injury.gamesRemaining - 1 === 1 ? gameOrWeek : `${gameOrWeek}s`}`;
+	])}">${p2.firstName} ${p2.lastName}</a> - ${p2.injury.type}, ${gamesOutText}`;
 
 	if (g.get("userTid") === p2.tid) {
 		if (p2.injury.gamesRemaining > 1) {
@@ -214,8 +248,8 @@ const doInjury = async (
 				reaggravateExtraDays === undefined
 					? "was injured"
 					: `reaggravated ${helpers.pronoun(g.get("gender"), "his")} injury`
-			}! (${p2.injury.type}, out for ${p2.injury.gamesRemaining} ${
-				p2.injury.gamesRemaining === 1 ? gameOrWeek : `${gameOrWeek}s`
+			}! (${p2.injury.type}, ${
+				gamesOut > 0 ? `out for ${gamesOutText}` : `back next ${gameOrWeek}`
 			})`,
 			showNotification: false,
 			pids: [p2.pid],
@@ -299,18 +333,7 @@ const doInjury = async (
 
 		const prevRatings = p2.ratings.at(-2)!;
 
-		// Bound pot - can't go up after injury!
-		if (newRatings.pot > prevRatings.pot) {
-			newRatings.pot = prevRatings.pot;
-		}
-		if (newRatings.pots && prevRatings.pots) {
-			for (const [pos, pot] of Object.entries(newRatings.pots)) {
-				const prevPot = prevRatings.pots[pos];
-				if (prevPot !== undefined && pot > prevPot) {
-					newRatings.pots[pos] = prevPot;
-				}
-			}
-		}
+		setPotAfterInjury(prevRatings, newRatings);
 
 		p2.injuries.at(-1)!.ovrDrop = prevRatings.ovr - newRatings.ovr;
 		p2.injuries.at(-1)!.potDrop = prevRatings.pot - newRatings.pot;
@@ -439,6 +462,18 @@ const writePlayerStats = async (
 				if (addNewStatsRow) {
 					player.addStatsRow(p2, g.get("season"), playoffs, nit);
 					psLatest = (nit ? p2.nitStats! : p2.stats).at(-1);
+				}
+
+				// Out injured for this game (his injury from before it): one more team game missed with it (the hardship rule)
+				if (
+					!allStarGame &&
+					p.injured &&
+					p2.injury.gamesRemaining > 0 &&
+					p2.injury.type !== "Healthy" &&
+					!p.stat.gp
+				) {
+					p2.injury.gamesMissed = gamesMissed(p2) + 1;
+					playersToSave.add(p2);
 				}
 
 				// Only need to write stats if player got minutes, except for minAvailable in BBGM

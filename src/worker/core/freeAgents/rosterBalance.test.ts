@@ -14,7 +14,7 @@ import {
 	signNeedBonus,
 	sortByNeed,
 } from "./rosterBalance.ts";
-import { hardshipDiag } from "./hardship.ts";
+import { gamesMissed, hardshipDiag, nbaHardshipOut } from "./hardship.ts";
 import {
 	getContractAmount,
 	getContractExp,
@@ -242,6 +242,23 @@ test("hardship: a short-handed AI team signs a minimum free agent and releases h
 		15,
 	);
 	assert.strictEqual(hardshipDiag.signed, 0);
+});
+
+test("hardship: games missed counts his team's games out, not the countdown on the day he got hurt", () => {
+	const p: any = {
+		injury: { type: "Sprained Ankle", gamesRemaining: 9 },
+		injuries: [{ season: 2025, games: 10, type: "Sprained Ankle" }],
+	};
+	// Hurt today, counted down once at the end of the day: no games missed yet (the record without the counter)
+	assert.strictEqual(gamesMissed(p), 0);
+	p.injury.gamesRemaining = 6;
+	assert.strictEqual(gamesMissed(p), 3);
+	// The counter (team games he sat out, game/writePlayerStats.ts) wins over the countdown, which runs on days without games too
+	p.injury.gamesMissed = 2;
+	assert.strictEqual(gamesMissed(p), 2);
+	assert.isFalse(nbaHardshipOut(p));
+	p.injury.gamesMissed = 3;
+	assert.isTrue(nbaHardshipOut(p));
 });
 
 test("hardship: the NBA rule, 4+ out who have missed 3+ games and are out for a while yet", async () => {

@@ -32,11 +32,15 @@ export const HARDSHIP = {
 	extraSpots: 3,
 };
 
-// The games he has missed with his current injury (0 if it isn't on record) and whether he counts for the NBA rule
-const gamesMissed = (p: Player) => {
+// The games his team has played without him since his current injury, and whether he counts for the NBA rule. Injuries from before
+// the counter: the recorded length - games remaining - 1 (the countdown also runs at the end of the day he got hurt), 0 if not on record
+export const gamesMissed = (p: Player) => {
+	if (p.injury.gamesMissed !== undefined) {
+		return p.injury.gamesMissed;
+	}
 	const rec = p.injuries?.at(-1);
 	return rec !== undefined && rec.type === p.injury.type
-		? rec.games - p.injury.gamesRemaining
+		? Math.max(0, rec.games - p.injury.gamesRemaining - 1)
 		: 0;
 };
 export const nbaHardshipOut = (p: Player) =>

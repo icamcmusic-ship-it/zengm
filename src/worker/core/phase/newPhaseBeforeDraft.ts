@@ -488,6 +488,13 @@ const newPhaseBeforeDraft = async (
 				}
 			}
 
+			// Injury Depth: the offseason is long enough for any minutes restriction and return period to run out (an injury healed
+			// below doesn't start one either)
+			if (p.health) {
+				delete p.health;
+				update = true;
+			}
+
 			// Heal injures - this happens for repeatSeasonType === "players" too!
 			if (p.injury.gamesRemaining > 0 || p.injury.type !== "Healthy") {
 				const numGames = defaultGameAttributes.numGames[0].value;
