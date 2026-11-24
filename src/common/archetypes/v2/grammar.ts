@@ -2472,16 +2472,31 @@ const ALSO: Record<string, string[]> = {
 	chaser: ["shoot"],
 	postBully: ["stre"],
 };
-const groupsOfConcept = (c: string) => [
-	CONCEPT_GROUP[c] ?? c,
-	...(ALSO[c] ?? []),
-];
-const roleGroups = (r: RoleDef) => [
-	...new Set([
-		...r.concepts.filter((c) => c !== "scorer").flatMap(groupsOfConcept),
-		...(ALSO[r.key] ?? []),
-	]),
-];
+// (speed, same results: both read only the fixed tables, and compatible asks for them for every word of every reading,
+// so each is worked out once; read-only)
+const conceptGroupsCache = new Map<string, readonly string[]>();
+const groupsOfConcept = (c: string): readonly string[] => {
+	let out = conceptGroupsCache.get(c);
+	if (!out) {
+		out = [CONCEPT_GROUP[c] ?? c, ...(ALSO[c] ?? [])];
+		conceptGroupsCache.set(c, out);
+	}
+	return out;
+};
+const roleGroupsCache = new WeakMap<RoleDef, readonly string[]>();
+const roleGroups = (r: RoleDef): readonly string[] => {
+	let out = roleGroupsCache.get(r);
+	if (!out) {
+		out = [
+			...new Set([
+				...r.concepts.filter((c) => c !== "scorer").flatMap(groupsOfConcept),
+				...(ALSO[r.key] ?? []),
+			]),
+		];
+		roleGroupsCache.set(r, out);
+	}
+	return out;
+};
 
 const DEFENSIVE_ROLES: ReadonlySet<string> = new Set([
 	"lock",
