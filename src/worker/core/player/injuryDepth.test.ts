@@ -14,8 +14,10 @@ import {
 	maybeSameBodyPart,
 	onHealed,
 	PRONE_FRACTION,
+	proneHistoryCount,
 	shouldRest,
 } from "./injuryDepth.ts";
+import { NEW_LEAGUE_INJURY_RATE } from "../../../common/defaultGameAttributes.ts";
 import type { Player } from "../../../common/types.ts";
 
 beforeEach(() => {
@@ -117,6 +119,33 @@ describe("player state", () => {
 			}
 		}
 		assert.closeTo(prone / n, PRONE_FRACTION, 0.01);
+	});
+
+	test("injury prone by history: 5 injuries of 3+ games in three seasons, more at a higher injury rate", () => {
+		// A pid that isn't prone by the hash
+		let pid = 0;
+		while (isInjuryProne(makePlayer(pid))) {
+			pid += 1;
+		}
+		const withInjuries = (num: number) => ({
+			...makePlayer(pid),
+			injuries: Array.from({ length: num }, (_, i) => ({
+				season: 2025 - (i % 3),
+				games: 5,
+				type: "Sprained Ankle",
+			})),
+		});
+		assert.strictEqual(proneHistoryCount(), 5);
+		assert.isFalse(isInjuryProne(withInjuries(4)));
+		assert.isTrue(isInjuryProne(withInjuries(5)));
+		// A lower rate: as at the stock rate
+		g.setWithoutSavingToDB("injuryRate", 0.0001);
+		assert.strictEqual(proneHistoryCount(), 5);
+		// New leagues' rate (2x the stock): 10
+		g.setWithoutSavingToDB("injuryRate", NEW_LEAGUE_INJURY_RATE);
+		assert.strictEqual(proneHistoryCount(), 10);
+		assert.isFalse(isInjuryProne(withInjuries(9)));
+		assert.isTrue(isInjuryProne(withInjuries(10)));
 	});
 
 	test("load management: per player, team setting and AI policy", () => {

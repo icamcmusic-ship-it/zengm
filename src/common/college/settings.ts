@@ -104,6 +104,9 @@ export const getCollegeSettings = (level: CollegeLevel) => {
 		playoffsReseed: false,
 		neutralSite: "playoffs",
 
+		// The stock injury rate (new pro leagues start higher, at the NBA's rate: docs/native-features.md "Injury rate")
+		injuryRate: 0.25 / 10 / 200,
+
 		// Rosters: 13 scholarships, nobody is cut or signed
 		maxRosterSize: COLLEGE_SCHOLARSHIPS,
 		minRosterSize: 9,

@@ -1262,7 +1262,11 @@ export const settings: Setting[] = (
 								</a>{" "}
 								there are about 0.25 injuries per team per game, and with 10
 								players on the court and ~200 possessions per game, that works
-								out to 0.25/10/200 = 0.000125 by default.
+								out to 0.25/10/200 = 0.000125. Other effects (rest, load
+								management, the medical staff) bring that down to fewer injuries
+								and games missed than in recent NBA seasons, so new leagues
+								start at 0.25/10/100 = 0.00025 (existing leagues keep their
+								rate).
 							</>
 						) : null}
 					</p>

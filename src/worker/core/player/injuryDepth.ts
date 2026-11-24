@@ -17,6 +17,7 @@ import type {
 import { PHASE } from "../../../common/constants.ts";
 import { hasMajorPreDraftInjury } from "../../../common/collegeStats/injuries.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
+import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 
 export const isInjuryDepthEnabled = () =>
 	__SPORT === "basketball" && !!g.get("injuryDepth");
@@ -63,15 +64,31 @@ export const isInjuryProne = (
 		return true;
 	}
 
-	// Or a long history of injuries recently
+	// Or a long history of injuries recently: more than a player usually has at the league's injury rate (5 at the stock rate, more
+	// with a higher one, like new leagues' NEW_LEAGUE_INJURY_RATE: otherwise more of the league would count as injury prone the higher
+	// the rate, and get hurt more, season after season)
 	let count = 0;
 	for (const injury of p.injuries ?? []) {
 		if (injury.season >= season - 2 && injury.games >= 3) {
 			count += 1;
 		}
 	}
-	return count >= 5;
+	return count >= proneHistoryCount();
 };
+
+export const PRONE_HISTORY = 5;
+
+// The injuries of 3+ games in three seasons that make a player injury prone, at the league's injury rate (PRONE_HISTORY at the stock
+// rate or below, so a league with the stock rate is as before)
+export const proneHistoryCount = () =>
+	Math.round(
+		PRONE_HISTORY *
+			Math.max(
+				1,
+				(g.get("injuryRate") ?? defaultGameAttributes.injuryRate) /
+					defaultGameAttributes.injuryRate,
+			),
+	);
 
 export const isRecentlyReturned = (health: PlayerHealth | undefined) =>
 	health !== undefined && health.returnGames > 0;

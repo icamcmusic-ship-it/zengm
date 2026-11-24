@@ -574,6 +574,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	stopOnInjury: false,
 	stopOnInjuryGames: 20,
 	// According to data/injuries.ods, 0.25 injuries occur every game. Divided over 10 players and ~200 possessions, that means each player on the court has P = 0.25 / 10 / 200 = 0.000125 probability of being injured this play.
+	// (new basketball leagues start at NEW_LEAGUE_INJURY_RATE instead, see below; this stays the value of leagues without one stored)
 	injuryRate: 0.25 / 10 / 200,
 	homeCourtAdvantage: 1,
 	// The tragic death rate is the probability that a player will die a tragic death on a given regular season day. Yes, this only happens in the regular season. With roughly 100 days in a season, the default is about one death every 50 years.
@@ -1005,3 +1006,10 @@ if (__SPORT === "football") {
 }
 
 registerGlobal({ defaultGameAttributes });
+
+// The injury rate of a new basketball league (the New League page's default; leagues keep the rate they have stored, and
+// defaultGameAttributes.injuryRate stays the stock 0.000125 for anything without one). The stock rate gave about 0.18 injuries per team
+// game and 75 games missed per team season, under the rate of the study the stock value is from (0.25 per team game) and well under
+// recent NBA seasons; this gives about 0.37 and 150, and AI hardship signings about 10 a season. See docs/native-features.md
+// "Injury rate".
+export const NEW_LEAGUE_INJURY_RATE = 0.25 / 10 / 100;
