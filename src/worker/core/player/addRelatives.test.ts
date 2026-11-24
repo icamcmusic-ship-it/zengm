@@ -319,6 +319,11 @@ describe("makeSon", () => {
 			await makeSon(son);
 			assert.strictEqual(son.relatives.length, 1);
 			colors.add(son.face.hair.color);
+			// His family's hair loss and greying genes: the father's seed, and a clean aging state for his new face
+			const fatherPid = son.relatives[0]!.pid;
+			assert.strictEqual(son.faceAging?.gs, fatherPid);
+			assert.deepEqual(son.faceAging?.h, {});
+			assert.strictEqual(son.faceAging?.b.hi, son.face.hair.id);
 		}
 		assert.isFalse(colors.has(AGED));
 		// facesjs keeps a relative's hair colour 75% of the time

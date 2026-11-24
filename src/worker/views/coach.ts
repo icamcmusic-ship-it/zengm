@@ -6,6 +6,8 @@ import { coachingDepthOn } from "../core/staffDepth/coaching.ts";
 import { coachTreePage } from "../core/staffDepth/careers.ts";
 import { coachRelationshipsFor } from "../core/staff/relationships.ts";
 import { g } from "../util/index.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
+import { primeFace } from "../util/faceAging.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import {
 	STAFF_DISABLED_MESSAGE,
@@ -13,6 +15,21 @@ import {
 	getTeamColors,
 	staffViewEnabled,
 } from "./staffShared.ts";
+
+// An ex-player coach's prime face as a player, for "Then and Now" on his page
+const playerThen = async (pid: number | undefined) => {
+	if (pid === undefined || !featureOn("faceAging")) {
+		return undefined;
+	}
+	const p = await idb.merged.players.get(pid);
+	if (!p || p.imgURL || !p.faceAging) {
+		return undefined;
+	}
+	const prime = await primeFace(p);
+	return prime
+		? { ...prime, pid, name: `${p.firstName} ${p.lastName}` }
+		: undefined;
+};
 
 export default defineView({
 	id: "coach",
@@ -50,6 +67,8 @@ export default defineView({
 				coach,
 				// Coaching Staff Depth: where his career started, his mentors, protégés and the assistants who worked under him
 				tree: coachingDepthOn() ? await coachTreePage(c) : undefined,
+				// Face Aging: an ex-player coach's "Then and Now", his face in his prime as a player (that season's jersey)
+				playerThen: await playerThen(c.tree?.exPlayer),
 				// Player–coach relationships (undefined when off)
 				relationships: await coachRelationshipsFor(c.cid),
 				colors: c.tid >= 0 ? (await getTeamColors()).get(c.tid) : undefined,

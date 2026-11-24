@@ -1,4 +1,5 @@
 import useTitleBar from "../hooks/useTitleBar.tsx";
+import { PlayerPicture } from "../components/PlayerPicture.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
 import {
@@ -33,6 +34,7 @@ const Coach = ({
 	awards,
 	coach: c,
 	colors,
+	playerThen,
 	relationships,
 	stats,
 	transactions,
@@ -47,6 +49,7 @@ const Coach = ({
 					face={c.face}
 					colors={colors}
 					age={c.age}
+					player={c.faceAsPlayer}
 					seed={c.cid}
 					width={120}
 				/>
@@ -166,6 +169,40 @@ const Coach = ({
 					) : null}
 				</div>
 			</div>
+
+			{playerThen ? (
+				<div className="mb-3" data-testid="coach-then-and-now">
+					<h2>Then and Now</h2>
+					<div className="d-flex flex-wrap gap-4 align-items-end">
+						<figure className="mb-0 text-center">
+							<div style={{ width: 100, height: 150 }}>
+								<PlayerPicture
+									face={playerThen.face}
+									colors={playerThen.colors}
+									jersey={playerThen.jersey}
+								/>
+							</div>
+							<figcaption className="small">
+								<a href={helpers.leagueUrl(["player", playerThen.pid])}>
+									Player
+								</a>
+								, {playerThen.season}
+							</figcaption>
+						</figure>
+						<figure className="mb-0 text-center">
+							<CoachPortrait
+								face={c.face}
+								colors={colors}
+								age={c.age}
+								player={c.faceAsPlayer}
+								seed={c.cid}
+								width={100}
+							/>
+							<figcaption className="small">Coach, now</figcaption>
+						</figure>
+					</div>
+				</div>
+			) : null}
 
 			{awards.length > 0 ? (
 				<>

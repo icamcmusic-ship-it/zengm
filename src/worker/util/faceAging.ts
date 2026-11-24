@@ -9,6 +9,7 @@ import {
 	extractAgingFields,
 	faceAgingAfterEdit,
 	faceForSeason,
+	generatedBase,
 	type FaceAging,
 	type FaceAgingOptions,
 } from "../../common/faceAging.ts";
@@ -63,6 +64,7 @@ const agingContext = (p: AgingPlayer) => {
 	const base = p.faceAging?.b;
 	return {
 		seed: p.pid,
+		familySeed: p.faceAging?.gs,
 		born: p.born.year,
 		minutes: careerMinutes(p),
 		weight: p.weight,
@@ -78,6 +80,15 @@ const agingContext = (p: AgingPlayer) => {
 	};
 };
 
+// Retired players' snapshots: a visible change (style, lines, glasses, fatness by SPARSE_FATNESS) any season; the slow
+// greying and filling out only the first season after he retired and every RETIRED_SNAPSHOT_EVERY seasons. Seasons in
+// between show the last snapshot's face (a few years of greying behind, at most)
+export const RETIRED_SNAPSHOT_EVERY = 5;
+export const retiredSnapshotSeason = (season: number, retiredYear: number) => {
+	const years = season - retiredYear;
+	return years <= 1 || years % RETIRED_SNAPSHOT_EVERY === 0;
+};
+
 // Ages one player's face to a season, in place. Returns true if his face or its stored aging state (generated fields,
 // snapshots) changed, so the caller saves the player. Only the season marker moving isn't worth a write: without it the same
 // (pure, cheap) aging is just worked out again next time.
@@ -90,14 +101,19 @@ export const agePlayerFace = (
 	if (p.imgURL || !p.face?.hair || p.pid === undefined) {
 		return false;
 	}
+	const retired = p.tid === PLAYER.RETIRED && p.retiredYear !== undefined;
 	const result = ageFaceForSeason(
 		p.face,
 		p.faceAging,
 		{
 			...agingContext(p),
 			season,
-			// No snapshot of a draft prospect's face: face history starts at his first pro season
+			// No snapshot of a draft prospect's face: face history starts at his first pro season. Retired players (who age
+			// a little every year) keep a sparse one, so it doesn't grow every season for the rest of the league
 			record: p.tid !== PLAYER.UNDRAFTED,
+			sparse: retired
+				? { force: retiredSnapshotSeason(season, p.retiredYear!) }
+				: undefined,
 		},
 		options,
 	);
@@ -211,15 +227,49 @@ export const faceAgingOnCustomize = (
 	season: number,
 ) => {
 	if (!p.imgURL && p.face?.hair && isFreshFace(p)) {
+		const gs = prev?.faceAging?.gs ?? p.faceAging?.gs;
 		p.faceAging = freshFaceAging(p.face);
+		if (gs !== undefined) {
+			p.faceAging.gs = gs;
+		}
 		return true;
+	}
+	// "Reset to generated face": his generated fields back, unlocked, his history kept, and aged back to now on save (unless
+	// the face was edited again after the reset)
+	const reset = p.faceAging?.r === 1;
+	if (reset) {
+		delete p.faceAging!.r;
+		const generated = generatedBase(prev?.faceAging);
+		if (
+			!p.imgURL &&
+			p.face?.hair &&
+			generated &&
+			JSON.stringify(extractAgingFields(p.face)) ===
+				JSON.stringify(extractAgingFields(applyAgingFields(p.face, generated)))
+		) {
+			// This season's snapshot is recorded again when he's aged
+			const h = { ...prev?.faceAging?.h };
+			for (const key of Object.keys(h)) {
+				if (Number(key) >= season) {
+					delete h[Number(key)];
+				}
+			}
+			p.faceAging = { b: generated, h };
+			if (prev?.faceAging?.gs !== undefined) {
+				p.faceAging.gs = prev.faceAging.gs;
+			}
+			return true;
+		}
 	}
 	const allow = p.faceAging?.a === 1;
 	const age = season - p.born.year;
+	// Only what aging works on counts as an edit: the external facesjs editor's round trip can reorder or drop things aging
+	// never touches (team colours, jersey, the fork's other extras)
 	const changed =
 		!prev ||
-		JSON.stringify(stripExtra(prev.face)) !==
-			JSON.stringify(stripExtra(p.face));
+		reset ||
+		JSON.stringify(extractAgingFields(prev.face)) !==
+			JSON.stringify(extractAgingFields(p.face));
 	if (changed) {
 		p.faceAging = faceAgingAfterEdit(
 			prev?.faceAging,
@@ -239,15 +289,6 @@ export const faceAgingOnCustomize = (
 		delete p.faceAging;
 	}
 	return false;
-};
-
-// Team colours and jersey are set for drawing, not chosen by the user
-const stripExtra = (face: AgingPlayer["face"] | undefined) => {
-	if (!face) {
-		return face;
-	}
-	const { teamColors: _t, jersey: _j, ...rest } = face;
-	return rest;
 };
 
 // His face in any season: rebuilt from the snapshots, or worked out from his generated face for a season before them (a

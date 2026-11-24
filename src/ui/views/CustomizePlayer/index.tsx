@@ -37,7 +37,11 @@ import type {
 	PlayerWithoutKey,
 } from "../../../common/types.ts";
 import { posRatings } from "../../../common/posRatings.ts";
-import { extractAgingFields } from "../../../common/faceAging.ts";
+import {
+	applyAgingFields,
+	extractAgingFields,
+	generatedBase,
+} from "../../../common/faceAging.ts";
 import { last, orderBy } from "../../../common/utils.ts";
 import CustomMoodItemsForm from "./CustomMoodItemsForm.tsx";
 import { roundContract } from "../../../common/roundContract.ts";
@@ -1603,6 +1607,42 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 									unless this is ticked. Ticked, it keeps aging from the edited
 									face (hairline, grey, lines; the beard style is yours).
 								</div>
+								{originalTid !== undefined &&
+								generatedBase((p as any).faceAging) ? (
+									<button
+										type="button"
+										className="btn btn-sm btn-secondary mt-2"
+										onClick={() => {
+											setState((prevState) => {
+												const prevAging = (prevState.p as any).faceAging;
+												const base = generatedBase(prevAging);
+												let parsed;
+												try {
+													parsed = JSON.parse(prevState.p.face as any);
+												} catch {}
+												if (!base || !parsed) {
+													return prevState;
+												}
+												// His generated hair, beard, lines, ...: unlocked and aged back to now on save
+												const { a: _a, e: _e, ...rest } = prevAging;
+												return {
+													...prevState,
+													p: {
+														...prevState.p,
+														face: JSON.stringify(
+															applyAgingFields(parsed, base),
+															null,
+															2,
+														),
+														faceAging: { ...rest, r: 1 },
+													} as any,
+												};
+											});
+										}}
+									>
+										Reset to generated face
+									</button>
+								) : null}
 							</div>
 						) : null}
 						{appearanceOption === "Cartoon Face" ? null : (

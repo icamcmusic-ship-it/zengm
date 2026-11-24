@@ -195,6 +195,9 @@ export type CoachTree = {
 	initial?: boolean;
 	// A former player of the league who became an assistant
 	exPlayer?: number;
+	// His face ages on as the player's (seeded by his pid) from the season he retired, with his family's genes (Face Aging).
+	// Only for coaches made since this was kept, so older ones (stored with an aged face) keep staff aging
+	exPlayerFace?: { ry: number; gs?: number | string };
 	// The head coach he last worked under before his first head coaching job
 	mentor?: { cid: number; name: string };
 	// Promotions to a bigger job (assistant to head coach, possibly at another team)

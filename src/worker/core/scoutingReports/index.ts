@@ -56,6 +56,8 @@ import type { ScoutingExportPage } from "../../../common/playerExport.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import { getLeagueSalt } from "../../../common/leagueSalt.ts";
 import { getProspectRooms } from "./room.ts";
 import { scoutingDepthOn } from "../staffDepth/scouting.ts";
 import fuzzRating from "../player/fuzzRating.ts";
@@ -291,16 +293,38 @@ export const getScoutingBlurbs = async (pids: number[]) => {
 
 const RACES: Race[] = ["white", "black", "asian", "brown"];
 
-const seededFace = (seed: string) => {
+// Generated once per scout, not on every view update: memoized by everything the face depends on. A staff face at his age,
+// so StaffFace's (staff) aging starts from an adult look, not a young player's
+const scoutFaceCache = new Map<string, ReturnType<typeof generateFace>>();
+const SCOUT_FACE_CACHE_MAX = 500;
+
+export const seededFace = (seed: string, age: number) => {
+	const key = JSON.stringify([
+		seed,
+		age,
+		getLeagueSalt(),
+		featureOn("forkFaces"),
+		g.get("gender"),
+	]);
+	const cached = scoutFaceCache.get(key);
+	if (cached) {
+		return cached;
+	}
 	const rng = new Rng(`face|${seed}`);
 	const race = RACES[rng.int(0, RACES.length - 1)]!;
 	const orig = Math.random;
 	Math.random = () => rng.random();
+	let face;
 	try {
-		return generateFace({ race });
+		face = generateFace({ race, age, staff: true });
 	} finally {
 		Math.random = orig;
 	}
+	if (scoutFaceCache.size >= SCOUT_FACE_CACHE_MAX) {
+		scoutFaceCache.clear();
+	}
+	scoutFaceCache.set(key, face);
+	return face;
 };
 
 // Every player, retired ones included (the cache's copy wins: right after a draft, its players have moved teams there)
@@ -472,7 +496,7 @@ export const getDepartmentPage = async (tid: number) => {
 			until: s.until,
 			age: s.age,
 			current,
-			face: current ? seededFace(s.seed) : undefined,
+			face: current ? seededFace(s.seed, s.age) : undefined,
 			calls: own.length,
 			// Slot calls (where he had each prospect in the class) and flags, scored TRACK_SEASONS seasons on
 			slots: {

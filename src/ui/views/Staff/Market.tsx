@@ -339,6 +339,8 @@ export const Market = ({
 									face={c.face}
 									colors={colors}
 									age={c.age}
+									lazy
+									player={c.faceAsPlayer}
 									seed={c.cid}
 									width={36}
 								/>

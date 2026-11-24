@@ -13,12 +13,21 @@ import {
 import { textureOf } from "../../common/faceEvents.ts";
 import { prepareFaceForDisplay } from "../../common/faceRender.ts";
 import { useFeatureOn, useFeatureOption } from "../util/nativeFeatures.ts";
+import { useLocal } from "../util/local.ts";
+
+export type ExPlayerFace = {
+	pid: number;
+	born: number;
+	retiredYear: number;
+	familySeed?: number | string;
+};
 
 export const StaffFace = ({
 	age,
 	colors,
 	face,
 	lazy,
+	player,
 	seed,
 }: {
 	age?: number;
@@ -26,6 +35,9 @@ export const StaffFace = ({
 	colors?: [string, string, string];
 	face: FaceConfig;
 	lazy?: boolean;
+	// An ex-player coach (CoachTree.exPlayerFace): his face ages on as the player's (his pid, birth year, the season he
+	// retired, his family's genes), so the coach is the same man, a few years on, as the retired player
+	player?: ExPlayerFace;
 	// Something stable for the person (cid, gmid, name), so he always wears the same suit
 	seed?: number | string;
 }) => {
@@ -33,7 +45,8 @@ export const StaffFace = ({
 
 	// League Extras "Face Aging": staff age the same way as players (hairline, grey, lines), worked out when drawn from
 	// their id and age, so nothing is stored and a coach looks the same every time he's drawn in a season, and older the next.
-	// Coaches and GMs are their own people (not former players), so this is their whole history. With "Style Events", now
+	// Coaches and GMs are their own people (seeded by their id), except an ex-player coach (player, below: aged on as the
+	// player). With "Style Events", now
 	// and then a new hairstyle or beard and, with the years, glasses (common/faceEvents.ts); the per-age draws are keyed by
 	// age (born 0), so they don't depend on the season.
 	const agingOn = useFeatureOn("faceAging");
@@ -42,45 +55,64 @@ export const StaffFace = ({
 	const graying = useFeatureOption<boolean>("faceAgingGraying");
 	const styleEvents = useFeatureOption<boolean>("faceAgingStyleEvents");
 	const forkFacesOn = useFeatureOn("forkFaces");
-	const aged = agingOn && age !== undefined && seed !== undefined;
-	const drawnFace = useMemo(
-		() =>
-			prepareFaceForDisplay(
-				aged
-					? applyAgingFields(
-							face,
-							agedFields(
-								extractAgingFields(face),
-								{
-									seed: `staff|${seed}`,
-									age,
-									born: 0,
-									staff: true,
-									texture: textureOf(
-										face.body?.color,
-										face.hair.id,
-										face.hairBg?.id,
-									),
-								},
-								{ speed, hairLoss, graying, styleEvents },
-							),
-						)
-					: face,
-				{ fitFacialHair: agingOn || forkFacesOn },
-			),
-		[
-			aged,
-			age,
-			agingOn,
-			face,
-			forkFacesOn,
-			graying,
-			hairLoss,
-			seed,
-			speed,
-			styleEvents,
-		],
-	);
+	// Every seeded draw is salted by the league (common/leagueSalt.ts)
+	const { leagueSalt } = useLocal(["leagueSalt"]);
+	const aged = agingOn && age !== undefined && (seed !== undefined || !!player);
+	const playerPid = player?.pid;
+	const playerBorn = player?.born;
+	const playerRetired = player?.retiredYear;
+	const playerFamily = player?.familySeed;
+	const drawnFace = useMemo(() => {
+		const texture = textureOf(face.body?.color, face.hair.id, face.hairBg?.id);
+		const ctx =
+			playerPid !== undefined && playerBorn !== undefined
+				? {
+						seed: playerPid,
+						familySeed: playerFamily,
+						age: age!,
+						born: playerBorn,
+						retiredYear: playerRetired,
+						texture,
+					}
+				: {
+						seed: `staff|${seed}`,
+						age: age!,
+						born: 0,
+						staff: true,
+						texture,
+					};
+		return prepareFaceForDisplay(
+			aged
+				? applyAgingFields(
+						face,
+						agedFields(extractAgingFields(face), ctx, {
+							speed,
+							hairLoss,
+							graying,
+							styleEvents,
+						}),
+					)
+				: face,
+			{ fitFacialHair: agingOn || forkFacesOn },
+		);
+		// leagueSalt: read by the seeded draws through common/leagueSalt.ts
+	}, [
+		aged,
+		age,
+		agingOn,
+		face,
+		forkFacesOn,
+		graying,
+		hairLoss,
+		leagueSalt,
+		playerBorn,
+		playerFamily,
+		playerPid,
+		playerRetired,
+		seed,
+		speed,
+		styleEvents,
+	]);
 
 	const overrides = staffFaceOverrides(face, {
 		// Greyed above when aging is on

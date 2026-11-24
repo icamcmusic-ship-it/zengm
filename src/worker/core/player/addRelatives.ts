@@ -14,7 +14,10 @@ import {
 	toRoman,
 } from "../../util/romanNumerals.ts";
 import { generateFace } from "../../util/face.ts";
-import { applyAgingFields } from "../../../common/faceAging.ts";
+import {
+	applyAgingFields,
+	extractAgingFields,
+} from "../../../common/faceAging.ts";
 import { randInt, choice } from "../../../common/random.ts";
 import { inheritFromRelative } from "./heredity.ts";
 
@@ -158,6 +161,13 @@ const makeSimilar = async (existingRelative: Player, newRelative: Player) => {
 				? applyAgingFields(existingRelative.face, existingRelative.faceAging.b)
 				: existingRelative.face,
 		});
+		// A new face, so a clean aging state for it; hair loss and greying run in the family (common/faceAging.ts
+		// familyFaceGenes): his relative's family seed, or the relative himself
+		newRelative.faceAging = {
+			b: extractAgingFields(newRelative.face),
+			h: {},
+			gs: existingRelative.faceAging?.gs ?? existingRelative.pid,
+		};
 	}
 };
 

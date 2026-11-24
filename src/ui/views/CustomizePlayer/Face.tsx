@@ -2,6 +2,8 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { PlayerPicture } from "../../components/PlayerPicture.tsx";
 import clsx from "clsx";
 import { FORK_FACE_PARTS } from "../../../common/faceParts.ts";
+import { mergeEditorFace } from "../../../common/faceAging.ts";
+import type { FaceConfig } from "facesjs";
 
 // The fork's own parts (common/faceParts.ts) are not in the facesjs editor, so they are set here
 const FORK_FEATURES = [...new Set(FORK_FACE_PARTS.map((part) => part.feature))];
@@ -28,13 +30,16 @@ export const Face = ({
 
 	const faceHash = parsedFace ? btoa(JSON.stringify(parsedFace)) : "";
 
-	const onFaceChange = useEffectEvent(onChange);
+	// The external editor doesn't know the fork's extras and parts: put back what it dropped
+	const onFaceChange = useEffectEvent((value: FaceConfig) => {
+		onChange(JSON.stringify(mergeEditorFace(parsedFace, value)));
+	});
 
 	useEffect(() => {
 		const listener = (event: MessageEvent) => {
 			// key check is to handle the case where the user opens an editor, switches to another player, and opens another editor. So there are two editors open for two different players - we need to tell which one this is. Can't use pid alone because new players don't have a pid yet!
 			if (event.data.type === "facesjs" && event.data.key === faceCount) {
-				onFaceChange(JSON.stringify(event.data.value));
+				onFaceChange(event.data.value);
 				event.source?.postMessage(
 					{
 						type: "facesjs",

@@ -10,6 +10,8 @@
 // - h: per-season snapshots of the fields that changed that preseason, first entry complete, so a past season's face can be
 //   rebuilt (faceForSeason) without storing whole faces
 // - s: last season aged; e: face edited by the user (locked from aging unless a: "allow aging" ticked)
+// - g: the generated fields once an edit has replaced b (Customize Player's "Reset to generated face")
+// - gs: family seed (relatives share hair loss and greying genes)
 import type { FaceConfig } from "facesjs";
 import {
 	facialHairTier,
@@ -51,6 +53,12 @@ export type FaceAging = {
 	s?: number;
 	e?: 1;
 	a?: 1;
+	// The generated fields, kept when a user edit replaces b (for "Reset to generated face")
+	g?: FaceAgingFields;
+	// Sent by Customize Player's "Reset to generated face" (never stored)
+	r?: 1;
+	// Family seed (a father's or brother's seed): hair loss and greying run in the family (familyFaceGenes)
+	gs?: number | string;
 };
 
 export type FaceAgingOptions = {
@@ -333,6 +341,37 @@ export const faceGenes = (seed: number | string): FaceGenes => {
 	};
 };
 
+// With a family seed (faceAging.gs: a father's or brother's seed, shared down the family), hair loss and greying run in the
+// family: 70% of the time each takes after the family's genes (faceGenes of the family seed, so the relative it came from has
+// exactly them), within a couple of years of its onsets; the rest of his genes are his own
+export const FAMILY_INHERIT = 0.7;
+export const familyFaceGenes = (
+	seed: number | string,
+	family?: number | string,
+): FaceGenes => {
+	const own = faceGenes(seed);
+	if (family === undefined || family === seed) {
+		return own;
+	}
+	const fam = faceGenes(family);
+	const r = seededRandom("faceGenesFamily", seed, family);
+	const hairDraw = r();
+	const hairShift = Math.floor(r() * 5) - 2;
+	const greyDraw = r();
+	const greyShift = Math.floor(r() * 5) - 2;
+	const out = { ...own };
+	if (hairDraw < FAMILY_INHERIT) {
+		out.hairLoss = fam.hairLoss;
+		out.hairLossOnset = clamp(fam.hairLossOnset + hairShift, 26, 35);
+		out.widowsPeak = fam.widowsPeak;
+	}
+	if (greyDraw < FAMILY_INHERIT) {
+		out.greyStart = clamp(fam.greyStart + greyShift, 32, 43);
+		out.greySpan = fam.greySpan;
+	}
+	return out;
+};
+
 const speedFactor = (speed: FaceAgingOptions["speed"]) =>
 	speed === "subtle" ? 0.6 : speed === "strong" ? 1.5 : 1;
 
@@ -341,6 +380,8 @@ const speedFactor = (speed: FaceAgingOptions["speed"]) =>
 
 export type AgeContext = {
 	seed: number | string;
+	// faceAging.gs: hair loss and greying genes shared with his family
+	familySeed?: number | string;
 	age: number;
 	// Birth year, for the per-season draws (season = born + age)
 	born: number;
@@ -522,7 +563,7 @@ export const agedFields = (
 	ctx: AgeContext,
 	options: FaceAgingOptions = DEFAULT_FACE_AGING_OPTIONS,
 ): FaceAgingFields => {
-	const genes = faceGenes(ctx.seed);
+	const genes = familyFaceGenes(ctx.seed, ctx.familySeed);
 	const factor = speedFactor(options.speed);
 	const age = ctx.age;
 	const edited = ctx.baseAge !== undefined;
@@ -692,6 +733,9 @@ export const agedFields = (
 export const faceAgingLocked = (aging: FaceAging | undefined) =>
 	aging?.e === 1 && aging.a !== 1;
 
+// Sparse histories: the fatness change since the last snapshot that is worth a snapshot of its own
+export const SPARSE_FATNESS = 0.05;
+
 /**
  * Age a face to a season. Returns the new face and aging state, or undefined when nothing applies (locked, already done).
  */
@@ -702,6 +746,11 @@ export const ageFaceForSeason = (
 		season: number;
 		// false: age the face but keep no snapshot (draft prospects: no face from before he was drafted is ever shown)
 		record?: boolean;
+		// Sparse history (retired players, who age a little every year): a snapshot only for a visible change since the last
+		// one (any style, line, accessory or glasses change, or fatness by SPARSE_FATNESS) or when forced (every few seasons,
+		// for the slow greying and filling out). A snapshot is then the difference from the face the snapshots so far add up
+		// to, not from his current face
+		sparse?: { force: boolean };
 	},
 	options: FaceAgingOptions,
 ): { face: FaceConfig; aging: FaceAging } | undefined => {
@@ -722,8 +771,29 @@ export const ageFaceForSeason = (
 		options,
 	);
 	const first = Object.keys(state.h).length === 0;
-	const diff = first ? { ...fields } : diffAgingFields(current, fields);
-	if (ctx.record !== false && (first || Object.keys(diff).length > 0)) {
+	let before = current;
+	// Diff from the snapshots so far, not his current face, when they may not add up to it: a sparse history, or a face not aged
+	// since its state was reset (Customize Player's "Reset to generated face" keeps his history)
+	if (!first && (ctx.sparse || state.s === undefined)) {
+		const seasons = historySeasons(state);
+		before = extractAgingFields(
+			applyAgingFields(face, snapshotFields(state, seasons, Infinity)),
+		);
+	}
+	const diff = first ? { ...fields } : diffAgingFields(before, fields);
+	const visible =
+		first ||
+		!ctx.sparse ||
+		ctx.sparse.force ||
+		Object.keys(diff).some(
+			(key) => key !== "hc" && key !== "bc" && key !== "ft",
+		) ||
+		Math.abs(fields.ft - before.ft) >= SPARSE_FATNESS;
+	if (
+		ctx.record !== false &&
+		visible &&
+		(first || Object.keys(diff).length > 0)
+	) {
 		state.h[ctx.season] = diff;
 	}
 	state.s = ctx.season;
@@ -758,6 +828,44 @@ export const faceAgingAfterEdit = (
 	if (allow) {
 		out.a = 1;
 	}
+	const generated = generatedBase(aging);
+	if (generated) {
+		out.g = generated;
+	}
+	if (aging?.gs !== undefined) {
+		out.gs = aging.gs;
+	}
+	return out;
+};
+
+// His face's aging fields as generated: b until a user edit replaces it, then g (undefined for a face edited before g was
+// kept, or never generated)
+export const generatedBase = (aging: FaceAging | undefined) =>
+	aging?.g ?? (aging && aging.ba === undefined ? aging.b : undefined);
+
+// A face back from the external facesjs editor, which knows nothing of the fork: it can drop the fork's extras (beard and
+// dyed hair colours) and the fork's part ids, so they're put back from the face that was sent
+export const mergeEditorFace = (
+	before: FaceConfig | undefined,
+	after: FaceConfig,
+): FaceConfig => {
+	if (!before) {
+		return after;
+	}
+	const out: any = { ...after };
+	const extra = (before as FaceWithExtra).fork;
+	if (extra && out.fork === undefined) {
+		out.fork = extra;
+	}
+	for (const [feature, part] of Object.entries(before)) {
+		const id = (part as any)?.id;
+		if (typeof id === "string" && id.startsWith("fork-")) {
+			const back = out[feature];
+			if (back === undefined || back === null || !back.id) {
+				out[feature] = part;
+			}
+		}
+	}
 	return out;
 };
 
@@ -779,6 +887,15 @@ export const faceForSeason = (
 	if (seasons.length === 0 || season >= seasons.at(-1)!) {
 		return face;
 	}
+	return applyAgingFields(face, snapshotFields(aging, seasons, season));
+};
+
+// The aging fields the snapshots up to a season add up to
+const snapshotFields = (
+	aging: FaceAging,
+	seasons: number[],
+	season: number,
+) => {
 	// Accessories weren't in the first snapshot of faces aged before they were tracked: start from the generated ones
 	let fields: Partial<FaceAgingFields> = {};
 	if (aging.b.ac !== undefined) {
@@ -799,7 +916,7 @@ export const faceForSeason = (
 		found = true;
 		fields = { ...fields, ...aging.h[s] };
 	}
-	return applyAgingFields(face, fields);
+	return fields;
 };
 
 // Seasons whose snapshot changed something, with the face then (for the player page)
