@@ -8,7 +8,7 @@
 // - Usage form: his shooter-draw weight × exp(sd × uz - sd² / 2) (mean 1), sd from formSdStar (rf 0) to formSdRole (rf 1), with
 //   uz = formRho × gameZ (his shooting form for the game, player traits) + sqrt(1 - formRho²) × his own draw. A good shooting night is
 //   also a more aggressive night.
-// - Career night: with probability careerProb × rf (a rank 4+ player: about 1 in 150 games) his usage form × careerUsage and his shots
+// - Career night: with probability careerProb × rf (a rank 4+ player: about 1 in 300 games) his usage form × careerUsage and his shots
 //   from the shooter draw + careerMake make probability.
 // - Openings: each injured player among his team's top 5 by value (a starter out, up to openInjuryMax) × 1 + openInjury × rf. And the
 //   game plan goes at the opponent's weakness: a shooter (three-point threat) against a poor perimeter defense (the opponent's healthy
@@ -28,10 +28,11 @@ export const BREAKOUT = {
 	roleByRank: [0, 0.35, 0.7, 1],
 	formRho: 0.6,
 	formSdStar: 0.06,
-	formSdRole: 0.22,
-	formZMax: 2.5,
-	careerProb: 1 / 150,
-	careerUsage: 1.55,
+	// (the extreme tail trimmed to the NBA's bench 30-point games: was 0.22, 2.5, 1 / 150, 1.55 and hotPossRole 6, see the doc)
+	formSdRole: 0.17,
+	formZMax: 2,
+	careerProb: 1 / 300,
+	careerUsage: 1.4,
 	careerMake: 0.035,
 	openInjury: 0.07,
 	openInjuryMax: 2,
@@ -48,7 +49,7 @@ export const BREAKOUT = {
 	rimLo: 0.5,
 	rimSpan: 0.2,
 	hotRole: 0.35,
-	hotPossRole: 6,
+	hotPossRole: 4,
 	coldMisses: 2,
 	heatPts: 12,
 	heatEff: 1.3,

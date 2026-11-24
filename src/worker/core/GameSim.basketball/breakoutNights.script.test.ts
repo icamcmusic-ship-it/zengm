@@ -4,8 +4,11 @@
 // top 3 in usage (season FGA + 0.44 FTA + TOV per game, players with 10+ games for the team) and outside its top 3 scorers (PPG); the
 // game-to-game points SD (and SD / mean) of stars (top 3 in usage) and role players (the rest, 40+ games at 15+ MPG); league totals per
 // team-game; the scoring leader and the 25+ PPG count (40+ games); and the minutes distribution (MPG by minutes rank in each team-game,
-// 40+ minute games, the minutes of bench players' 20+ point games). BREAKOUT_OUT writes one JSON line per season (to pool several seeds).
-//   BREAKOUT=1 [BREAKOUT_SEED=1] [BREAKOUT_SEASONS=2] [BREAKOUT_SETTINGS='{}'] [BREAKOUT_OUT=/tmp/x.jsonl]
+// 40+ minute games, the minutes of bench players' 20+ point games); and injuries (players out per team-game and their distribution,
+// games missed per team-season, new injuries and their lengths, hardship signings). BREAKOUT_OUT writes one JSON line per season (to
+// pool several seeds), BREAKOUT_CONST changes breakout.ts constants (for tuning).
+//   BREAKOUT=1 [BREAKOUT_SEED=1] [BREAKOUT_SEASONS=2] [BREAKOUT_SETTINGS='{}'] [BREAKOUT_CONST='{"careerProb":0.005}']
+//   [BREAKOUT_OUT=/tmp/x.jsonl]
 //   npx vitest run --project basketball --silent=false <this file>
 import "fake-indexeddb/auto";
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
@@ -21,6 +24,8 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers, lock } from "../../util/index.ts";
 import gameSimPresets from "../../../ui/views/Settings/gameSimPresets.ts";
 import { FLOW_DIAG } from "./gameFlow.ts";
+import { hardshipDiag } from "../freeAgents/hardship.ts";
+import { BREAKOUT } from "./breakout.ts";
 
 const env = (globalThis as any).process.env;
 
@@ -50,6 +55,17 @@ const summarize = (games, season) => {
 		tov: 0,
 	};
 	const minRank = new Array(13).fill(0);
+	// Injuries: players out (didn't play, injured before the game) per team-game and their distribution, new in-game injuries and
+	// their lengths, team-games with fewer than 8 available (roster minus out) and with 4+ out
+	const inj = {
+		outDist: new Array(8).fill(0),
+		out: 0,
+		newInj: 0,
+		newGames: 0,
+		new10: 0,
+		avail8: 0,
+		out4: 0,
+	};
 	let teamGames = 0;
 	let min40 = 0;
 	for (const gm of games) {
@@ -57,6 +73,28 @@ const summarize = (games, season) => {
 			teamGames += 1;
 			tot.g += 1;
 			const mins = [];
+			let out = 0;
+			for (const p of t.players) {
+				const i0 = p.injuryAtStart ?? p.injury;
+				if (
+					!(p.min > 0) &&
+					i0 &&
+					i0.gamesRemaining > 0 &&
+					!i0.newThisGame &&
+					!p.injury?.newThisGame
+				) {
+					out += 1;
+				}
+				if (p.injury?.newThisGame) {
+					inj.newInj += 1;
+					inj.newGames += p.injury.gamesRemaining;
+					inj.new10 += Number(p.injury.gamesRemaining >= 10);
+				}
+			}
+			inj.out += out;
+			inj.outDist[Math.min(7, out)] += 1;
+			inj.avail8 += Number(t.players.length - out < 8);
+			inj.out4 += Number(out >= 4);
 			for (const p of t.players) {
 				if (p.min <= 0) {
 					continue;
@@ -187,6 +225,17 @@ const summarize = (games, season) => {
 		minRank: minRank.map((m) => m / teamGames),
 		min40PerTeamGame: min40 / teamGames,
 		benchBigMin: mean(benchBigMin),
+		injuries: {
+			outPerTeamGame: inj.out / teamGames,
+			missedPerTeamSeason: inj.out / (teamGames / 82),
+			newPerTeamGame: inj.newInj / teamGames,
+			newMeanGames: inj.newGames / Math.max(1, inj.newInj),
+			new10PerSeason: inj.new10,
+			outDist: inj.outDist.map((x) => x / teamGames),
+			out4TeamGames: inj.out4,
+			avail8TeamGames: inj.avail8,
+			hardship: { ...hardshipDiag },
+		},
 	};
 };
 
@@ -200,6 +249,8 @@ const fmt = (s) =>
 		`  pts SD role  n ${s.sdRole.n} ppg ${f(s.sdRole.ppg)} SD ${f(s.sdRole.sd)} (p10/50/90 ${f(s.sdRole.sdP10)}/${f(s.sdRole.sdP50)}/${f(s.sdRole.sdP90)}) CV ${f(s.sdRole.cv, 3)} max ${f(s.sdRole.max, 1)}`,
 		`  league pts ${f(s.league.pts)} FG% ${f(s.league.fgp, 3)} 3P% ${f(s.league.tpp, 3)} AST ${f(s.league.ast)} TOV ${f(s.league.tov)}`,
 		`  scoring leader ${f(s.leaderPpg, 1)} PPG, 25+ PPG ${s.ppg25}`,
+		`  injuries: out per team-game ${f(s.injuries.outPerTeamGame, 3)} (missed per team-season ${f(s.injuries.missedPerTeamSeason, 1)}) dist 0..7+ ${s.injuries.outDist.map((x) => f(x, 3)).join("/")} | 4+ out team-games ${s.injuries.out4TeamGames} | <8 available ${s.injuries.avail8TeamGames}`,
+		`  new injuries per team-game ${f(s.injuries.newPerTeamGame, 3)} mean length ${f(s.injuries.newMeanGames, 1)} 10+ games ${s.injuries.new10PerSeason} | hardship ${JSON.stringify(s.injuries.hardship)}`,
 		`  MPG by minutes rank ${s.minRank.map((m) => f(m, 1)).join("/")} | 40+ min per team-game ${f(s.min40PerTeamGame, 3)} | bench 20+ pt games avg min ${f(s.benchBigMin, 1)}`,
 	].join("\n");
 
@@ -210,6 +261,7 @@ test.skipIf(!env.BREAKOUT)(
 		const seed = Number(env.BREAKOUT_SEED ?? 1);
 		const numSeasons = Number(env.BREAKOUT_SEASONS ?? 2);
 		const extra = JSON.parse(env.BREAKOUT_SETTINGS ?? "{}");
+		Object.assign(BREAKOUT, JSON.parse(env.BREAKOUT_CONST ?? "{}"));
 		const out = env.BREAKOUT_OUT;
 		Math.random = makeSeededRandom(seed);
 		FLOW_DIAG.on = true;
@@ -251,6 +303,9 @@ test.skipIf(!env.BREAKOUT)(
 			const s = g.get("season");
 			await phase.newPhase(PHASE.REGULAR_SEASON, {});
 			await lock.set("gameSim", false);
+			for (const k of Object.keys(hardshipDiag)) {
+				hardshipDiag[k] = 0;
+			}
 			let guard = 0;
 			while (
 				g.get("phase") === PHASE.REGULAR_SEASON ||

@@ -243,3 +243,79 @@ test("hardship: a short-handed AI team signs a minimum free agent and releases h
 	);
 	assert.strictEqual(hardshipDiag.signed, 0);
 });
+
+test("hardship: the NBA rule, 4+ out who have missed 3+ games and are out for a while yet", async () => {
+	g.setWithoutSavingToDB("featureAiRosterBalance" as any, true);
+	g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+	g.setWithoutSavingToDB("userTids", [0]);
+	g.setWithoutSavingToDB("maxRosterSize", 15);
+	g.setWithoutSavingToDB("minRosterSize", 13);
+	g.setWithoutSavingToDB("salaryCapType", "none");
+	const positions = ["PG", "SG", "G", "SF", "GF", "F", "PF", "C", "FC"];
+	const players: PlayerWithoutKey[] = [];
+	for (const tid of [0, 1]) {
+		for (let i = 0; i < 13; i++) {
+			players.push(genPlayer(tid, positions[i % positions.length]!, 50));
+		}
+	}
+	for (let i = 0; i < 4; i++) {
+		players.push(genPlayer(PLAYER.FREE_AGENT, i < 2 ? "SF" : "C", 45 + i));
+	}
+	const teams = helpers.getTeamsDefault().slice(0, 2).map(team.generate);
+	await resetCache({ players, teams });
+	const season = g.get("season");
+	// Out for `remaining` more games of an injury of `total`
+	const hurt = async (p: any, total: number, remaining: number) => {
+		p.injury = { type: "Sprained Ankle", gamesRemaining: remaining };
+		p.injuries = [{ season, games: total, type: "Sprained Ankle" }];
+		await idb.cache.players.put(p);
+	};
+	const roster = await idb.cache.players.indexGetAll("playersByTid", 1);
+	const numHardship = async () =>
+		(await idb.cache.players.indexGetAll("playersByTid", 1)).filter(
+			(p) => p.hardship !== undefined,
+		).length;
+
+	// 4 out, but one has missed only 2 games: 9 available, nothing
+	for (const p of roster.slice(0, 3)) {
+		await hurt(p, 20, 15);
+	}
+	await hurt(roster[3], 20, 18);
+	hardshipDiag.signed = 0;
+	await team.checkRosterSizes("other");
+	assert.strictEqual(await numHardship(), 0);
+	// ... or one back in 5 games: still nothing
+	await hurt(roster[3], 10, 5);
+	await team.checkRosterSizes("other");
+	assert.strictEqual(await numHardship(), 0);
+	// 4 out with 3+ missed and 6+ to go: one signing
+	await hurt(roster[3], 20, 15);
+	await team.checkRosterSizes("other");
+	assert.strictEqual(await numHardship(), 1);
+	assert.strictEqual(hardshipDiag.signed, 1);
+	// A 5th: a second one
+	await hurt(roster[4], 20, 15);
+	await team.checkRosterSizes("other");
+	assert.strictEqual(await numHardship(), 2);
+	// One back (4 still out): one is released
+	roster[4]!.injury = { type: "Healthy", gamesRemaining: 0 };
+	await idb.cache.players.put(roster[4]!);
+	await team.checkRosterSizes("other");
+	assert.strictEqual(await numHardship(), 1);
+	// Another back, 3 out: the last one goes too (no room on the roster to keep him)
+	roster[3]!.injury = { type: "Healthy", gamesRemaining: 0 };
+	await idb.cache.players.put(roster[3]!);
+	await team.checkRosterSizes("other");
+	assert.strictEqual(await numHardship(), 0);
+	// The user's team is never touched
+	for (const p of (
+		await idb.cache.players.indexGetAll("playersByTid", 0)
+	).slice(0, 6)) {
+		await hurt(p, 20, 15);
+	}
+	await team.checkRosterSizes("other");
+	assert.strictEqual(
+		(await idb.cache.players.indexGetAll("playersByTid", 0)).length,
+		13,
+	);
+});

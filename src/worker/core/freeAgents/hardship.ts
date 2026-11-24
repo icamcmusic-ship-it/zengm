@@ -1,7 +1,8 @@
-// AI Roster Balance (the aiRosterBalance setting, basketball): hardship signings. An AI team down to fewer than 8 players who can play
-// in the next few games signs a cheap free agent (the minimum, to the end of the season) and releases him once it is healthy again,
-// unless its roster has room to keep him. Up to 2 over the maximum roster (they do not count against it), no random numbers. Called from team.checkRosterSizes before
-// each regular season game day. See docs/native-features.md.
+// AI Roster Balance (the aiRosterBalance setting, basketball): hardship signings. Like the NBA's hardship exception, an AI team with 4+
+// players out who have missed 3+ games and are out for a while yet (one more for each such player past 3), or down to fewer than 8
+// players who can play in the next few games, signs a cheap free agent (the minimum, to the end of the season) and releases him once it
+// no longer qualifies, unless its roster has room to keep him. Up to 3 over the maximum roster (they do not count against it), no
+// random numbers. Called from team.checkRosterSizes before each regular season game day. See docs/native-features.md.
 import { PHASE } from "../../../common/constants.ts";
 import type { Player } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
@@ -12,25 +13,44 @@ import getPayroll from "../team/getPayroll.ts";
 import { rosterBalanceOn, sortByNeed } from "./rosterBalance.ts";
 
 export const HARDSHIP = {
-	// Fewer than this many players available ...
+	// The NBA's rule: this many players out ...
+	nbaOut: 4,
+	// ... each of whom has missed this many games ...
+	nbaMissed: 3,
+	// ... and is out for at least this many more (the NBA's "two more weeks"). One signing for each such player past nbaOut - 1
+	nbaRemaining: 6,
+	// Or short-handed: fewer than this many players available ...
 	minHealthy: 8,
 	// ... counting the ones back within this many games, so it's short-handed for a stretch, not one night
 	lookaheadGames: 3,
-	// Released once this many others are healthy (one more than minHealthy, so the next injury doesn't sign him right back)
+	// Released once this many others are healthy (one more than minHealthy, so the next injury doesn't sign him right back) and
+	// fewer than nbaOut others are out (any injury: one back from his injury ends it, as in the NBA)
 	releaseHealthy: 9,
 	// Kept instead when the roster has at least this many open spots with him on it
 	keepOpenSpots: 2,
 	// Like the NBA's hardship exception, up to this many over the maximum roster (they don't count against it, team/checkRosterSizes.ts)
-	extraSpots: 2,
+	extraSpots: 3,
 };
+
+// The games he has missed with his current injury (0 if it isn't on record) and whether he counts for the NBA rule
+const gamesMissed = (p: Player) => {
+	const rec = p.injuries?.at(-1);
+	return rec !== undefined && rec.type === p.injury.type
+		? rec.games - p.injury.gamesRemaining
+		: 0;
+};
+export const nbaHardshipOut = (p: Player) =>
+	p.injury.gamesRemaining >= HARDSHIP.nbaRemaining &&
+	gamesMissed(p) >= HARDSHIP.nbaMissed;
 
 // Counts for the calibration script (rosterBalance.script.test.ts)
 export const hardshipDiag = {
 	signed: 0,
 	released: 0,
 	kept: 0,
-	// Team-days short-handed (by the lookahead) and how many of them with no roster spot to sign one
+	// Team-days short-handed (by the lookahead, or by the NBA rule) and how many of them with no roster spot to sign one
 	shortDays: 0,
+	nbaDays: 0,
 	noRoom: 0,
 };
 
@@ -57,14 +77,22 @@ export const hardshipMoves = async (
 	const maxRosterSize = g.get("maxRosterSize");
 	const season = g.get("season");
 
-	// Healthy again: release or keep the hardship signings
+	// Healthy again: release or keep the hardship signings (down to the NBA rule's count while 4+ others are still out)
 	const hardship = players.filter((p) => isHardshipPlayer(p, tid));
 	if (hardship.length > 0) {
-		const healthyOthers = players.filter(
-			(p) => p.injury.gamesRemaining === 0 && !hardship.includes(p),
+		const others = players.filter((p) => !hardship.includes(p));
+		const healthyOthers = others.filter(
+			(p) => p.injury.gamesRemaining === 0,
 		).length;
-		if (healthyOthers >= HARDSHIP.releaseHealthy) {
-			for (const p of hardship.toSorted((a, b) => a.value - b.value)) {
+		const keepNba = Math.max(
+			0,
+			others.filter((p) => p.injury.gamesRemaining > 0).length -
+				(HARDSHIP.nbaOut - 1),
+		);
+		if (healthyOthers >= HARDSHIP.releaseHealthy && hardship.length > keepNba) {
+			for (const p of hardship
+				.toSorted((a, b) => a.value - b.value)
+				.slice(0, hardship.length - keepNba)) {
 				if (players.length <= maxRosterSize - HARDSHIP.keepOpenSpots) {
 					delete p.hardship;
 					await idb.cache.players.put(p);
@@ -80,15 +108,24 @@ export const hardshipMoves = async (
 		}
 	}
 
-	// Short-handed (the hardship signings so far count as available): sign one more for each player missing
+	// Short-handed (the hardship signings so far count as available): sign one more for each player missing. The NBA rule: one for
+	// each player out past 3
 	const available = players.filter(
 		(p) => p.injury.gamesRemaining < HARDSHIP.lookaheadGames,
 	).length;
+	const nbaSpots =
+		players.filter((p) => !isHardshipPlayer(p, tid) && nbaHardshipOut(p))
+			.length -
+		(HARDSHIP.nbaOut - 1);
+	const numHardship = players.filter((p) => isHardshipPlayer(p, tid)).length;
 	let numToSign = Math.min(
-		HARDSHIP.minHealthy - available,
+		Math.max(HARDSHIP.minHealthy - available, nbaSpots - numHardship),
 		maxRosterSize + HARDSHIP.extraSpots - players.length,
 	);
-	if (available < HARDSHIP.minHealthy) {
+	if (nbaSpots > 0) {
+		hardshipDiag.nbaDays += 1;
+	}
+	if (available < HARDSHIP.minHealthy || nbaSpots > numHardship) {
 		hardshipDiag.shortDays += 1;
 		if (numToSign <= 0) {
 			hardshipDiag.noRoom += 1;

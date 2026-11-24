@@ -8,7 +8,10 @@ import { defaultTragicDeaths } from "../util/defaultTragicDeaths.ts";
 import { defaultInjuries } from "../util/defaultInjuries.ts";
 import { newLeagueGodModeLimits } from "../util/newLeagueGodModeLimits.ts";
 import { getNewLeagueLid } from "../util/getNewLeagueLid.ts";
-import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
+import {
+	defaultGameAttributes,
+	NEW_LEAGUE_INJURY_RATE,
+} from "../../common/defaultGameAttributes.ts";
 import { DEFAULT_REAL_DRAFT_RATINGS } from "../../common/constants.ts";
 import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
@@ -82,7 +85,11 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"aiTradeOffersFrequency",
 		),
-		injuryRate: unwrapGameAttribute(defaultGameAttributes, "injuryRate"),
+		// Basketball: a higher rate for new leagues (existing leagues keep theirs)
+		injuryRate:
+			__SPORT === "basketball"
+				? NEW_LEAGUE_INJURY_RATE
+				: unwrapGameAttribute(defaultGameAttributes, "injuryRate"),
 		homeCourtAdvantage: unwrapGameAttribute(
 			defaultGameAttributes,
 			"homeCourtAdvantage",
