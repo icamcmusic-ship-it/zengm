@@ -705,6 +705,8 @@ and at 40 px.
 - **Edited faces:** a face changed in Customize Player (God Mode or a new player) is locked from aging. Ticking _Allow aging_ under
   the face lets it age on from the edited face: hairline, grey, lines and fullness move from there; the hair and beard style,
   headband and glasses stay the user's (no style events). Stored as `p.faceAging.e` / `.a`.
+- **Relatives:** a new son or brother takes after his relative's face as generated (`faceAging.b` applied), not his aged one, so
+  he doesn't inherit a father's grey hair, lines or hairline (`player/addRelatives.ts`).
 
 ### Style and life events
 

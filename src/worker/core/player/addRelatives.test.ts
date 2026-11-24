@@ -284,6 +284,47 @@ describe("makeSon", () => {
 		assert.strictEqual(son.born.loc, father.born.loc);
 	});
 
+	test("a son takes after his father's generated face, not his aged one", async () => {
+		const AGED = "#aaaaaa";
+		const BASE = "#111111";
+		const colors = new Set<string>();
+		for (let i = 0; i < 8; i++) {
+			const fathers = genFathers();
+			for (const father of fathers) {
+				father.imgURL = "";
+				// Face Aging: grey now, black when he was generated
+				father.face.hair.color = AGED;
+				father.faceAging = {
+					b: {
+						hi: father.face.hair.id,
+						hc: BASE,
+						fh: father.face.facialHair.id,
+						el: father.face.eyeLine.id,
+						sl: father.face.smileLine.id,
+						ss: father.face.smileLine.size,
+						ml: father.face.miscLine.id,
+						ft: father.face.fatness,
+						sh: father.face.head.shave,
+					},
+					h: {},
+				};
+			}
+			await resetCache({
+				players: [
+					player.generate(PLAYER.UNDRAFTED, 20, season, true, DEFAULT_LEVEL),
+					...fathers,
+				],
+			});
+			const son = await getPlayer(0);
+			await makeSon(son);
+			assert.strictEqual(son.relatives.length, 1);
+			colors.add(son.face.hair.color);
+		}
+		assert.isFalse(colors.has(AGED));
+		// facesjs keeps a relative's hair colour 75% of the time
+		assert.isTrue(colors.has(BASE));
+	});
+
 	test("skip player if no possible father exists", async () => {
 		await resetCache({
 			players: [
