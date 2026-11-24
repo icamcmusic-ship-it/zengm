@@ -4,6 +4,7 @@ import type { Player } from "../../../common/types.ts";
 import {
 	BACK_TO_BACK_ENDURANCE,
 	getInjuryRiskFactor,
+	getLateSeasonRest,
 	getRestrictionFactor,
 	isBackToBack,
 	isInjuryDepthEnabled,
@@ -27,7 +28,9 @@ export const applyInjuryDepth = (
 		foFatigue?: SimFatigue;
 	},
 	teamInput: { tid: number; loadManagement?: boolean },
-	teamSeason: { lastGameDay?: number },
+	teamSeason: Parameters<typeof getLateSeasonRest>[0] & {
+		lastGameDay?: number;
+	},
 	players: Player[],
 ) => {
 	if (!isInjuryDepthEnabled() || t.id < 0) {
@@ -35,6 +38,8 @@ export const applyInjuryDepth = (
 	}
 
 	const backToBack = isBackToBack(teamSeason.lastGameDay);
+	// Late-season rest for a team with nothing left to play for (clinched the #1 seed, or eliminated)
+	const lateSeason = getLateSeasonRest(teamSeason);
 	const playersByPid = new Map(players.map((p) => [p.pid, p]));
 
 	const aiControlled =
@@ -64,7 +69,7 @@ export const applyInjuryDepth = (
 			continue;
 		}
 
-		if (backToBack) {
+		if (backToBack || lateSeason) {
 			const rest = shouldRest({
 				// The per-player flag is the user's: on an AI team it's ignored (one set before a trade or release in an older league)
 				p: userTeam ? p : { ...p, loadManagement: undefined },
@@ -73,6 +78,8 @@ export const applyInjuryDepth = (
 				aiControlled,
 				numHealthy,
 				rank: rankByPid.get(p.pid) ?? 99,
+				backToBack,
+				lateSeason,
 			});
 			if (rest) {
 				p2.injured = true;
@@ -80,7 +87,9 @@ export const applyInjuryDepth = (
 				numHealthy -= 1;
 				continue;
 			}
+		}
 
+		if (backToBack) {
 			if (p2.compositeRating.endurance !== undefined) {
 				p2.compositeRating.endurance *=
 					// Front Office Budget: Travel & Sports Science scales the penalty (undefined when off)

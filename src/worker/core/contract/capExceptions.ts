@@ -2,6 +2,7 @@
 import { PHASE } from "../../../common/constants.ts";
 import {
 	CAP_EXCEPTIONS,
+	DISABLED_PLAYER,
 	FIRST_APRON_FACTOR,
 	REPEATER_TAX_MIN_SEASONS,
 	REPEATER_TAX_SEASONS,
@@ -10,9 +11,18 @@ import {
 	type CapExceptionUse,
 } from "../../../common/capExceptions.ts";
 import type { GmWeights } from "../../../common/gmPersonality.ts";
-import type { Contract, Player, Team } from "../../../common/types.ts";
+import type {
+	Conditions,
+	Contract,
+	Player,
+	Team,
+} from "../../../common/types.ts";
+import {
+	getContractAmount,
+	getCurrentContract,
+} from "../../../common/contracts.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, logEvent } from "../../util/index.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 
@@ -57,6 +67,17 @@ const getAprons = () => {
 
 type TeamExceptions = Pick<Team, "capExceptions">;
 
+// Disabled player exceptions that can be used right now, biggest first: granted this season, not used, before the trade deadline
+export const getUnusedDisabledPlayerExceptions = (t: TeamExceptions) => {
+	if (g.get("phase") !== PHASE.REGULAR_SEASON) {
+		return [];
+	}
+	const season = g.get("season");
+	return (t.capExceptions?.disabledPlayer ?? [])
+		.filter((dpe) => dpe.season === season && dpe.usedPid === undefined)
+		.toSorted((a, b) => b.amount - a.amount);
+};
+
 const usesThisYear = (t: TeamExceptions, leagueYear: number) =>
 	(t.capExceptions?.uses ?? []).filter((use) => use.season === leagueYear);
 
@@ -79,7 +100,12 @@ export const getAvailableCapExceptions = (
 	}
 
 	const leagueYear = getLeagueYear();
-	const used = new Set(usesThisYear(t, leagueYear).map((use) => use.type));
+	// (a disabled player exception's use doesn't count against the others)
+	const used = new Set(
+		usesThisYear(t, leagueYear)
+			.filter((use) => use.type !== "disabledPlayer")
+			.map((use) => use.type),
+	);
 	const usedCapSpace = t.capExceptions?.capSpaceSeason === leagueYear;
 	const aprons = getAprons();
 	const minContract = g.get("minContract");
@@ -106,6 +132,21 @@ export const getAvailableCapExceptions = (
 	}
 
 	const available: AvailableCapException[] = [];
+
+	// Disabled player exception: apart from the others (also after using cap space), no apron limit, the biggest one left
+	const dpe = getUnusedDisabledPlayerExceptions(t)[0];
+	const dpeAmount = dpe
+		? Math.min(dpe.amount, Math.floor(payrollCeiling - payroll))
+		: 0;
+	if (dpe && dpeAmount > minContract) {
+		available.push({
+			type: "disabledPlayer",
+			amount: dpeAmount,
+			fullAmount: dpe.amount,
+			maxYears: getCapExceptionMaxYears("disabledPlayer"),
+		});
+	}
+
 	for (const { type, ceiling } of types) {
 		const fullAmount = getCapExceptionAmount(type);
 		const amount = Math.min(
@@ -173,6 +214,30 @@ const prune = (t: TeamExceptions, leagueYear: number) => {
 		t.capExceptions.uses = t.capExceptions.uses.filter(
 			(use) => use.season >= leagueYear - 1,
 		);
+		// Disabled player exceptions are only good in the season they're granted
+		if (t.capExceptions.disabledPlayer) {
+			const season = g.get("season");
+			t.capExceptions.disabledPlayer = t.capExceptions.disabledPlayer.filter(
+				(dpe) => dpe.season === season,
+			);
+			if (t.capExceptions.disabledPlayer.length === 0) {
+				delete t.capExceptions.disabledPlayer;
+			}
+		}
+	}
+};
+
+// Use up the smallest unused disabled player exception that covers the amount
+const useDisabledPlayerException = (
+	t: TeamExceptions,
+	pid: number,
+	amount: number,
+) => {
+	const dpe = getUnusedDisabledPlayerExceptions(t).findLast(
+		(dpe) => dpe.amount >= amount,
+	);
+	if (dpe) {
+		dpe.usedPid = pid;
 	}
 };
 
@@ -230,6 +295,9 @@ export const recordCapExceptionSigning = async (
 			pid,
 			amount,
 		});
+		if (exception === "disabledPlayer") {
+			useDisabledPlayerException(t, pid, amount);
+		}
 	} else {
 		t.capExceptions.capSpaceSeason = leagueYear;
 	}
@@ -627,4 +695,158 @@ export const stretchHardCapSeason = ({
 			return season;
 		}
 	}
+};
+
+// Disabled player exception: what a season-ending injury to a player with this salary is worth
+export const getDisabledPlayerExceptionAmount = (salary: number) =>
+	Math.min(
+		helpers.roundContract(DISABLED_PLAYER.salaryFraction * salary),
+		getCapExceptionAmount("nonTaxpayerMle"),
+	);
+
+// Out for the rest of the regular season (his injury lasts at least as long as his team's games left), in the first half of it (the
+// NBA's January 15 deadline). gp: his team's games played. The injury countdown is per day tick, about one per team game
+export const isDisabledPlayerInjury = (
+	p: Pick<Player, "injury">,
+	gp: number,
+) => {
+	const numGames = g.get("numGames");
+	return (
+		p.injury.gamesRemaining > 0 &&
+		gp <= DISABLED_PLAYER.maxSeasonFraction * numGames &&
+		p.injury.gamesRemaining >= numGames - gp
+	);
+};
+
+// After each regular season day: grant a disabled player exception to the team of each player who is now out for the season. Once per
+// player and season, kept even if he comes back early or is traded or released (as in the NBA). players: everyone on a team
+export const grantDisabledPlayerExceptions = async (
+	players: Player[],
+	conditions?: Conditions,
+) => {
+	if (!capExceptionsEnabled() || g.get("phase") !== PHASE.REGULAR_SEASON) {
+		return;
+	}
+	const season = g.get("season");
+	const minContract = g.get("minContract");
+	// (in the window, a team has at least the other half of its games left)
+	const minGamesOut =
+		(1 - DISABLED_PLAYER.maxSeasonFraction) * g.get("numGames");
+	const candidates = players.filter(
+		(p) =>
+			p.tid >= 0 &&
+			p.injury.gamesRemaining > 0 &&
+			p.injury.gamesRemaining >= minGamesOut,
+	);
+	for (const p of candidates) {
+		const contract = getCurrentContract(p);
+		const salary = contract ? getContractAmount(contract, season) : undefined;
+		if (salary === undefined) {
+			continue;
+		}
+		const amount = getDisabledPlayerExceptionAmount(salary);
+		// Half a minimum contract signs nobody (minimum contracts never need an exception)
+		if (amount <= minContract) {
+			continue;
+		}
+		const teamSeason = await idb.cache.teamSeasons.indexGet(
+			"teamSeasonsByTidSeason",
+			[p.tid, season],
+		);
+		if (
+			!teamSeason ||
+			!isDisabledPlayerInjury(p, helpers.getTeamSeasonGp(teamSeason))
+		) {
+			continue;
+		}
+		const t = await idb.cache.teams.get(p.tid);
+		if (
+			!t ||
+			t.capExceptions?.disabledPlayer?.some(
+				(dpe) => dpe.season === season && dpe.pid === p.pid,
+			)
+		) {
+			continue;
+		}
+		t.capExceptions ??= { uses: [] };
+		prune(t, getLeagueYear());
+		t.capExceptions.disabledPlayer ??= [];
+		t.capExceptions.disabledPlayer.push({ season, pid: p.pid, amount });
+		await idb.cache.teams.put(t);
+
+		const info = g.get("teamInfoCache")[p.tid];
+		logEvent(
+			{
+				type: "capException",
+				text: `The <a href="${helpers.leagueUrl(["roster", `${info?.abbrev}_${p.tid}`, season])}">${info?.region} ${info?.name}</a> were granted a ${helpers.formatCurrency(amount / 1000, "M")} disabled player exception for <a href="${helpers.leagueUrl(["player", p.pid])}">${p.firstName} ${p.lastName}</a>, out for the season with ${helpers.pronoun(g.get("gender"), "his")} ${p.injury.type.toLowerCase()}. It can be used to sign or trade for one player on a contract that ends this season, until the trade deadline.`,
+				pids: [p.pid],
+				tids: [p.tid],
+				score: 0,
+				showNotification: g.get("userTids").includes(p.tid),
+			},
+			conditions,
+		);
+	}
+};
+
+// Disabled player exception in a trade: a team that ends up over the cap can take in one player whose contract ends this season and
+// whose salary fits its exception, outside salary matching; the rest of the trade still has to match. received: the players it gets
+// (salary this season, contract end), sent: the salaries it trades away. Returns the pid of the player it uses the exception on, the
+// most expensive one that works, or undefined. Amounts in thousands.
+export const pickTradeDisabledPlayerException = (
+	t: TeamExceptions,
+	payrollBefore: number,
+	received: { pid: number; amount: number; exp: number }[],
+	sentTotal: number,
+) => {
+	if (!capExceptionsEnabled()) {
+		return;
+	}
+	const dpe = getUnusedDisabledPlayerExceptions(t)[0];
+	if (!dpe) {
+		return;
+	}
+	const season = g.get("season");
+	const receivedTotal = received.reduce((sum, p) => sum + p.amount, 0);
+	const salaryCap = g.get("salaryCap");
+	const match = g.get("softCapTradeSalaryMatch");
+	let best: { pid: number; amount: number } | undefined;
+	for (const p of received) {
+		if (p.exp !== season || p.amount > dpe.amount) {
+			continue;
+		}
+		// Without him, the rest is either under the cap or matched like any trade (summary.ts's rule)
+		const rest = receivedTotal - p.amount;
+		const ok =
+			payrollBefore + rest - sentTotal <= salaryCap ||
+			(sentTotal > 0
+				? Math.floor((100 * rest) / sentTotal) <= match
+				: rest === 0);
+		if (ok && (!best || p.amount > best.amount)) {
+			best = p;
+		}
+	}
+	return best?.pid;
+};
+
+// Record a disabled player exception used in a trade (processTrade.ts)
+export const recordTradeDisabledPlayerException = async (
+	tid: number,
+	pid: number,
+	amount: number,
+) => {
+	const t = await idb.cache.teams.get(tid);
+	if (!t?.capExceptions) {
+		return;
+	}
+	const leagueYear = getLeagueYear();
+	prune(t, leagueYear);
+	t.capExceptions.uses.push({
+		season: leagueYear,
+		type: "disabledPlayer",
+		pid,
+		amount,
+	});
+	useDisabledPlayerException(t, pid, amount);
+	await idb.cache.teams.put(t);
 };

@@ -160,6 +160,10 @@ export const types: Partial<
 		text: "Luxury Tax",
 		category: "team",
 	},
+	capException: {
+		text: "Cap Exception",
+		category: "team",
+	},
 	luxuryTaxDist: {
 		text: "Luxury Tax Dist",
 		category: "team",

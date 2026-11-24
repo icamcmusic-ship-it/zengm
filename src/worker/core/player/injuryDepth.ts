@@ -13,19 +13,23 @@ import type {
 	Player,
 	PlayerHealth,
 	PlayerInjury,
+	TeamSeason,
 } from "../../../common/types.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { hasMajorPreDraftInjury } from "../../../common/collegeStats/injuries.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
+import { scaleGamesToSeason } from "../season/scheduleDayScale.ts";
 
 export const isInjuryDepthEnabled = () =>
 	__SPORT === "basketball" && !!g.get("injuryDepth");
 
-// Re-injury window after returning, in days (the injury countdown is per day, like the rest of the injury code)
+// Re-injury window after returning, in days (the injury countdown is per day, like the rest of the injury code), for an 82-game
+// season: getReturnGames scales it to the league's season length
 export const RETURN_GAMES = 15;
+export const getReturnGames = () => scaleGamesToSeason(RETURN_GAMES);
 
-// Extra risk right after returning, fading to nothing over RETURN_GAMES
+// Extra risk right after returning, fading to nothing over the return window
 export const RETURN_RISK = 0.8;
 
 export const PRONE_RISK = 1.4;
@@ -123,7 +127,9 @@ export const getInjuryRiskFactor = (
 		factor *= PRONE_RISK;
 	}
 	if (p.health && p.health.returnGames > 0) {
-		factor *= 1 + (RETURN_RISK * p.health.returnGames) / RETURN_GAMES;
+		// (bounded: a window started before the season length changed can be longer than the current one)
+		factor *=
+			1 + RETURN_RISK * Math.min(1, p.health.returnGames / getReturnGames());
 	}
 	if (backToBack) {
 		factor *= BACK_TO_BACK_RISK;
@@ -158,7 +164,7 @@ export const onHealed = (p: Player) => {
 	p.health = {
 		restrict,
 		restrictTotal: restrict,
-		returnGames: RETURN_GAMES,
+		returnGames: getReturnGames(),
 		bodyPart: injuryBodyPart(type),
 	};
 };
@@ -251,7 +257,49 @@ export const isBackToBack = (lastGameDay: number | undefined) =>
 	lastGameDay === simDay - 1 &&
 	g.get("phase") !== PHASE.PLAYOFFS;
 
-// Should this player sit out the second night of a back-to-back?
+// Late-season rest: in the last LATE_SEASON_GAMES games of an 82-game season (scaled to the season length), a team that has clinched
+// the #1 seed (it can't move) or has been eliminated rests its veterans and injury-prone players more
+export const LATE_SEASON_GAMES = 10;
+export const LATE_SEASON_REST_AGE = 30;
+
+export type LateSeasonRest = {
+	status: "clinched" | "eliminated";
+	// This game's number in the team's season (1-based), for resting every other game without random numbers
+	gameNumber: number;
+};
+
+export const getLateSeasonRest = (teamSeason: {
+	clinchedPlayoffs?: TeamSeason["clinchedPlayoffs"];
+	won: number;
+	lost: number;
+	tied?: number;
+	otl?: number;
+}): LateSeasonRest | undefined => {
+	const phase = g.get("phase");
+	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
+		return;
+	}
+	const clinched = teamSeason.clinchedPlayoffs;
+	if (clinched !== "z" && clinched !== "o") {
+		return;
+	}
+	const gp =
+		teamSeason.won +
+		teamSeason.lost +
+		(teamSeason.tied ?? 0) +
+		(teamSeason.otl ?? 0);
+	const gamesLeft = g.get("numGames") - gp;
+	if (gamesLeft <= 0 || gamesLeft > scaleGamesToSeason(LATE_SEASON_GAMES)) {
+		return;
+	}
+	return {
+		status: clinched === "z" ? "clinched" : "eliminated",
+		gameNumber: gp + 1,
+	};
+};
+
+// Should this player sit out the game? Called for the second night of a back-to-back, and for every game of a team in its late-season
+// rest window (lateSeason)
 export const shouldRest = ({
 	p,
 	age,
@@ -259,6 +307,8 @@ export const shouldRest = ({
 	aiControlled,
 	numHealthy,
 	rank,
+	backToBack = true,
+	lateSeason,
 }: {
 	p: Pick<Player, "pid" | "injuries" | "loadManagement">;
 	age: number;
@@ -268,6 +318,8 @@ export const shouldRest = ({
 	numHealthy: number;
 	// 0 for the best player on the team by value
 	rank: number;
+	backToBack?: boolean;
+	lateSeason?: LateSeasonRest;
 }) => {
 	// The whole regular season, after the trade deadline too (when real teams rest the most)
 	const phase = g.get("phase");
@@ -280,7 +332,8 @@ export const shouldRest = ({
 		return false;
 	}
 
-	if (p.loadManagement) {
+	// The per-player flag is for back-to-backs
+	if (backToBack && p.loadManagement) {
 		return true;
 	}
 
@@ -292,5 +345,14 @@ export const shouldRest = ({
 	if (rank >= 8) {
 		return false;
 	}
-	return age >= 34 || (age >= 31 && isInjuryProne(p));
+	if (backToBack && (age >= 34 || (age >= 31 && isInjuryProne(p)))) {
+		return true;
+	}
+
+	// Late-season rest (nothing to play for): 30+ or injury prone, on back-to-backs and every other game otherwise (by game number and
+	// pid, so not all of them sit the same night)
+	if (lateSeason && (age >= LATE_SEASON_REST_AGE || isInjuryProne(p))) {
+		return backToBack || (lateSeason.gameNumber + p.pid) % 2 === 0;
+	}
+	return false;
 };
