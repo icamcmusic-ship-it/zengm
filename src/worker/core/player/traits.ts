@@ -25,11 +25,12 @@ import {
 	residualTraitZs,
 	scoreOne,
 	agingCurveDelta,
-	agingCurveForPlayer,
 	centerDevelopment,
 	egoTradeRequestMoodShift,
 	egoTradeRequestProbMult,
-	lockerRoomMood,
+	lockerRoomMoodFromSums,
+	moodTraitsFromPersonality,
+	lockerRoomWeight,
 	personalityTradeRequestProbMult,
 	workEthicZ,
 	AGING_CURVE_INFO,
@@ -43,12 +44,14 @@ import {
 	type TraitScores,
 } from "../../../common/playerTraits/index.ts";
 import { PLAYER } from "../../../common/constants.ts";
-import type { NonEmptyArray } from "../../../common/types.ts";
+import type { MoodTrait, NonEmptyArray } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
+import { agingCurveOf, ensureTrajectorySeed } from "./trajectory.ts";
 
 type TraitPlayer = {
 	pid?: number;
 	traits?: PlayerTraits;
+	trajectorySeed?: number;
 	born: { year: number };
 	draft: { year: number; tid?: number };
 	tid?: number;
@@ -66,6 +69,18 @@ export const traitsEnabled = () =>
 
 export const getLeagueTraitSeed = () =>
 	(__SPORT === "basketball" ? g.get("playerTraitsSeed") : 0) ?? 0;
+
+// The league seed for personality trait seeds only (generated and drifted p.traits): playerTraitsSeed with the league's personality salt,
+// when it has one (see GameAttributesLeague.personalityTraitsSalt). Exactly playerTraitsSeed without a salt, so nothing moves in leagues
+// without one. Trajectories, aging, scouting noise and mentoring keep reading getLeagueTraitSeed.
+export const getPersonalityTraitSeed = (): number | string => {
+	const seed = getLeagueTraitSeed();
+	const salt =
+		__SPORT === "basketball" && Object.hasOwn(g, "personalityTraitsSalt")
+			? (g.get("personalityTraitsSalt") ?? 0)
+			: 0;
+	return typeof salt === "number" && salt !== 0 ? `${seed}|ps${salt}` : seed;
+};
 
 // Years since the draft. Works for random-player leagues too, where players have no stats rows before the league starts. Draft prospects have 0.
 export const getTraitExperience = (p: TraitPlayer, season = g.get("season")) =>
@@ -93,7 +108,7 @@ const getContext = (p: TraitPlayer, season: number) => ({
 
 // Seeds for a player, without writing anything. Missing seeds are derived from the league seed and pid, so the answer is the same every time.
 export const getTraitSeeds = (p: TraitPlayer) =>
-	completeTraitSeeds(p.traits, getLeagueTraitSeed(), p.pid ?? 0);
+	completeTraitSeeds(p.traits, getPersonalityTraitSeed(), p.pid ?? 0);
 
 // Create p.traits if it is missing or partial. Safe to call as often as you like. Returns true if p changed.
 export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
@@ -102,12 +117,13 @@ export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
 		return false;
 	}
 	// Also repairs junk from a hand-edited league file (non-numbers, out of range)
-	const next = completeTraitSeeds(p.traits, getLeagueTraitSeed(), p.pid);
+	const next = completeTraitSeeds(p.traits, getPersonalityTraitSeed(), p.pid);
 	const same = TRAIT_KEYS.every(
 		(key) => p.traits?.[seedKey(key)] === next[seedKey(key)],
 	);
+	const trajectoryChanged = ensureTrajectorySeed(p);
 	if (same) {
-		return false;
+		return trajectoryChanged;
 	}
 	p.traits = next;
 	return true;
@@ -119,7 +135,8 @@ export const initTraits = (p: TraitPlayer & { pid: number }) => {
 	if (__SPORT !== "basketball" || !traitsEnabled()) {
 		return;
 	}
-	p.traits = generateTraitSeeds(getLeagueTraitSeed(), p.pid);
+	p.traits = generateTraitSeeds(getPersonalityTraitSeed(), p.pid);
+	ensureTrajectorySeed(p);
 };
 
 export const getPlayerTraitScores = (
@@ -196,10 +213,12 @@ export const developTraits = (
 	}
 	p.traits = driftTraitSeeds(
 		p.traits ?? {},
-		getLeagueTraitSeed(),
+		getPersonalityTraitSeed(),
 		p.pid,
 		season,
 	);
+	// (players from before it was stored get it here, the value they already had)
+	ensureTrajectorySeed(p);
 };
 
 export type PlayerTraitsForUI = {
@@ -268,9 +287,10 @@ export const getPlayerTraitsForUI = (
 	};
 };
 
-// The aging curve, for the worker only (development). Never send this to the UI: use getRevealedAgingCurve
-const getAgingCurve = (p: { pid?: number }) =>
-	agingCurveForPlayer(getLeagueTraitSeed(), p.pid ?? 0);
+// The aging curve, for the worker only (development). Never send this to the UI: use getRevealedAgingCurve. From his stored trajectory
+// seed, so it follows him to another league; without one, from the league seed and his pid as always (the same value)
+const getAgingCurve = (p: { pid?: number; trajectorySeed?: number }) =>
+	agingCurveOf({ pid: p.pid ?? 0, trajectorySeed: p.trajectorySeed });
 
 // The aging curve as the user may see it: only once he has retired (otherwise undefined, also in God Mode)
 export const getRevealedAgingCurve = (p: TraitPlayer & { pid: number }) => {
@@ -310,18 +330,161 @@ export const getTraitDevelopment = (
 export const getEgoScore = (p: TraitPlayer) =>
 	scoreOne("ego", {}, getTraitSeeds(p).egoSeed);
 
-// The "Locker room" mood component for a player on (or considering) team tid, from his would-be teammates' egos. 0 when traits are off.
+type LockerRoomPlayer = TraitPlayer & {
+	pid: number;
+	value?: number;
+	valueNoPot?: number;
+};
+
+// His weight in the locker room: his current value (lockerRoomWeight)
+const lockerRoomValue = (p: LockerRoomPlayer) => p.valueNoPot ?? p.value ?? 0;
+
+type LockerRoomTeam = {
+	key: string;
+	// The roster it was worked out for: player objects, their stored ego seeds and values (compared by identity/value)
+	players: LockerRoomPlayer[];
+	egoSeeds: (number | undefined)[];
+	values: number[];
+	// Weight and ego z of each, and their sums
+	w: number[];
+	z: number[];
+	sumW: number;
+	sumWZ: number;
+};
+
+// perf: moodInfo runs for every player and team many times over (free agency: every free agent with every team, every day), and the
+// locker room is the same for all of them. Remembered per team, checked against the roster each time (same player objects in the same
+// order, as the cache hands them back until one is replaced or the roster changes, with the same stored ego seed and value) and the league,
+// season, phase and personality seed (which derive the seeds not stored yet), so it is never stale.
+let lockerRoomCache = new Map<number, LockerRoomTeam>();
+// (off: worked out every time, for the benchmark's comparison)
+let lockerRoomCacheOn = true;
+export const setLockerRoomCache = (on: boolean) => {
+	lockerRoomCacheOn = on;
+	lockerRoomCache = new Map();
+};
+
+const lockerRoomKey = () =>
+	`${Object.hasOwn(g, "lid") ? g.get("lid") : ""}|${g.get("season")}|${g.get("phase")}|${getPersonalityTraitSeed()}`;
+
+const buildLockerRoomTeam = (
+	key: string,
+	teammates: LockerRoomPlayer[],
+): LockerRoomTeam => {
+	const team: LockerRoomTeam = {
+		key,
+		players: teammates.slice(),
+		egoSeeds: teammates.map((p) => p.traits?.egoSeed),
+		values: teammates.map(lockerRoomValue),
+		w: [],
+		z: [],
+		sumW: 0,
+		sumWZ: 0,
+	};
+	for (const [i, p] of teammates.entries()) {
+		const w = lockerRoomWeight(team.values[i]!);
+		const z = traitZ(getEgoScore(p));
+		team.w.push(w);
+		team.z.push(z);
+		team.sumW += w;
+		team.sumWZ += w * z;
+	}
+	return team;
+};
+
+const getLockerRoomTeam = (
+	teammates: LockerRoomPlayer[],
+	tid: number | undefined,
+) => {
+	const key = lockerRoomKey();
+	if (tid === undefined || !lockerRoomCacheOn) {
+		return buildLockerRoomTeam(key, teammates);
+	}
+	const hit = lockerRoomCache.get(tid);
+	if (
+		hit &&
+		hit.key === key &&
+		hit.players.length === teammates.length &&
+		teammates.every(
+			(p, i) =>
+				hit.players[i] === p &&
+				hit.egoSeeds[i] === p.traits?.egoSeed &&
+				hit.values[i] === lockerRoomValue(p),
+		)
+	) {
+		return hit;
+	}
+	const team = buildLockerRoomTeam(key, teammates);
+	lockerRoomCache.set(tid, team);
+	return team;
+};
+
+/**
+ * The "Locker room" mood component for a player on (or considering) team tid, from his would-be teammates' egos, each weighted by his
+ * value share (lockerRoomWeight in common/playerTraits/ego.ts). teammates: the team's roster (he is left out if he is on it). Pass tid to
+ * use the per-team cache. 0 when traits are off.
+ */
 export const getLockerRoomMood = (
 	p: { pid: number },
-	teammates: TraitPlayer[],
+	teammates: LockerRoomPlayer[],
+	tid?: number,
 ) => {
 	if (!traitsEnabled()) {
 		return 0;
 	}
-	return lockerRoomMood(
-		teammates.filter((p2) => p2.pid !== p.pid).map((p2) => getEgoScore(p2)),
-	);
+	const team = getLockerRoomTeam(teammates, tid);
+	let n = team.players.length;
+	let sumW = team.sumW;
+	let sumWZ = team.sumWZ;
+	for (const [i, p2] of team.players.entries()) {
+		if (p2.pid === p.pid) {
+			n -= 1;
+			sumW -= team.w[i]!;
+			sumWZ -= team.w[i]! * team.z[i]!;
+		}
+	}
+	return lockerRoomMoodFromSums(n, sumW, sumWZ);
 };
+
+/**
+ * The teammates (not p himself) who pull his "Locker room" mood down the most, worst first, at most max of them: divas (ego below 50),
+ * by weight x ego z. Only those isVisible allows (the UI passes the user's trait visibility, so a hidden ego is never given away).
+ */
+export const getLockerRoomWorstEgos = <T extends LockerRoomPlayer>(
+	p: { pid: number },
+	teammates: T[],
+	tid: number | undefined,
+	isVisible: (p2: T) => boolean,
+	max = 2,
+): T[] => {
+	if (!traitsEnabled()) {
+		return [];
+	}
+	const team = getLockerRoomTeam(teammates, tid);
+	const candidates = team.players
+		.map((p2, i) => ({ p2: p2 as T, c: team.w[i]! * team.z[i]! }))
+		.filter(({ p2, c }) => c < 0 && p2.pid !== p.pid)
+		.sort((a, b) => a.c - b.c);
+	const output: T[] = [];
+	for (const { p2 } of candidates) {
+		if (output.length >= max) {
+			break;
+		}
+		if (isVisible(p2)) {
+			output.push(p2);
+		}
+	}
+	return output;
+};
+
+// Can the user see this player's ego exactly (God Mode, or a hidden trait known after three seasons)? For naming divas in the mood panel.
+export const isEgoKnownToUser = (
+	p: TraitPlayer & { pid: number },
+	scoutingLevel?: number,
+) =>
+	getPlayerTraitsForUI(p, { scoutingLevel })?.traits.find(
+		(t) => t.key === "ego",
+	)?.exact ?? false;
 
 // Loyalty, role acceptance and money vs winning, from the seed and age alone (no ratings part), cheap enough for mood, which runs often
 export const getPersonalityScores = (
@@ -345,6 +508,20 @@ export const getPersonalityScores = (
 			context,
 		),
 	};
+};
+
+// His mood traits (F/L/$/W): from his personality with Player Traits on (moodTraitsFromPersonality), else the stored random ones, exactly
+// as before
+export const getMoodTraits = (
+	p: TraitPlayer & { moodTraits: MoodTrait[] },
+): MoodTrait[] => {
+	if (!traitsEnabled()) {
+		return p.moodTraits;
+	}
+	return moodTraitsFromPersonality({
+		...getPersonalityScores(p),
+		ego: getEgoScore(p),
+	});
 };
 
 // Trade requests: his ego moves the mood at which he asks and the chance he asks; loyalty and (when unhappy with his minutes) role

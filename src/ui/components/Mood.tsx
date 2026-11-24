@@ -130,6 +130,8 @@ type PlayerMood = {
 	components: MoodComponents;
 	probWilling: number;
 	traits: MoodTrait[];
+	// Player traits: the worst egos behind a negative locker room component, only those whose ego the user knows (worker: moodInfos)
+	lockerRoomEgos?: string[];
 };
 
 type Props = {
@@ -276,9 +278,17 @@ export const Mood = ({ className, defaultType, maxWidth, p }: Props) => {
 								);
 							}
 
-							const text = componentText(key, componentsRounded[key], gender);
+							let text = componentText(key, componentsRounded[key], gender);
 							if (!text) {
 								return null;
+							}
+							if (
+								key === "lockerRoom" &&
+								componentsRounded[key] < 0 &&
+								mood.lockerRoomEgos &&
+								mood.lockerRoomEgos.length > 0
+							) {
+								text += ` (mainly ${mood.lockerRoomEgos.join(" and ")})`;
 							}
 
 							return (

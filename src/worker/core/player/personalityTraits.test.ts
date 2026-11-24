@@ -9,7 +9,11 @@ import { g, helpers } from "../../util/index.ts";
 import { player, team } from "../index.ts";
 import moodInfo from "./moodInfo.ts";
 import { getPersonalityScores, setTraitScores } from "./traits.ts";
-import { PERSONALITY_AMPLITUDES } from "../../../common/playerTraits/index.ts";
+import {
+	loyaltyMoodMult,
+	moodTraitsFromPersonality,
+	PERSONALITY_AMPLITUDES,
+} from "../../../common/playerTraits/index.ts";
 
 const USER_TID = 0;
 
@@ -158,5 +162,75 @@ describe("personality traits", () => {
 		assert.deepEqual(after, getPersonalityScores(onTeam as any));
 		assert.isNumber(after.loyalty);
 		assert.isDefined(before);
+	});
+
+	test("mood traits come from the personality with traits on, and don't multiply what the personality already scales", async () => {
+		assert.deepStrictEqual(
+			moodTraitsFromPersonality({
+				loyalty: 80,
+				roleAcceptance: 50,
+				moneyVsWinning: 75,
+				ego: 50,
+			}),
+			["L", "W"],
+		);
+		assert.deepStrictEqual(
+			moodTraitsFromPersonality({
+				loyalty: 50,
+				roleAcceptance: 25,
+				moneyVsWinning: 20,
+				ego: 50,
+			}),
+			["$", "F"],
+		);
+		assert.deepStrictEqual(
+			moodTraitsFromPersonality({
+				loyalty: 69,
+				roleAcceptance: 60,
+				moneyVsWinning: 50,
+				ego: 25,
+			}),
+			["F"],
+		);
+
+		const { onTeam } = await setup();
+		g.setWithoutSavingToDB("playerMoodTraits", true);
+		onTeam.moodTraits = [];
+
+		// Traits off: the stored random ones, exactly as before
+		g.setWithoutSavingToDB("playerTraits", false);
+		const base = await moodInfo(onTeam, USER_TID);
+		assert.deepStrictEqual(base.traits, []);
+		onTeam.moodTraits = ["L"];
+		const storedL = await moodInfo(onTeam, USER_TID);
+		assert.deepStrictEqual(storedL.traits, ["L"]);
+		assert.closeTo(
+			storedL.components.loyalty,
+			base.components.loyalty * 2.5,
+			1e-9,
+		);
+
+		// Traits on: L from his loyalty, and the loyalty component scaled once (by the personality), not 2.5x on top
+		g.setWithoutSavingToDB("playerTraits", true);
+		setTraitScores(onTeam as any, {
+			loyalty: 95,
+			roleAcceptance: 50,
+			moneyVsWinning: 50,
+			ego: 50,
+		});
+		const loyalty = getPersonalityScores(onTeam as any).loyalty;
+		const on = await moodInfo(onTeam, USER_TID);
+		assert.include(on.traits, "L");
+		assert.closeTo(
+			on.components.loyalty,
+			base.components.loyalty * loyaltyMoodMult(loyalty),
+			1e-9,
+		);
+		// The stored ones don't matter any more
+		onTeam.moodTraits = [];
+		assert.deepStrictEqual(
+			(await moodInfo(onTeam, USER_TID)).traits,
+			on.traits,
+		);
 	});
 });

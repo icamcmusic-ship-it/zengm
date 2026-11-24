@@ -18,6 +18,30 @@ import { disableNba2027, initializeNba2027 } from "../draft/nba2027.ts";
 import { groupByUnique } from "../../../common/utils.ts";
 import { syncGms } from "../gm/index.ts";
 import { aiResignNegotiations } from "../phase/newPhaseResignPlayers.ts";
+import { newLeagueSalt } from "../../../common/leagueSalt.ts";
+
+const currentNumber = (key: "playerTraitsSeed" | "personalityTraitsSalt") =>
+	Object.hasOwn(g, key) ? (g.get(key) ?? 0) : 0;
+
+// Player Traits turned on for the first time in a league from before it existed (playerTraitsSeed 0): a personality salt of its own, so
+// its players don't get the same personalities as every other such league's players with the same pids. Only when no player has stored
+// trait seeds yet (a league that had traits on before keeps deriving them as it did).
+const needsPersonalitySalt = async (
+	gameAttributes: Partial<GameAttributesLeague>,
+) => {
+	if (
+		__SPORT !== "basketball" ||
+		!gameAttributes.playerTraits ||
+		(Object.hasOwn(g, "playerTraits") && g.get("playerTraits")) ||
+		gameAttributes.personalityTraitsSalt !== undefined ||
+		currentNumber("playerTraitsSeed") !== 0 ||
+		currentNumber("personalityTraitsSalt") !== 0
+	) {
+		return false;
+	}
+	const players = await idb.cache.players.getAll();
+	return !players.some((p) => p.traits);
+};
 
 const updateMetaDifficulty = async (difficulty: number) => {
 	await updateMeta({
@@ -82,6 +106,10 @@ const setGameAttributes = async (
 	}
 	if (gameAttributes.goatSeasonFormula === goatFormula.DEFAULT_FORMULA_SEASON) {
 		gameAttributes.goatSeasonFormula = undefined;
+	}
+
+	if (await needsPersonalitySalt(gameAttributes)) {
+		gameAttributes.personalityTraitsSalt = newLeagueSalt();
 	}
 
 	for (const key of helpers.keys(gameAttributes)) {

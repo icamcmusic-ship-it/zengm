@@ -11,7 +11,12 @@ import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts"
 import { getContractExp } from "../../../common/contracts.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
-import { getEgoScore, getLockerRoomMood, traitsEnabled } from "./traits.ts";
+import {
+	getEgoScore,
+	getLockerRoomMood,
+	getMoodTraits,
+	traitsEnabled,
+} from "./traits.ts";
 import { coachMood, coachSystemsEnabled } from "../staff/systems.ts";
 import { coachRelMood } from "../staff/relationships.ts";
 import { coachDecisionsOn, rolePromiseMood } from "../staff/rolePromise.ts";
@@ -379,6 +384,7 @@ const moodComponents = async (
 			components.lockerRoom = getLockerRoomMood(
 				p,
 				(await getTeamPlayers()) as any,
+				tid,
 			);
 		}
 	}
@@ -484,25 +490,41 @@ const moodComponents = async (
 
 	// Apply traits modulation
 	if (g.get("playerMoodTraits")) {
-		if (p.moodTraits.includes("F")) {
-			components.marketSize *= 2.5;
-			components.hype *= 2.5;
-			components.playingTime *= 2.5;
+		// Player Traits on: the mood traits come from his personality, and loyalty, playing time and team performance are already scaled
+		// by that same personality in moodInfo (loyalty, role acceptance, money vs winning), so the mood traits leave those three alone
+		// instead of multiplying them again (up to 2.5 x 1.5 = 3.75x before)
+		const personality = traitsEnabled();
+		const moodTraits = getMoodTraits(p as any);
+		const mult = (key: keyof MoodComponents, x: number) => {
+			if (
+				personality &&
+				(key === "loyalty" ||
+					key === "playingTime" ||
+					key === "teamPerformance")
+			) {
+				return;
+			}
+			(components as any)[key] *= x;
+		};
+		if (moodTraits.includes("F")) {
+			mult("marketSize", 2.5);
+			mult("hype", 2.5);
+			mult("playingTime", 2.5);
 		}
-		if (p.moodTraits.includes("L")) {
-			components.marketSize *= 0.5;
-			components.loyalty *= 2.5;
-			components.trades *= 2.5;
+		if (moodTraits.includes("L")) {
+			mult("marketSize", 0.5);
+			mult("loyalty", 2.5);
+			mult("trades", 2.5);
 		}
-		if (p.moodTraits.includes("$")) {
-			components.facilities *= 1.5;
-			components.marketSize *= 0.5;
-			components.teamPerformance *= 0.5;
+		if (moodTraits.includes("$")) {
+			mult("facilities", 1.5);
+			mult("marketSize", 0.5);
+			mult("teamPerformance", 0.5);
 		}
-		if (p.moodTraits.includes("W")) {
-			components.marketSize *= 0.5;
-			components.playingTime *= 0.5;
-			components.teamPerformance *= 2.5;
+		if (moodTraits.includes("W")) {
+			mult("marketSize", 0.5);
+			mult("playingTime", 0.5);
+			mult("teamPerformance", 2.5);
 		}
 	}
 

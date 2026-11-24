@@ -84,3 +84,11 @@ test("a failure to load never stops a game: no rivalries", async () => {
 	error.mockRestore();
 	assert.strictEqual(levels.size, 0);
 });
+
+test("nothing is loaded with the Rivalries extra off", async () => {
+	g.setWithoutSavingToDB("playerTraits", true);
+	g.setWithoutSavingToDB("featureRivalries" as any, false);
+	const levels = await getLevels();
+	assert.strictEqual(levels.size, 0);
+	assert.strictEqual(loadRivalries.mock.calls.length, 0);
+});

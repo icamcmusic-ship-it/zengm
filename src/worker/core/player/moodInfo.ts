@@ -8,7 +8,11 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { uniformSeed } from "../../../common/random.ts";
 import { getProStats } from "../../../common/preDraft.ts";
-import { getPersonalityScores, traitsEnabled } from "./traits.ts";
+import {
+	getMoodTraits,
+	getPersonalityScores,
+	traitsEnabled,
+} from "./traits.ts";
 import {
 	loyaltyContractMult,
 	loyaltyMoodMult,
@@ -227,7 +231,7 @@ const moodInfo = async (
 
 	return {
 		components,
-		traits: g.get("playerMoodTraits") ? p.moodTraits : [],
+		traits: g.get("playerMoodTraits") ? getMoodTraits(p as any) : [],
 		probWilling,
 		willing,
 		contractAmount,

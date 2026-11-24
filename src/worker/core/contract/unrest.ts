@@ -63,6 +63,17 @@ export const shouldRequestTrade = ({
 	moodShift?: number;
 }) => isStar && !signedThisSeason && moodSum <= TRADE_REQUEST_MOOD + moodShift;
 
+// He withdraws his request once happier than this. Shifted by his ego exactly like the asking line (shouldRequestTrade), so the gap
+// between asking and withdrawing is the same for everyone: a diva who asks sooner also takes more to win back, a team-first player who
+// asks later is won back sooner
+export const shouldWithdrawTradeRequest = ({
+	moodSum,
+	moodShift = 0,
+}: {
+	moodSum: number;
+	moodShift?: number;
+}) => moodSum > TRADE_REQUEST_WITHDRAW_MOOD + moodShift;
+
 // Seeded draws for trade requests and holdouts, keyed by player, season and day (and the league salt), like the rest of the personality
 // code: replaying a day gives the same decisions, and they never move the game's Math.random stream
 export const unrestRandom = (key: string) => {
@@ -96,7 +107,14 @@ export const updateTradeRequests = async () => {
 			}
 
 			const mood = await moodInfo(p, p.tid);
-			if (sumMoodComponents(mood.components) > TRADE_REQUEST_WITHDRAW_MOOD) {
+			// Player traits: ego (neutral with the setting off)
+			const ego = getEgoTradeRequestInfo(p as any);
+			if (
+				shouldWithdrawTradeRequest({
+					moodSum: sumMoodComponents(mood.components),
+					moodShift: ego.moodShift,
+				})
+			) {
 				delete p.tradeRequest;
 				await idb.cache.players.put(p);
 				await logEvent({

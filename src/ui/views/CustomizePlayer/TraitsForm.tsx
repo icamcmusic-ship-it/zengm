@@ -27,7 +27,7 @@ export const TraitsForm = ({
 	age: number;
 	disabled: boolean;
 	experience: number;
-	leagueSeed: number;
+	leagueSeed: number | string;
 	onChange: (traits: PlayerTraits) => void;
 	pid: number | undefined;
 	ratings: TraitRatings;

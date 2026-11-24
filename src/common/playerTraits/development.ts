@@ -1,4 +1,4 @@
-import { Rng } from "../ratingsBuilds/rng.ts";
+import { Rng, rngStateFor } from "../ratingsBuilds/rng.ts";
 import { traitZ } from "./effects.ts";
 
 // Development traits: work ethic (a regular trait key) and the aging curve (secret, not a trait key: see AGING_CURVE_INFO). Both act on the
@@ -61,9 +61,10 @@ export const AGING_CURVE_INFO: Record<
 };
 
 /**
- * The aging curve of a player. Never stored on the player (so it can never reach the UI through the player object, an export or a God Mode
- * editor): it is derived every time from the league's trait seed and the pid, so it is deterministic, fixed for a whole career, and existing
- * leagues need no backfill. Only revealed to the user once the player retires.
+ * The aging curve of a player. Never stored on the player (so it can never reach the UI through the player object or a God Mode editor):
+ * it is derived every time from the league's trait seed and the pid (or the seed of that draw stored as p.trajectorySeed, see
+ * trajectorySeedFor), so it is deterministic, fixed for a whole career, and existing leagues need no backfill. Only revealed to the user
+ * once the player retires.
  */
 export const agingCurveForPlayer = (
 	leagueSeed: number | string,
@@ -79,6 +80,20 @@ export const agingCurveForPlayer = (
 // that already existed (a college story, how he develops, the aging curve revealed at retirement).
 export const trajectoryU = (leagueSeed: number | string, pid: number) =>
 	new Rng(`agingCurve|${leagueSeed}|${pid}`).random();
+
+// The same draw from a stored per-player seed (p.trajectorySeed): trajectorySeedFor(leagueSeed, pid) is the state trajectoryU starts
+// from, so storing it changes nothing, and a player keeps his trajectory when he moves to another league (new pid, seed or salt)
+export const trajectorySeedFor = (leagueSeed: number | string, pid: number) =>
+	rngStateFor(`agingCurve|${leagueSeed}|${pid}`);
+
+export const trajectoryUFromSeed = (seed: number) =>
+	Rng.fromState(seed).random();
+
+export const isTrajectorySeed = (seed: unknown): seed is number =>
+	typeof seed === "number" &&
+	Number.isInteger(seed) &&
+	seed >= 0 &&
+	seed < 2 ** 32;
 
 export const agingCurveFromTrajectory = (u: number): AgingCurve => {
 	let cumulative = 0;

@@ -6,11 +6,9 @@
 // off nothing here runs.
 
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
+import { agingCurveOf } from "./trajectory.ts";
 import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
-import {
-	agingCurveForPlayer,
-	type TraitDevelopment,
-} from "../../../common/playerTraits/development.ts";
+import { type TraitDevelopment } from "../../../common/playerTraits/development.ts";
 import { g } from "../../util/index.ts";
 import { defaultInjuries } from "../../util/defaultInjuries.ts";
 import { injuryBodyPart } from "../../../common/injuryBodyPart.ts";
@@ -186,7 +184,12 @@ export const OLD_AGE = {
 } as const;
 
 /** The extra athletic decline (negative rating points) of a player this age this season, seeded per player and bounded. */
-export const oldAgeAthleticDelta = (pid: number, age: number) => {
+export const oldAgeAthleticDelta = (
+	player: number | { pid: number; trajectorySeed?: number },
+	age: number,
+) => {
+	const p = typeof player === "number" ? { pid: player } : player;
+	const pid = p.pid;
 	if (age < OLD_AGE.from) {
 		return 0;
 	}
@@ -199,8 +202,7 @@ export const oldAgeAthleticDelta = (pid: number, age: number) => {
 	if (
 		Object.hasOwn(g, "playerTraits") &&
 		(g.get as any)("playerTraits") &&
-		agingCurveForPlayer((g.get as any)("playerTraitsSeed") ?? 0, pid) ===
-			"graceful"
+		agingCurveOf(p) === "graceful"
 	) {
 		graceful = OLD_AGE.graceful;
 	}
@@ -303,7 +305,7 @@ export const getCareerAgingDevelopment = (
 			tilt = { keys: spec.subs, amount: C.reinventTilt * s };
 		}
 		// Past 39: faster athletic decline (not centered, it's meant to move the league's oldest down)
-		const old = oldAgeAthleticDelta(p.pid, age);
+		const old = oldAgeAthleticDelta(p, age);
 		if (old < 0) {
 			for (const key of ["spd", "jmp", "dnk"]) {
 				delta[key] = (delta[key] ?? 0) + old;

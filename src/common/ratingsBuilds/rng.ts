@@ -18,6 +18,11 @@ const hashSeed = (input: string) => {
 	};
 };
 
+// The 32 bit state a new Rng(seed) starts from (salted like it), to store and later resume with Rng.fromState: the stream is then the
+// same as new Rng(seed)'s, whatever the league salt is by then
+export const rngStateFor = (seed: string | number) =>
+	hashSeed(salted(String(seed)))();
+
 export class Rng {
 	seedString: string;
 	private a: number;
@@ -25,6 +30,13 @@ export class Rng {
 	constructor(seed: string | number) {
 		this.seedString = String(seed);
 		this.a = hashSeed(salted(this.seedString))();
+	}
+
+	static fromState(state: number) {
+		const rng = new Rng("");
+		rng.seedString = `state|${state}`;
+		rng.a = state >>> 0;
+		return rng;
 	}
 
 	// mulberry32, [0, 1)

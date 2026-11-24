@@ -53,6 +53,7 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"staffReportHistory",
 	"gmSuccessor",
 	"playerTraitsSeed",
+	"personalityTraitsSalt",
 	"leagueSalt",
 	"leagueSaltHistory",
 ];
@@ -114,6 +115,7 @@ const gameAttributesKeysSportSpecific = {
 		"injuryDepth",
 		"playerTraits",
 		"playerTraitsSeed",
+		"personalityTraitsSalt",
 		"randomDebutsForever",
 		"realDraftRatings",
 		"numPlayersDunk",
@@ -677,6 +679,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	// Off for existing leagues, on for new ones (see views/newLeague.ts)
 	playerTraits: false,
 	playerTraitsSeed: 0,
+	personalityTraitsSalt: 0,
 	leagueSalt: 0,
 	varyRealPlayers: false,
 	playerMoodTraits: true,
