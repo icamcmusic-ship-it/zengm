@@ -50,8 +50,10 @@ export type RivalryGame = {
 	clutch?: string[];
 	// Head coaches (Coaching Staff setting): home, away
 	coaches?: [string | null, string | null];
-	// Players who played (min > 0)
+	// Players who played (min > 0). In stored records (compact.ts) these are tuples without names, looked up when read.
 	players: RGPlayer[];
+	// An old season's record, pruned to the top scorers of each side (compact.ts)
+	cut?: 1;
 };
 
 export const pairOf = (x: number, y: number) =>
@@ -66,6 +68,8 @@ export type RivalrySeason = {
 	// doesn't read every past game of every rival pair). Only on rows started after this was added: a row without it is
 	// read from the games instead.
 	highs?: Record<string, number>;
+	// The season's games in the log were pruned to their top scorers (compact.ts), so they are not read again for that
+	cut?: 1;
 };
 
 export const isCloseGame = (gm: Pick<RivalryGame, "hPts" | "aPts" | "ot">) =>

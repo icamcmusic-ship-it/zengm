@@ -29,6 +29,7 @@ import archetypesApi from "../../api/archetypes.ts";
 import { isGenericBuild } from "../../../common/archetypes/generic.ts";
 import { getMilestones, getRecordsBook } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
+import { leagueStoreBytes } from "../../util/dbSize.ts";
 import { PLAY_TYPES } from "../GameSim.basketball/realisticPlayTypes.ts";
 import { MOVE_SCALE_REALISTIC } from "../GameSim.basketball/advTracking.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
@@ -1151,20 +1152,14 @@ const advSummary = async (season: number) => {
 	};
 };
 
-// Record by record, so the whole database is never one string in memory
+// In MB (the same measure as Delete Old Data's sizes)
 const dbSize = async () => {
+	const { total, stores } = await leagueStoreBytes();
 	const out: Record<string, number> = {};
-	let total = 0;
-	const db = idb.league as any;
-	for (const store of db.objectStoreNames as any as string[]) {
-		let bytes = 0;
-		for await (const cursor of db.transaction(store).store) {
-			bytes += JSON.stringify(cursor.value).length;
-		}
+	for (const [store, bytes] of Object.entries(stores)) {
 		out[store] = r(bytes / 1e6, 2);
-		total += bytes / 1e6;
 	}
-	return { total: r(total, 1), stores: out };
+	return { total: r(total / 1e6, 1), stores: out };
 };
 
 // Retired players: how many, their size, and the size of their tracking (row adv and the folded advCareer, Keep Career Tracking

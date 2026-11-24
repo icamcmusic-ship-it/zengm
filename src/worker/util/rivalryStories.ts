@@ -4,6 +4,14 @@
 import { ADV } from "../../common/advStats.ts";
 import { rivalryGameFromBox } from "../../common/rivalryStories/record.ts";
 import {
+	packRivalryGame,
+	pruneStoredRivalryGame,
+	RIVALRY_LOG_FULL_SEASONS,
+	storedPids,
+	unpackRivalryGame,
+	type StoredRivalryGame,
+} from "../../common/rivalryStories/compact.ts";
+import {
 	buildRivalryStory,
 	type Crossing,
 	type RivalryStory,
@@ -105,7 +113,7 @@ const writeRecords = async (records: RivalryGame[]) => {
 		}
 	}
 	for (const rec of records) {
-		void games.put(rec);
+		void games.put(packRivalryGame(rec));
 	}
 	for (const row of addToRivalrySeasons(rows, fresh)) {
 		void seasonsStore.put(row);
@@ -215,7 +223,130 @@ export const ensureBackfill = async () => {
 	if (records.size === 0) {
 		return;
 	}
-	await writeRecords([...records.values()]);
+	// Seasons whose log was pruned or deleted (Delete Old Data) already have their games in the season rows: a box score
+	// still stored from one of them is not logged again, or it would be counted twice
+	const cut = new Set(
+		(await idb.league.transaction("rivalrySeasons").store.getAll())
+			.filter((row) => row.cut)
+			.map((row) => row.season),
+	);
+	const toWrite = [...records.values()].filter((rec) => !cut.has(rec.season));
+	if (toWrite.length === 0) {
+		return;
+	}
+	await writeRecords(toWrite);
+};
+
+// Player names, looked up when the log is read (the stored records only have pids): the cache first (active players),
+// then the players store. Kept for the session, by league.
+const nameMemo = new Map<number, string>();
+let nameMemoLid: number | undefined;
+const readGames = async (recs: StoredRivalryGame[]) => {
+	const lid = g.get("lid");
+	if (nameMemoLid !== lid) {
+		nameMemo.clear();
+		nameMemoLid = lid;
+	}
+	const missing = new Set<number>();
+	for (const rec of recs) {
+		for (const pid of storedPids(rec)) {
+			if (!nameMemo.has(pid)) {
+				missing.add(pid);
+			}
+		}
+	}
+	const fromDb: number[] = [];
+	for (const pid of missing) {
+		const p = await idb.cache.players.get(pid);
+		if (p) {
+			nameMemo.set(pid, `${p.firstName} ${p.lastName}`);
+		} else {
+			fromDb.push(pid);
+		}
+	}
+	if (fromDb.length > 0) {
+		const store = idb.league.transaction("players").store;
+		const found = await Promise.all(fromDb.map((pid) => store.get(pid)));
+		for (const p of found) {
+			if (p) {
+				nameMemo.set(p.pid, `${p.firstName} ${p.lastName}`);
+			}
+		}
+	}
+	return recs.map((rec) => unpackRivalryGame(rec, (pid) => nameMemo.get(pid)));
+};
+
+// New season (newPhaseRegularSeason): games older than RIVALRY_LOG_FULL_SEASONS keep only the game and the top scorers of
+// each side. The season rows (the rivalry score's inputs) are untouched and marked, so a pruned season is not read again.
+// Safe to repeat: a pruned record is left as it is.
+export const pruneRivalryLog = async (
+	fullSeasons: number = RIVALRY_LOG_FULL_SEASONS,
+) => {
+	const cutoff = g.get("season") - fullSeasons;
+	const seasons: number[] = [];
+	// Keys only, one per season
+	let cursor = await idb.league
+		.transaction("rivalryGames")
+		.store.index("season")
+		.openKeyCursor(IDBKeyRange.upperBound(cutoff, true), "nextunique");
+	while (cursor) {
+		seasons.push(cursor.key);
+		cursor = await cursor.continue();
+	}
+	if (seasons.length === 0) {
+		return 0;
+	}
+	let pruned = 0;
+	const tx = idb.league.transaction(
+		["rivalryGames", "rivalrySeasons"],
+		"readwrite",
+	);
+	const seasonsStore = tx.objectStore("rivalrySeasons");
+	for (const season of seasons) {
+		const row = await seasonsStore.get(season);
+		if (row?.cut) {
+			continue;
+		}
+		for await (const cursor of tx
+			.objectStore("rivalryGames")
+			.index("season")
+			.iterate(season)) {
+			const out = pruneStoredRivalryGame(cursor.value);
+			if (out) {
+				await cursor.update(out);
+				pruned += 1;
+			}
+		}
+		if (row) {
+			await seasonsStore.put({ ...row, cut: 1 });
+		}
+	}
+	await tx.done;
+	clearPairMemo();
+	return pruned;
+};
+
+// Delete Old Data: the log of past seasons. The season rows are kept (the rivalry score doesn't change) and marked, so the
+// box scores still stored from those seasons are not logged again.
+export const deleteOldRivalryLog = async () => {
+	const season = g.get("season");
+	const tx = idb.league.transaction(
+		["rivalryGames", "rivalrySeasons"],
+		"readwrite",
+	);
+	for await (const cursor of tx
+		.objectStore("rivalryGames")
+		.index("season")
+		.iterate(IDBKeyRange.upperBound(season, true))) {
+		await cursor.delete();
+	}
+	for await (const cursor of tx.objectStore("rivalrySeasons")) {
+		if (cursor.value.season < season && !cursor.value.cut) {
+			await cursor.update({ ...cursor.value, cut: 1 });
+		}
+	}
+	await tx.done;
+	clearPairMemo();
 };
 
 // Small memo of pair reads, cleared whenever games are logged
@@ -238,7 +369,8 @@ export const pairGames = async (a: number, b: number) => {
 		p = idb.league
 			.transaction("rivalryGames")
 			.store.index("pair")
-			.getAll(pairOf(a, b));
+			.getAll(pairOf(a, b))
+			.then(readGames);
 		pairMemo.set(key, p);
 		if (pairMemo.size > 50) {
 			pairMemo.delete(pairMemo.keys().next().value!);
@@ -249,10 +381,12 @@ export const pairGames = async (a: number, b: number) => {
 
 export const seasonGames = async (season: number) => {
 	await ensureBackfill();
-	return idb.league
-		.transaction("rivalryGames")
-		.store.index("season")
-		.getAll(season);
+	return readGames(
+		await idb.league
+			.transaction("rivalryGames")
+			.store.index("season")
+			.getAll(season),
+	);
 };
 
 // Players who played for both teams in the log, oldest move first, with how they moved when an event says so

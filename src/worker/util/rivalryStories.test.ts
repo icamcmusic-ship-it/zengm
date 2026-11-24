@@ -2,6 +2,9 @@
 // days played while it was off are backfilled from their box scores), the log matches the box scores, the rivalry page's
 // story matches the raw games and loads fast, and the Newspaper and Games to Watch pick it up.
 import "fake-indexeddb/auto";
+// @ts-expect-error
+import { appendFileSync } from "node:fs";
+import { pruneStoredRivalryGame } from "../../common/rivalryStories/compact.ts";
 import { assert, beforeAll, describe, test } from "vitest";
 import { LEAGUE_DATABASE_VERSION, PHASE } from "../../common/constants.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
@@ -15,7 +18,10 @@ import { getDefaultSettings } from "../views/newLeague.ts";
 import * as views from "../views/index.ts";
 import {
 	ensureBackfill,
+	pairGames,
+	pruneRivalryLog,
 	recordRivalryGames,
+	resetRivalryStoriesSession,
 	rivalrySeasonRows,
 	seasonGames,
 } from "./rivalryStories.ts";
@@ -109,8 +115,21 @@ describe("rivalry stories in a league", () => {
 		const games = await allGames();
 		assert.isBelow(before, games.length, "the days played while off");
 		await ensureBackfill();
-		const logged = await idb.league.transaction("rivalryGames").store.getAll();
+		const logged = await seasonGames(g.get("season"));
 		assert.strictEqual(logged.length, games.length);
+		// Stored compact: no names, player lines as tuples. The names come back when read.
+		const stored = await idb.league.transaction("rivalryGames").store.getAll();
+		assert.isTrue(stored.every((x) => x.pl && !x.players));
+		const bytes = (list: unknown[]) =>
+			list.reduce<number>((t, x) => t + JSON.stringify(x).length, 0) /
+			list.length;
+		const line = `rivalry log bytes/game: ${bytes(logged).toFixed(0)} as read (the old stored shape) -> ${bytes(stored).toFixed(0)} stored -> ${bytes(stored.map((x) => pruneStoredRivalryGame(x)!)).toFixed(0)} pruned (old seasons)`;
+		console.log(line);
+		const env = (globalThis as any).process.env;
+		if (env.RIVALRY_SIZE_OUT) {
+			appendFileSync(env.RIVALRY_SIZE_OUT, `${line}\n`);
+		}
+		assert.isBelow(bytes(stored), 0.6 * bytes(logged));
 		const byGid = new Map(logged.map((x) => [x.gid, x]));
 		for (const gm of games) {
 			const rec = byGid.get(gm.gid)!;
@@ -120,6 +139,12 @@ describe("rivalry stories in a league", () => {
 			assert.strictEqual(rec.aPts, gm.teams[1].pts);
 			assert.strictEqual(rec.playoffs, !!gm.playoffs);
 			const top = Math.max(...gm.teams[0].players.map((p: any) => p.pts));
+			for (const p of rec.players) {
+				const box = gm.teams
+					.flatMap((t) => t.players as any[])
+					.find((x) => x.pid === p.pid);
+				assert.strictEqual(p.name, box.name);
+			}
 			assert.strictEqual(
 				Math.max(
 					...rec.players.filter((p) => p.tid === rec.home).map((p) => p.pts),
@@ -220,7 +245,7 @@ describe("rivalry stories in a league", () => {
 	test("the season rows keep each pair's high, the same as reading the games", async () => {
 		await ensureBackfill();
 		const season = g.get("season");
-		const logged = await idb.league.transaction("rivalryGames").store.getAll();
+		const logged = await seasonGames(season);
 		const fromGames = pairHighBefore(
 			[{ season: season + 1 }] as RivalryGame[],
 			logged,
@@ -260,6 +285,73 @@ describe("rivalry stories in a league", () => {
 			season: String(g.get("season")),
 		});
 		assert.isUndefined(out.error);
+	});
+
+	test("old records (full player rows with names) are still read", async () => {
+		const [rec] = await idb.league
+			.transaction("rivalryGames")
+			.store.getAll(undefined, 1);
+		const [read] = (await seasonGames(g.get("season"))).filter(
+			(x) => x.gid === rec!.gid,
+		);
+		const { pl: _pl, ...rest } = rec!;
+		await idb.league
+			.transaction("rivalryGames", "readwrite")
+			.store.put({ ...rest, players: read!.players });
+		resetRivalryStoriesSession();
+		const [again] = (await seasonGames(g.get("season"))).filter(
+			(x) => x.gid === rec!.gid,
+		);
+		assert.deepEqual(again, read);
+	});
+
+	test("pruning old seasons keeps the games, their top scorers and the rivalry score", async () => {
+		await ensureBackfill();
+		const scoreOf = async () =>
+			(await loadRivalries()).map((e) => [e.key, e.score.score]);
+		const before = await scoreOf();
+		const rowsBefore = await rivalrySeasonRows();
+		const gamesBefore = await seasonGames(g.get("season"));
+		// As if this season were more than the kept seasons ago
+		const n = await pruneRivalryLog(-1);
+		assert.strictEqual(n, gamesBefore.length);
+		assert.strictEqual(await pruneRivalryLog(-1), 0, "a second run is a no-op");
+		const after = await seasonGames(g.get("season"));
+		assert.strictEqual(after.length, gamesBefore.length);
+		const byGid = new Map(gamesBefore.map((x) => [x.gid, x]));
+		for (const gm of after) {
+			const old = byGid.get(gm.gid)!;
+			assert.strictEqual(gm.cut, 1);
+			assert.strictEqual(gm.hPts, old.hPts);
+			assert.isAtMost(gm.players.length, 6);
+			for (const tid of [gm.home, gm.away]) {
+				const top = (list: RivalryGame["players"]) =>
+					Math.max(0, ...list.filter((p) => p.tid === tid).map((p) => p.pts));
+				assert.strictEqual(top(gm.players), top(old.players));
+			}
+		}
+		assert.deepEqual(await scoreOf(), before);
+		// The season rows are only marked
+		assert.deepEqual(
+			(await rivalrySeasonRows()).map(({ cut: _cut, ...row }) => row),
+			rowsBefore,
+		);
+		// A stored box score of a pruned season isn't logged (or counted) again
+		const last = (await allGames()).sort((x, y) => y.gid - x.gid)[0]!;
+		await idb.league
+			.transaction("rivalryGames", "readwrite")
+			.store.delete(last.gid);
+		resetRivalryStoriesSession();
+		await ensureBackfill();
+		assert.strictEqual(
+			(await seasonGames(g.get("season"))).length,
+			gamesBefore.length - 1,
+		);
+		assert.deepEqual(await scoreOf(), before);
+		const [a, b] = after[0]!.pair.split("-").map(Number) as [number, number];
+		assert.isAbove((await pairGames(a, b)).length, 0);
+		const page = await load("rivalries", { pair: after[0]!.pair });
+		assert.isDefined(page.selected.story);
 	});
 
 	test("off again: the page has no story", async () => {
