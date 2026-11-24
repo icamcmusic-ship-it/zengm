@@ -243,7 +243,11 @@ const runPicks = async (
 				dp.tid,
 			);
 			const teamOvrDiffs = await getTeamOvrDiffs(teamPlayers, playersAll);
-			const userTeam = g.get("userTids").includes(dp.tid);
+			// In spectator mode or during auto play the AI runs the user's team, so it drafts like any AI team (never by true value)
+			const userTeam =
+				g.get("userTids").includes(dp.tid) &&
+				!g.get("spectator") &&
+				!local.autoPlayUntil;
 
 			// Basketball: value plus the AI's bounded draft factors (need, fit, timeline, production, combine, medicals, GM...), see
 			// draftDecision.ts. User teams drafting on auto take the best player by value, as before
