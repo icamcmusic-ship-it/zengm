@@ -27,13 +27,19 @@ import {
 	getAvailableCapExceptions,
 	getCapExceptionAmount,
 	getCapExceptionsSummary,
+	getDisabledPlayerExceptionAmount,
 	getLeagueYear,
 	getSigningAdvice,
 	getSigningCapInfo,
 	getStretchedAmounts,
+	getUnusedDisabledPlayerExceptions,
+	grantDisabledPlayerExceptions,
+	isDisabledPlayerInjury,
 	isRepeaterTaxTeam,
 	makeAiCapExceptionPicker,
+	pickTradeDisabledPlayerException,
 	recordCapExceptionSigning,
+	recordTradeDisabledPlayerException,
 	stretchHardCapSeason,
 } from "./capExceptions.ts";
 
@@ -155,6 +161,10 @@ describe("salary cap exceptions", () => {
 		test("amounts scale with the salary cap, in NBA-like proportions", () => {
 			const cap = g.get("salaryCap");
 			for (const type of helpers.keys(CAP_EXCEPTIONS)) {
+				// Not a share of the cap (half the injured player's salary)
+				if (type === "disabledPlayer") {
+					continue;
+				}
 				const amount = getCapExceptionAmount(type);
 				assert.closeTo(
 					amount / cap,
@@ -925,6 +935,188 @@ describe("salary cap exceptions", () => {
 				[0, 0, 0, 0],
 			);
 			assert.isTrue(freeAgents.every((p) => marketOff.unwanted(p)));
+		});
+	});
+
+	describe("disabled player exception", () => {
+		// Team 1's best-paid player out for the season, with the team 20 games into an 82-game season
+		const setupInjury = async (gp = 20, gamesOut = 70) => {
+			await setup({ phase: PHASE.REGULAR_SEASON });
+			set("numGames", 82);
+			const season = g.get("season");
+			for (let tid = 0; tid < NUM_TEAMS; tid++) {
+				const row = team.genSeasonRow({ tid } as any);
+				row.season = season;
+				row.won = gp;
+				await idb.cache.teamSeasons.add(row);
+			}
+			const roster = await idb.cache.players.indexGetAll("playersByTid", 1);
+			const p = roster[0]!;
+			p.injury = { type: "Torn ACL", gamesRemaining: gamesOut };
+			await idb.cache.players.put(p);
+			const salary = getCurrentContract(p)!.amounts[0]!;
+			return { p, salary, season };
+		};
+		const allPlayers = () =>
+			idb.cache.players.indexGetAll("playersByTid", [0, Infinity]);
+
+		test("granted for a season-ending injury: half his salary, at most the mid-level, once", async () => {
+			const { p, salary, season } = await setupInjury();
+			await grantDisabledPlayerExceptions(await allPlayers());
+			await grantDisabledPlayerExceptions(await allPlayers());
+			const t = await getTeam(1);
+			const expected = Math.min(
+				helpers.roundContract(salary / 2),
+				getCapExceptionAmount("nonTaxpayerMle"),
+			);
+			assert.deepEqual(t.capExceptions?.disabledPlayer, [
+				{ season, pid: p.pid, amount: expected },
+			]);
+			assert.strictEqual(getDisabledPlayerExceptionAmount(salary), expected);
+			assert.strictEqual(getDisabledPlayerExceptionAmount(2000), 1000);
+			const dpe = getAvailableCapExceptions(t, 2 * g.get("salaryCap")).find(
+				(e) => e.type === "disabledPlayer",
+			);
+			assert.strictEqual(dpe?.amount, expected);
+			assert.strictEqual(dpe?.maxYears, 1);
+			// No other team gets one
+			assert.isUndefined((await getTeam(0)).capExceptions?.disabledPlayer);
+			const events = await idb.cache.events.getAll();
+			assert.isTrue(
+				events.some(
+					(e) => e.type === "capException" && e.pids?.includes(p.pid),
+				),
+			);
+		});
+
+		test("not for an injury that ends before the season does, nor after the first half, nor with the setting off", async () => {
+			await setupInjury(20, 61);
+			await grantDisabledPlayerExceptions(await allPlayers());
+			assert.isUndefined((await getTeam(1)).capExceptions?.disabledPlayer);
+
+			await setupInjury(42, 70);
+			await grantDisabledPlayerExceptions(await allPlayers());
+			assert.isUndefined((await getTeam(1)).capExceptions?.disabledPlayer);
+
+			const { p } = await setupInjury(41, 41);
+			assert.isTrue(isDisabledPlayerInjury(p, 41));
+			assert.isFalse(isDisabledPlayerInjury(p, 42));
+			set("featureCapExceptions", false);
+			await grantDisabledPlayerExceptions(await allPlayers());
+			assert.isUndefined((await getTeam(1)).capExceptions?.disabledPlayer);
+		});
+
+		test("signs one player for one season, apart from the other exceptions, and expires at the trade deadline", async () => {
+			const { season } = await setupInjury();
+			await grantDisabledPlayerExceptions(await allPlayers());
+			let t = await getTeam(1);
+			const amount = t.capExceptions!.disabledPlayer![0]!.amount;
+			const payroll = 2 * g.get("salaryCap");
+			// Far past the aprons nothing else is left, the disabled player exception is
+			assert.deepEqual(
+				getAvailableCapExceptions(t, payroll).map((e) => e.type),
+				["disabledPlayer"],
+			);
+			assert.strictEqual(
+				getSigningCapInfo(t, payroll, amount, 2)?.type,
+				"none",
+			);
+			const info = getSigningCapInfo(t, payroll, amount, 1);
+			assert.strictEqual(
+				info?.type === "exception" ? info.exception.type : undefined,
+				"disabledPlayer",
+			);
+
+			await recordCapExceptionSigning(1, {
+				pid: 500,
+				amount,
+				exception: "disabledPlayer",
+				payroll,
+			});
+			t = await getTeam(1);
+			assert.strictEqual(t.capExceptions!.disabledPlayer![0]!.usedPid, 500);
+			assert.deepEqual(getAvailableCapExceptions(t, payroll), []);
+			// Using it doesn't use up the mid-level
+			assert.isTrue(
+				getAvailableCapExceptions(t, g.get("salaryCap")).some(
+					(e) => e.type === "nonTaxpayerMle",
+				),
+			);
+
+			// A new one, then the trade deadline
+			t.capExceptions!.disabledPlayer!.push({ season, pid: 1, amount });
+			assert.strictEqual(getUnusedDisabledPlayerExceptions(t).length, 1);
+			set("phase", PHASE.AFTER_TRADE_DEADLINE);
+			assert.deepEqual(getUnusedDisabledPlayerExceptions(t), []);
+			set("phase", PHASE.REGULAR_SEASON);
+			set("season", season + 1);
+			assert.deepEqual(getUnusedDisabledPlayerExceptions(t), []);
+		});
+
+		test("AI teams use it in free agency, on a one-season contract", async () => {
+			await setupInjury();
+			await grantDisabledPlayerExceptions(await allPlayers());
+			const t = await getTeam(1);
+			const amount = t.capExceptions!.disabledPlayer![0]!.amount;
+			const pick = makeAiCapExceptionPicker({
+				t: { ...t, strategy: "contending" },
+				roster: [{ value: 40 }],
+				// Over the cap, under the tax: the mid-level covers him too, the smaller disabled player exception is used
+				payroll: g.get("salaryCap") + 1000,
+				gm: undefined,
+			});
+			const picked = pick!(
+				{ value: 60, born: { year: g.get("season") - 25, loc: "" } },
+				{ amount, exp: g.get("season") + 3 },
+			);
+			assert.strictEqual(picked?.exception.type, "disabledPlayer");
+			assert.strictEqual(picked?.exp, g.get("season"));
+		});
+
+		test("trades: takes in one expiring contract outside salary matching", async () => {
+			const { season } = await setupInjury();
+			await grantDisabledPlayerExceptions(await allPlayers());
+			const t = await getTeam(1);
+			const amount = t.capExceptions!.disabledPlayer![0]!.amount;
+			const payroll = g.get("salaryCap") + 1000;
+			const expiring = { pid: 7, amount, exp: season };
+			assert.strictEqual(
+				pickTradeDisabledPlayerException(t, payroll, [expiring], 0),
+				7,
+			);
+			// Too much, or not expiring
+			assert.isUndefined(
+				pickTradeDisabledPlayerException(
+					t,
+					payroll,
+					[{ ...expiring, amount: amount + 10 }],
+					0,
+				),
+			);
+			assert.isUndefined(
+				pickTradeDisabledPlayerException(
+					t,
+					payroll,
+					[{ ...expiring, exp: season + 1 }],
+					0,
+				),
+			);
+			// The rest of the trade still has to match
+			const other = { pid: 8, amount: 3000, exp: season + 2 };
+			assert.isUndefined(
+				pickTradeDisabledPlayerException(t, payroll, [expiring, other], 1000),
+			);
+			assert.strictEqual(
+				pickTradeDisabledPlayerException(t, payroll, [expiring, other], 3000),
+				7,
+			);
+
+			await recordTradeDisabledPlayerException(1, 7, amount);
+			const after = await getTeam(1);
+			assert.strictEqual(after.capExceptions!.disabledPlayer![0]!.usedPid, 7);
+			assert.isUndefined(
+				pickTradeDisabledPlayerException(after, payroll, [expiring], 0),
+			);
 		});
 	});
 

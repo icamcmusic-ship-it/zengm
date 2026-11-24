@@ -69,6 +69,7 @@ import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
 import { hotSeatNewsMidSeason } from "../gm/index.ts";
 import { afterDay as staffDepthAfterDay } from "../staffDepth/index.ts";
 import { getDayTicks, scheduleDaysSpread } from "../season/scheduleDayScale.ts";
+import { grantDisabledPlayerExceptions } from "../contract/capExceptions.ts";
 
 const FLUSH_COALESCE_MS = 5000;
 
@@ -360,6 +361,9 @@ const play = async (
 				}
 			}
 			await idb.cache.players.putAll(playersToSave);
+
+			// Salary cap exceptions: a disabled player exception for each player now out for the season
+			await grantDisabledPlayerExceptions(players, conditions);
 
 			if (healedTexts.length > 0) {
 				logEvent(

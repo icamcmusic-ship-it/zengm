@@ -18,6 +18,7 @@ import {
 } from "../frontOffice/index.ts";
 import { getStashedPlayers } from "../draftStash/index.ts";
 import { getGmWeights } from "../gm/index.ts";
+import { pickTradeDisabledPlayerException } from "../contract/capExceptions.ts";
 
 const getTeamOvr = async (playersRaw: Player[]) => {
 	const players = await player.formatAll(playersRaw, {
@@ -199,10 +200,33 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 
 	const softCapTradeSalaryMatch = g.get("softCapTradeSalaryMatch");
 
-	const softCapCondition =
-		g.get("salaryCapType") === "soft" &&
-		((ratios[0] > softCapTradeSalaryMatch && overCap[0]) ||
-			(ratios[1] > softCapTradeSalaryMatch && overCap[1]));
+	// Salary cap exceptions: a disabled player exception lets a team over the cap take in one expiring contract outside salary matching
+	const usesDisabledPlayerException = async (j: 0 | 1) => {
+		const k = j === 0 ? 1 : 0;
+		const t = await idb.cache.teams.get(tids[j]);
+		return (
+			!!t &&
+			pickTradeDisabledPlayerException(
+				t,
+				Math.round(s.teams[j].payrollBeforeTrade * 1000),
+				s.teams[k].trade.map((p) => ({
+					pid: p.pid,
+					amount: Math.round(p.contract.amount * 1000),
+					exp: p.contract.exp,
+				})),
+				Math.round(s.teams[j].total * 1000),
+			) !== undefined
+		);
+	};
+	const softCapFails: [boolean, boolean] = [false, false];
+	for (const j of [0, 1] as const) {
+		softCapFails[j] =
+			g.get("salaryCapType") === "soft" &&
+			ratios[j] > softCapTradeSalaryMatch &&
+			overCap[j] &&
+			!(await usesDisabledPlayerException(j));
+	}
+	const softCapCondition = softCapFails[0] || softCapFails[1];
 
 	const overCapAndIncreasing = (i: 0 | 1) =>
 		overCap[i] && s.teams[i].payrollAfterTrade > s.teams[i].payrollBeforeTrade;
@@ -213,7 +237,7 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 
 	if (softCapCondition) {
 		// Which team is at fault?;
-		const j = ratios[0] > softCapTradeSalaryMatch ? 0 : 1;
+		const j = softCapFails[0] ? 0 : 1;
 		s.warning = `The ${s.teams[j].name} are over the salary cap, so the players it receives must have a combined salary of less than ${softCapTradeSalaryMatch}% of the salaries of the players it trades away.  Currently, that value is ${ratios[j] === Infinity ? "infinite" : `${ratios[j]}%`}.`;
 		s.warningAmount = ratios[j];
 	} else if (hardCapCondition) {

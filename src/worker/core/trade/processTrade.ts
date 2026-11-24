@@ -28,6 +28,12 @@ import {
 } from "../../../common/draftPickConditions.ts";
 import { getTeammateJerseyNumbers } from "../player/genJerseyNumber.ts";
 import { recomputeLocalUITeamOvrs } from "../../util/recomputeLocalUITeamOvrs.ts";
+import {
+	getUnusedDisabledPlayerExceptions,
+	pickTradeDisabledPlayerException,
+	recordTradeDisabledPlayerException,
+} from "../contract/capExceptions.ts";
+import getPayroll from "../team/getPayroll.ts";
 
 const processTrade = async (
 	rawTeams: TradeTeams,
@@ -74,6 +80,62 @@ const processTrade = async (
 		numPlayersTradedAway?: TeamSeason["numPlayersTradedAway"];
 	};
 	const undoInfoTeams: [UndoInfoTeams, UndoInfoTeams] = [{}, {}];
+
+	// Salary cap exceptions: a team over the cap taking in an expiring contract with its disabled player exception (the same rule as
+	// trade/summary.ts), worked out before the players move and recorded after
+	const disabledPlayerUses: {
+		tid: number;
+		pid: number;
+		amount: number;
+		previous: Team["capExceptions"];
+	}[] = [];
+	for (const j of [0, 1] as const) {
+		const k = j === 0 ? 1 : 0;
+		const t = await idb.cache.teams.get(tids[j]);
+		if (!t || getUnusedDisabledPlayerExceptions(t).length === 0) {
+			continue;
+		}
+		const salaries = async (pidList: number[]) =>
+			(await idb.merged.players.getAll({ pids: pidList })).map((p) => {
+				const contract = getContractSummary(p);
+				return {
+					pid: p.pid,
+					amount: contract?.amount ?? 0,
+					exp: contract?.exp ?? g.get("season"),
+				};
+			});
+		const received = await salaries(pids[k]);
+		const sentTotal = (await salaries(pids[j])).reduce(
+			(sum, p) => sum + p.amount,
+			0,
+		);
+		const receivedTotal = received.reduce((sum, p) => sum + p.amount, 0);
+		const payrollBefore = await getPayroll(tids[j]);
+		// Fits without it
+		if (
+			payrollBefore + receivedTotal - sentTotal <= g.get("salaryCap") ||
+			(sentTotal > 0 &&
+				Math.floor((100 * receivedTotal) / sentTotal) <=
+					g.get("softCapTradeSalaryMatch"))
+		) {
+			continue;
+		}
+		const pid = pickTradeDisabledPlayerException(
+			t,
+			payrollBefore,
+			received,
+			sentTotal,
+		);
+		const amount = received.find((p) => p.pid === pid)?.amount;
+		if (pid !== undefined && amount !== undefined) {
+			disabledPlayerUses.push({
+				tid: tids[j],
+				pid,
+				amount,
+				previous: helpers.deepCopy(t.capExceptions),
+			});
+		}
+	}
 
 	for (const j of [0, 1] as const) {
 		const k = j === 0 ? 1 : 0;
@@ -312,6 +374,10 @@ const processTrade = async (
 		});
 	}
 
+	for (const use of disabledPlayerUses) {
+		await recordTradeDisabledPlayerException(use.tid, use.pid, use.amount);
+	}
+
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	await recomputeLocalUITeamOvrs();
 
@@ -446,6 +512,19 @@ const processTrade = async (
 					teamSeason.numPlayersTradedAway = undoInfoTeam.numPlayersTradedAway;
 					await idb.cache.teamSeasons.put(teamSeason);
 				}
+			}
+		}
+
+		// Give back a disabled player exception used in it
+		for (const use of disabledPlayerUses) {
+			const t = await idb.cache.teams.get(use.tid);
+			if (t) {
+				if (use.previous) {
+					t.capExceptions = use.previous;
+				} else {
+					delete t.capExceptions;
+				}
+				await idb.cache.teams.put(t);
 			}
 		}
 

@@ -1335,7 +1335,8 @@ export type LogEventType =
 	| "tradeRequest"
 	| "holdout"
 	| "draftPickCondition"
-	| "draftStash";
+	| "draftStash"
+	| "capException";
 
 // https://stackoverflow.com/a/57103940/786644
 export type DistributiveOmit<T, K extends keyof T> = T extends any

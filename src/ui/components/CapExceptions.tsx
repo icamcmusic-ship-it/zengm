@@ -71,6 +71,12 @@ export const CapExceptions = ({
 						cap, instead of the others for a team that signed a free agent with
 						cap space this season.
 					</li>
+					<li>
+						<b>Disabled player:</b> granted when a player is ruled out for the
+						rest of the season in its first half: half his salary (at most the
+						mid-level), to sign or trade for one player on a contract that ends
+						this season. It expires at the trade deadline.
+					</li>
 				</ul>
 				<p className="mb-0">
 					{usedCapSpace
