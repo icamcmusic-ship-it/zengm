@@ -25,6 +25,7 @@ import {
 import { hofWatchFor, projectHofScore } from "./watch.ts";
 import retire from "../player/retire.ts";
 import { hofScoreBasketball } from "../player/madeHof.basketball.ts";
+import { recomputedHof } from "../debug/recomputeHallOfFame.ts";
 
 // A retired player with `n` seasons of the same value (value = (dws + ows + ewa) / 2)
 const makePlayer = (
@@ -426,6 +427,44 @@ describe("un-retirement", () => {
 		assert.strictEqual(
 			ballotLine({ ...hofBallot, votes: [80] }, 2010),
 			"first ballot, 80.0%",
+		);
+	});
+});
+
+describe("recompute Hall of Fame (debug)", () => {
+	test("keeps ballot and veterans committee inductions, leaves ballot candidates to the ballot", () => {
+		const options = { ballotOn: true, startingSeason: 2000 };
+		// Voted in with a case below the instant threshold
+		const voted = makePlayer(50, 7, 12);
+		voted.hof = 1;
+		voted.hofBallot = {
+			first: 2019,
+			votes: [80],
+			score: 90,
+			threshold: 120,
+			status: "inducted",
+		};
+		assert.isUndefined(recomputedHof(voted, options));
+		const veterans = makePlayer(51, 7, 12);
+		veterans.hof = 1;
+		veterans.hofBallot = {
+			first: 2005,
+			votes: [40],
+			score: 110,
+			threshold: 120,
+			status: "veterans",
+		};
+		assert.isUndefined(
+			recomputedHof(veterans, { ...options, ballotOn: false }),
+		);
+		// A great player still waiting for the ballot: not inducted by the recompute
+		const waiting = makePlayer(52, 15, 12);
+		assert.isUndefined(recomputedHof(waiting, options));
+		// Retired before the league started (not a ballot candidate), or the ballot off: madeHof decides
+		assert.isTrue(recomputedHof(makePlayer(53, 15, 12, 1995), options));
+		assert.isTrue(recomputedHof(waiting, { ...options, ballotOn: false }));
+		assert.isFalse(
+			recomputedHof(makePlayer(54, 2, 10), { ...options, ballotOn: false }),
 		);
 	});
 });
