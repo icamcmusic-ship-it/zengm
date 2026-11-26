@@ -11,6 +11,10 @@ import {
 	keyStatTitle,
 	type AwardKeyStats,
 } from "../components/AwardKeyStats.tsx";
+import {
+	AwardStatPicker,
+	useAwardStatCols,
+} from "../components/AwardStatCols.tsx";
 
 type ActualProps = Exclude<
 	View<"history">,
@@ -19,6 +23,41 @@ type ActualProps = Exclude<
 
 const NO_WINNER = "No winner";
 
+type AnyAward =
+	| ActualProps["awards"]["individualAwards"][number]
+	| ActualProps["awards"]["teamAwards"][number];
+
+const awardKeyStats = (award: AnyAward) =>
+	(award as { keyStats?: AwardKeyStats }).keyStats;
+
+// The Columns menu alone (playoff awards, which have no heading)
+const AwardStatPickerFor = ({ award }: { award: AnyAward }) => {
+	const keyStats = awardKeyStats(award);
+	const statCols = useAwardStatCols(award.shortName, keyStats);
+	return <AwardStatPicker keyStats={keyStats} statCols={statCols} />;
+};
+
+// An award's heading with its Columns menu: pick the stats the recap shows for its winners. The choice is the award's statCols
+// setting, shared with Award Races, Award History and Award Settings
+const AwardHeading = ({
+	award,
+	children,
+}: {
+	award: AnyAward;
+	children: React.ReactNode;
+}) => {
+	const keyStats = awardKeyStats(award);
+	const statCols = useAwardStatCols(award.shortName, keyStats);
+	return (
+		<h2 className="d-flex align-items-center gap-2">
+			<span>{children}</span>
+			<span className="fs-6 fw-normal">
+				<AwardStatPicker keyStats={keyStats} statCols={statCols} />
+			</span>
+		</h2>
+	);
+};
+
 const Winner = ({
 	award,
 	indentStats,
@@ -26,9 +65,7 @@ const Winner = ({
 	season,
 	userTid,
 }: {
-	award:
-		| ActualProps["awards"]["individualAwards"][number]
-		| ActualProps["awards"]["teamAwards"][number];
+	award: AnyAward;
 	indentStats?: boolean;
 	p:
 		| ActualProps["awards"]["individualAwards"][number]["winner"]
@@ -42,9 +79,11 @@ const Winner = ({
 	}
 	// Award key stats: the award's chosen columns (its statCols setting), or the ones its formula suggests, as on Award Races and
 	// Award History
-	const keyStats = (award as { keyStats?: AwardKeyStats }).keyStats;
+	// (a change in a Columns menu shows right away)
+	const keyStats = awardKeyStats(award);
+	const statCols = useAwardStatCols(award.shortName, keyStats);
 	const stats: string[] =
-		keyStats && keyStats.shown.length > 0 ? keyStats.shown : fixedStats;
+		keyStats && statCols.stats.length > 0 ? statCols.stats : fixedStats;
 
 	if (!p) {
 		return null;
@@ -123,7 +162,9 @@ const Teams = ({
 
 	return (
 		<>
-			{multipleTeams ? <h2>{award.name}</h2> : null}
+			{multipleTeams ? (
+				<AwardHeading award={award}>{award.name}</AwardHeading>
+			) : null}
 			{award.winner.map((t, i) => {
 				if (t.length === 0) {
 					return null;
@@ -134,7 +175,7 @@ const Teams = ({
 						{multipleTeams ? (
 							<h3>{helpers.ordinal(i + 1)} team</h3>
 						) : (
-							<h2>{award.name} team</h2>
+							<AwardHeading award={award}>{award.name} team</AwardHeading>
 						)}
 						{t.map((p, i) => {
 							return (
@@ -273,7 +314,7 @@ const History = (props: View<"history">) => {
 														firstAward.name,
 														groupedAwards.length,
 													)}
-													:{" "}
+													: <AwardStatPickerFor award={firstAward} />
 													{groupedAwards.map((award, i) => {
 														return award.winner ? (
 															<Winner
@@ -352,7 +393,7 @@ const History = (props: View<"history">) => {
 							{awards.individualAwards.map((award, i) => {
 								return (
 									<React.Fragment key={i}>
-										<h2>{award.name}</h2>
+										<AwardHeading award={award}>{award.name}</AwardHeading>
 										<div className="mb-3">
 											{award.winner ? (
 												<Winner
