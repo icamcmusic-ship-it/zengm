@@ -47,6 +47,7 @@ import {
 import updatePlayoffSeries from "./updatePlayoffSeries.ts";
 import writeGameStats from "./writeGameStats.ts";
 import { recordRivalryGames } from "../../util/rivalryStories.ts";
+import { suspensionsToUI } from "../../util/suspensionsToUI.ts";
 import writePlayerStats, {
 	P_FATIGUE_DAILY_REDUCTION,
 } from "./writePlayerStats.ts";
@@ -516,6 +517,7 @@ const play = async (
 			// This loads next game and calls mergeGames internally
 			await recomputeLocalUITeamOvrs();
 		}
+		await suspensionsToUI();
 
 		// College mode with the quick sim (hundreds of teams): advanced stats every third day of the regular season, and on its last day
 		if (

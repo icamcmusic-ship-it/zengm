@@ -679,6 +679,156 @@ if (__SPORT === "hockey") {
 			frequency: 9,
 			games: 12.28,
 		},
+		{
+			name: "Strained Hip Flexor",
+			frequency: 30,
+			games: 6.5,
+		},
+		{
+			name: "Strained Adductor",
+			frequency: 22,
+			games: 7.2,
+		},
+		{
+			name: "Sprained MCL",
+			frequency: 20,
+			games: 14,
+		},
+		{
+			name: "Hyperextended Knee",
+			frequency: 18,
+			games: 8.5,
+		},
+		{
+			name: "Bone Bruise (Knee)",
+			frequency: 16,
+			games: 9.5,
+		},
+		{
+			name: "Knee Tendinitis",
+			frequency: 14,
+			games: 6.8,
+		},
+		{
+			name: "Stress Reaction (Shin)",
+			frequency: 12,
+			games: 12,
+		},
+		{
+			name: "Torn Plantar Fascia",
+			frequency: 9,
+			games: 22,
+		},
+		{
+			name: "Turf Toe",
+			frequency: 9,
+			games: 7.5,
+		},
+		{
+			name: "Heel Contusion",
+			frequency: 8,
+			games: 4.2,
+		},
+		{
+			name: "Fractured Wrist",
+			frequency: 8,
+			games: 30,
+		},
+		{
+			name: "Torn Ligament (Thumb)",
+			frequency: 7,
+			games: 24,
+		},
+		{
+			name: "Dislocated Finger",
+			frequency: 14,
+			games: 4.5,
+		},
+		{
+			name: "Dislocated Shoulder",
+			frequency: 7,
+			games: 18,
+		},
+		{
+			name: "Torn Labrum",
+			frequency: 5,
+			games: 40,
+		},
+		{
+			name: "Torn Rotator Cuff",
+			frequency: 3,
+			games: 55,
+		},
+		{
+			name: "Fractured Orbital Bone",
+			frequency: 6,
+			games: 10,
+		},
+		{
+			name: "Fractured Jaw",
+			frequency: 3,
+			games: 20,
+		},
+		{
+			name: "Lacerated Eyelid",
+			frequency: 8,
+			games: 1.5,
+		},
+		{
+			name: "Strained Lower Back",
+			frequency: 20,
+			games: 5.8,
+		},
+		{
+			name: "Bulging Disc",
+			frequency: 6,
+			games: 16,
+		},
+		{
+			name: "Stress Fracture (Foot)",
+			frequency: 8,
+			games: 40,
+		},
+		{
+			name: "Fractured Fibula",
+			frequency: 4,
+			games: 38,
+		},
+		{
+			name: "Torn Hamstring",
+			frequency: 4,
+			games: 30,
+		},
+		{
+			name: "Torn Patellar Tendon",
+			frequency: 2,
+			games: 100,
+		},
+		{
+			name: "Strained Pectoral",
+			frequency: 5,
+			games: 8,
+		},
+		{
+			name: "Bruised Tailbone",
+			frequency: 10,
+			games: 3.5,
+		},
+		{
+			name: "Sprained Neck",
+			frequency: 8,
+			games: 3.2,
+		},
+		{
+			name: "Torn Meniscus (Lateral)",
+			frequency: 5,
+			games: 24,
+		},
+		{
+			name: "Shin Splints",
+			frequency: 10,
+			games: 4.4,
+		},
 	];
 } else {
 	// For football and baseball, keep using the old basketball injuries, cause I'm not sure if the new ones would actually be better or worse

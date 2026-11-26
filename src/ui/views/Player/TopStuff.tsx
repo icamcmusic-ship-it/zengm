@@ -1,3 +1,4 @@
+import { SuspensionIcon } from "../../components/SuspensionIcon.tsx";
 import { last } from "../../../common/utils.ts";
 import {
 	draftedVsPreDraftText,
@@ -489,6 +490,10 @@ const TopStuff = ({
 				{injured ? (
 					<InjuryIcon className="ms-0" injury={player.injury} />
 				) : null}
+				<SuspensionIcon
+					className={injured ? undefined : "ms-0 me-1"}
+					pid={player.pid}
+				/>
 				<SkillsBlock
 					className={injured ? undefined : "skills-alone"}
 					skills={skills}

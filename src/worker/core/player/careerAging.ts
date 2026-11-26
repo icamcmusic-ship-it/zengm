@@ -452,6 +452,13 @@ export const MAJOR_INJURIES: Record<string, number> = {
 	"Fractured Ankle": 0.5,
 	"Torn Calf": 0.5,
 	"Fractured Neck": 0.8,
+	"Torn Patellar Tendon": 1.2,
+	"Torn Plantar Fascia": 0.5,
+	"Stress Fracture (Foot)": 0.5,
+	"Fractured Fibula": 0.5,
+	"Torn Hamstring": 0.5,
+	"Torn Meniscus (Lateral)": 0.6,
+	"Bulging Disc": 0.4,
 };
 
 // Custom injury names (a league's own injury list) aren't in MAJOR_INJURIES: one is major when it's a tear, rupture, fracture,

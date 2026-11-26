@@ -3,6 +3,7 @@ import { getProcessedGames } from "./getProcessedGames.ts";
 import toUI from "./toUI.ts";
 import type { LocalStateUI } from "../../common/types.ts";
 import { getOneUpcomingGame } from "./recomputeLocalUITeamOvrs.ts";
+import { getSuspensions } from "./suspensionsToUI.ts";
 
 export const initUILocalGames = async () => {
 	const userTid = g.get("userTid");
@@ -47,6 +48,7 @@ export const initUILocalGames = async () => {
 	await toUI("updateLocal", [
 		{
 			games,
+			suspensions: await getSuspensions(),
 		},
 	]);
 };

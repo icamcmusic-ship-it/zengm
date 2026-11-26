@@ -1549,6 +1549,8 @@ export type LocalStateUI = {
 	moreInfoTid?: number;
 	stickyFooterAd: boolean;
 	stickyFormButtons: boolean;
+	// Games left on each active league suspension, by pid (worker/util/suspensionsToUI.ts)
+	suspensions: Record<number, number>;
 } & {
 	[Key in Exclude<GameAttributesSyncedToUi, "lid">]: GameAttributesLeague[Key];
 };

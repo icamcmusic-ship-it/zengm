@@ -4,6 +4,7 @@ import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 import type { Player, PlayerInjury } from "../../common/types.ts";
 import { InjuryIcon } from "./InjuryIcon.tsx";
+import { SuspensionIcon } from "./SuspensionIcon.tsx";
 import { SeasonIcons } from "./SeasonIcons.tsx";
 import { CountryFlag } from "./CountryFlag.tsx";
 import { useEffect, useState } from "react";
@@ -268,6 +269,7 @@ export const PlayerNameLabels = (props: Props) => {
 				name
 			)}
 			<InjuryIcon injury={injury} />
+			<SuspensionIcon pid={pid} season={season} />
 			<SkillsBlock
 				skills={skills}
 				badges={badges}
