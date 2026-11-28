@@ -69,14 +69,14 @@ describe("more pre-draft paths", () => {
 	}, 120000);
 
 	test("off: exactly what the model generated before", () => {
-		// Hashes of whole classes made before preDraftPaths existed
+		// Hashes of whole classes made with paths, injuries and the context model off (remade when the role model changed: zRole, MPG_BASE)
 		const expected = [
-			"2888518018",
-			"589293571",
-			"1085206878",
-			"3956000019",
-			"2531247753",
-			"4132320079",
+			"1268277882",
+			"2942573275",
+			"2745689988",
+			"3929402476",
+			"1064001037",
+			"3256444081",
 		];
 		for (let c = 0; c < expected.length; c++) {
 			const results = generateCollegeClass(makeClass(70, `base${c}`), {

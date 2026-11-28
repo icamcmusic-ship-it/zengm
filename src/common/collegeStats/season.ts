@@ -19,8 +19,10 @@ const subDev = (ratings: Ratings, key: string) =>
 // 3: the sub-ratings (the subRatings setting) move blocks, steals, 3PA rate and 3P%, assists, turnovers and the ORB/DRB split. Only
 // prospects generated with sub-ratings are marked 3 (COLLEGE_STATS_VERSION); with the setting off generation is unchanged and stays 2
 // (COLLEGE_STATS_VERSION_BASE), and turning it on remakes undrafted prospects' stats once
-export const COLLEGE_STATS_VERSION = 3;
-export const COLLEGE_STATS_VERSION_BASE = 2;
+// 4 (5 with sub-ratings): role (minutes and usage) reads draft stock (ovr and pot, zRole) and a class-average prospect, nearly always
+// a draftee, is a starter rather than a 22 minute bench player, so draftees score like real NCAA draftees
+export const COLLEGE_STATS_VERSION = 5;
+export const COLLEGE_STATS_VERSION_BASE = 4;
 
 // Division I averages (modern era), per team game
 export const PACE = 68; // possessions
@@ -173,6 +175,8 @@ export type SeasonContext = {
 	// Also from the college season model: how many of his team's regular season games were conference games (played after the non-conference games)
 	confGames?: number;
 	// Hooks of the career model (career.ts). Without them nothing changes
+	// Talent for his role (minutes, usage), when it differs from zTalent: his draft stock (generate.ts)
+	zRole?: number;
 	// Minutes per game above or below what his talent gets him (buried on the bench at a big program, the star of a small one)
 	mpgShift?: number;
 	// Usage above or below, in standard deviations
@@ -203,6 +207,12 @@ export const sosRateFactor = (strength: number) =>
 // Minutes he starts at: a game whose planned minutes are this high or more, for a freshman whose role grew during the season
 const RAMP_START_MPG = 22;
 
+// Role (minutes per game and usage) of a class-average prospect. A draft class is nearly all draftees, so the class average is a
+// second-round pick: a starter in college (real NCAA draftees average ~27 minutes and 12-13 points), not a bench player
+const MPG_BASE = 27.5;
+const MPG_PER_Z = 4.6;
+const USG_BASE = 0.27;
+
 /**
  * The part of a season's minutes per game and usage that does not depend on random numbers (simulateSeason without its draws), for a
  * team's budget of minutes and usage (teams.ts).
@@ -210,6 +220,7 @@ const RAMP_START_MPG = 22;
 export const expectedRole = ({
 	ratings,
 	zTalent,
+	zRole = zTalent,
 	classIndex,
 	gameMinutes,
 	mpgShift = 0,
@@ -217,6 +228,7 @@ export const expectedRole = ({
 }: {
 	ratings: Ratings;
 	zTalent: number;
+	zRole?: number;
 	classIndex: number;
 	gameMinutes: number;
 	mpgShift?: number;
@@ -224,8 +236,8 @@ export const expectedRole = ({
 }) => {
 	const c = clamp(classIndex, 0, 3);
 	const mpg = clamp(
-		25.5 * (gameMinutes / 40) +
-			4.8 * zTalent +
+		MPG_BASE * (gameMinutes / 40) +
+			MPG_PER_Z * zRole +
 			[-2.6, -0.8, 0.7, 1.6][c]! +
 			0.04 * (ratings.endu - 45) +
 			mpgShift,
@@ -235,8 +247,8 @@ export const expectedRole = ({
 	const zUsage =
 		(composite(ratings, "usage") - TYPICAL.usage) / TYPICAL.usageSd;
 	const usgRaw =
-		0.262 +
-		0.044 * (0.6 * zUsage + 0.4 * zTalent + usageShift) +
+		USG_BASE +
+		0.044 * (0.6 * zUsage + 0.4 * zRole + usageShift) +
 		0.0045 * (c - 1.5);
 	const usg = clamp(
 		usgRaw > 0.29 ? 0.29 + 0.55 * (usgRaw - 0.29) : usgRaw,
@@ -371,6 +383,8 @@ const MAX_KEYS = [
 export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const { rng, ratings, noise, gameMinutes } = ctx;
 	const z = ctx.zTalent;
+	// Role (minutes, usage) reads his draft stock, not only his ratings now: a young high-upside prospect is his team's featured player
+	const zRole = ctx.zRole ?? z;
 	const c = ctx.classIndex;
 	const b = getBigness(ratings);
 	const ln = (sd: number) =>
@@ -415,8 +429,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	}
 	// Role on his college team: a class-average prospect is a rotation player around 25 minutes, the best of the class are 30-34 minute stars, the bottom of the class (and young players) come off the bench. Real Division I starters rarely average more than 35
 	const mpgBase =
-		25.5 * (gameMinutes / 40) +
-		4.8 * z +
+		MPG_BASE * (gameMinutes / 40) +
+		MPG_PER_Z * zRole +
 		[-2.6, -0.8, 0.7, 1.6][clamp(c, 0, 3)]! +
 		0.04 * (ratings.endu - 45) +
 		rng.normal(0, 2.6 * noise) +
@@ -474,9 +488,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	// Usage: the share of his team's scoring chances he finishes while on the floor
 	const usageComp = composite(ratings, "usage");
 	const zUsage = (usageComp - TYPICAL.usage) / TYPICAL.usageSd;
-	const zU = 0.6 * zUsage + 0.4 * z + (ctx.usageShift ?? 0);
+	const zU = 0.6 * zUsage + 0.4 * zRole + (ctx.usageShift ?? 0);
 	const usgRaw =
-		0.262 +
+		USG_BASE +
 		(proEnv?.usageShift ?? 0) +
 		0.044 * zU +
 		0.0045 * (c - 1.5) +

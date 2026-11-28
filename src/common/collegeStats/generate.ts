@@ -143,6 +143,8 @@ export const getClassIndexForStock = (
 
 // How far above the class average (in class standard deviations) a prospect's stock can be in a season he came back after: higher, and he would have declared then
 export const STAY_CAP = 0.55;
+// How much of his upside (class z of pot minus class z of ovr) his role (minutes, usage) reads
+const ROLE_POT_WEIGHT = 0.5;
 
 export const getClassStats = (prospects: CollegeProspect[]) => {
 	// A small class can't tell what's typical, so it leans on a prior
@@ -246,11 +248,14 @@ const planProspects = (
 				backProject(p.ratings, k, p.age),
 				year.lag + stayLag,
 			);
-			years.push({ year, zTalent, ratings });
+			// His role reads his stock: upside the ratings don't show yet (pot over ovr) earns minutes and shots too
+			const zRole = zTalent + ROLE_POT_WEIGHT * (zPot - zClass);
+			years.push({ year, zTalent, zRole, ratings });
 			if (teams && !p.linked && isTeamSchool(year.school)) {
 				const expected = expectedRole({
 					ratings,
 					zTalent,
+					zRole,
 					classIndex: year.classIndex,
 					gameMinutes: year.gameMinutes,
 					mpgShift: year.mpgShift,
@@ -365,7 +370,7 @@ export const generateCollegeClass = (
 		// His draft year season ended early: he missed the postseason
 		let missedPostseason = false;
 		// Oldest first
-		for (const { year, zTalent, ratings } of plannedYears) {
+		for (const { year, zTalent, zRole, ratings } of plannedYears) {
 			const k = year.yearsBack;
 			const draftYearTeam = k === 0 && ncaaSeason && team >= 0;
 			if (draftYearTeam && year.gamesCap !== undefined) {
@@ -395,6 +400,7 @@ export const generateCollegeClass = (
 					rng,
 					ratings,
 					zTalent,
+					zRole,
 					classIndex: year.classIndex,
 					school: year.school,
 					conference: year.conference,

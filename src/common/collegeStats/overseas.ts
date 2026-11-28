@@ -31,8 +31,8 @@ const env = (
 	youthCap: number | undefined,
 	mpgCap: number,
 	games: number,
-	usageShift = -0.035,
-	minShift = -6,
+	usageShift = -0.025,
+	minShift = -4,
 ): LeagueEnv => ({
 	pace,
 	gameMinutes,

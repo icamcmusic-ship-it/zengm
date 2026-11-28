@@ -2462,6 +2462,23 @@ The colstats audit only looked at the current draft class. A new league has seve
 | Correlation APG~pss, BPG~idef, RPG~reb, SPG~pdef, 3PA rate~tp | 0.66, 0.50, 0.60, 0.56, 0.70 | 0.85, 0.61, 0.64, 0.71, 0.93 |                                   |
 | G League PPG p50 / max                                        | 13.2 / 33.6                  | 7.9 / 12.0                   |                                   |
 
+### College stats round 3: draftees score like draftees
+
+User report: too many prospects had tiny scoring and usage lines in college (and overseas). Measured over 8 classes (new league path, expanded ratings, ranked by value as a draft order proxy), picks 1-30 had a median of 9.8 ppg (p10 5.7) and only 48% were in double figures, barely ahead of undrafted prospects (8.0).
+
+- **Root cause:** role (minutes and usage) in `season.ts` was calibrated as if a draft class were a cross-section of Division I rotation players. A class-average prospect got 25.5 mpg base and 26% usage. But a ~70-player class is nearly all draftees, so the class average is a second-round pick, who in real college is a starter scoring 11-13 points. On top of that, role read only the class z of **ovr**, while draft stock is mostly **pot**: a young high-upside lottery pick with a modest ovr was given a bench role. That left picks 1-30 and 31-60 with almost the same minutes (22.9 vs 21.8 median).
+- **Fix:** role reads `zRole = zTalent + 0.5 × (zPot − zClass)` (`ROLE_POT_WEIGHT` in `generate.ts`), passed to `simulateSeason` and `expectedRole`, so team budgets (`teams.ts`) see the same role. Efficiency, counting stats and everything else still read `zTalent`. The base role is now 27.5 mpg (`MPG_BASE`, 4.6 per SD, `MPG_PER_Z`) and 27% usage (`USG_BASE`). The default overseas club env (leagues without their own numbers) takes −4 minutes and −0.025 usage instead of −6 and −0.035. EuroLeague, ACB and the other top clubs keep their small roles for teenagers.
+- **Existing leagues:** `COLLEGE_STATS_VERSION` goes to 5 and `COLLEGE_STATS_VERSION_BASE` to 4, so undrafted prospects' generated stats are remade once when a league is opened.
+- **Tests:** `generate.test.ts` (average mpg 21-30, a season he came back after under 26 ppg), `collegeStatsUiPath.test.ts` (per-class median ppg 8-15, median mpg 20-30, ranks 20+ median ppg 7-13), and the pinned hashes in `paths.test.ts`.
+
+| Draft-year line (8 classes), ppg p10 / p50 / p90, usage p50, mpg p50, share in double figures | Before                           | After                             |
+| --------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
+| NCAA picks 1-30                                                                               | 5.7 / 9.8 / 16.6, 26%, 22.9, 48% | 9.6 / 13.8 / 19.2, 29%, 29.3, 88% |
+| NCAA picks 31-60                                                                              | 5.0 / 9.1 / 15.5, 26%, 21.8, 42% | 8.4 / 12.2 / 16.1, 28%, 27.1, 75% |
+| NCAA undrafted                                                                                | 4.2 / 8.0 / 12.3, 25%, 19.7, 29% | 5.6 / 9.2 / 13.1, 26%, 22.0, 35%  |
+| Overseas picks 1-30                                                                           | 2.7 / 6.6 / 10.8, 24%, 15.0, 15% | 6.3 / 9.4 / 14.5, 28%, 19.9, 47%  |
+| Overseas picks 31-60                                                                          | 1.8 / 4.0 / 10.2, 23%, 11.6, 13% | 4.7 / 8.1 / 11.5, 26%, 18.6, 25%  |
+
 ### Prospect careers: transfers, redshirts, recruiting, unusual prospects
 
 Part of _College & Overseas Stats_ (no toggle of its own): everything here is made when a class's college stats are generated, and is biography built around the ratings a prospect already has. Nothing reads back into ratings, age, value or how draft classes are generated for the pro game.
