@@ -36,7 +36,7 @@ import { TRAIT_DEFINITIONS } from "../../common/playerTraits/definitions.ts";
 import { formatTraitReading } from "../../common/playerTraits/scouting.ts";
 import type { Conditions } from "../../common/types.ts";
 import { isCollege } from "../core/college/isCollege.ts";
-import { league } from "../core/index.ts";
+import { league, player } from "../core/index.ts";
 import {
 	getPreDraftAwards,
 	getPreDraftSchool,
@@ -626,6 +626,11 @@ export const getPlayerProfileExport = async (
 			if (!pt) {
 				skip("traits", "No trait readings.");
 			} else {
+				// God Mode: the exact values the game uses (0-100), even for traits the scouts only have a range for
+				const godMode = !!g.get("godMode");
+				const exactScores: Record<string, number> | undefined = godMode
+					? (player.getPlayerTraitScores(pRaw as any) as any)
+					: undefined;
 				const readings = pt.traits.map((t: any) => {
 					const category = TRAIT_CATEGORIES.find((c) =>
 						(c.traits as readonly string[]).includes(t.key),
@@ -642,6 +647,9 @@ export const getPlayerProfileExport = async (
 						...(t.exact ? { score: t.estimate } : { low: t.low, high: t.high }),
 						status: traitStatusText(t),
 						effect: view.effects?.[t.key],
+						...(exactScores && exactScores[t.key] !== undefined
+							? { value: exactScores[t.key] }
+							: {}),
 					};
 				});
 				const tables: ExportTable[] = [];
@@ -651,12 +659,14 @@ export const getPlayerProfileExport = async (
 						.map((r: any) => [
 							r.name,
 							r.reading,
+							...(exactScores ? [cell(r.value)] : []),
 							r.effect ? `${r.status}. In games: ${r.effect}` : r.status,
 						]);
 					if (category.key === "physical" && pt.agingCurve) {
 						rows.push([
 							"Aging curve",
 							pt.agingCurve.name,
+							...(exactScores ? [""] : []),
 							pt.agingCurve.description,
 						]);
 					}
@@ -664,7 +674,9 @@ export const getPlayerProfileExport = async (
 						tables.push({
 							section: "Traits",
 							title: category.name,
-							cols: ["Trait", "Reading", "Status"],
+							cols: exactScores
+								? ["Trait", "Reading", "Exact (God Mode)", "Status"]
+								: ["Trait", "Reading", "Status"],
 							rows,
 						});
 					}
@@ -696,6 +708,18 @@ export const getPlayerProfileExport = async (
 					tables,
 					data: {
 						readings,
+						// God Mode only: every trait's exact value by name ("Clutch": 72)
+						...(exactScores
+							? {
+									traitValues: Object.fromEntries(
+										Object.entries(exactScores).map(([key, value]) => [
+											TRAIT_DEFINITIONS[key as keyof typeof TRAIT_DEFINITIONS]
+												?.name ?? key,
+											value,
+										]),
+									),
+								}
+							: {}),
 						agingCurve: pt.agingCurve
 							? {
 									name: pt.agingCurve.name,
@@ -1131,7 +1155,9 @@ export const getPlayerProfileExport = async (
 			playerTraits: traitsOn,
 			scoutingReports: scoutingOn,
 			note: showRatings
-				? "Ratings, traits and scouting grades are as your scouts see them (not exact values), like the player pages."
+				? g.get("godMode") && traitsOn
+					? "Ratings and scouting grades are as your scouts see them, like the player pages. God Mode: traits also have their exact values."
+					: "Ratings, traits and scouting grades are as your scouts see them (not exact values), like the player pages."
 				: "Ratings are hidden (no visible ratings challenge), like the player pages.",
 		},
 		player: {
