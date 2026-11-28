@@ -155,6 +155,7 @@ export { default as AwardHistory } from "./AwardHistory.tsx";
 export { default as Timeline } from "./Timeline.tsx";
 export { default as LeagueExtras } from "./LeagueExtras.tsx";
 export { default as FaceStyleGallery } from "./FaceStyleGallery.tsx";
+export { default as ForkManual } from "./ForkManual/index.tsx";
 export { default as LeagueAchievements } from "./LeagueAchievements/index.tsx";
 export { default as TradeGrader } from "./TradeGrader.tsx";
 export { default as ContractValue } from "./ContractValue.tsx";

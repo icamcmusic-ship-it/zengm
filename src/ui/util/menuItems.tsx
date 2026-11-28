@@ -1416,6 +1416,15 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 		children: [
 			{
 				type: "link",
+				active: (pageID) => pageID === "forkManual",
+				league: true,
+				nonLeague: true,
+				commandPalette: true,
+				path: "/fork_manual",
+				text: "Fork Manual",
+			},
+			{
+				type: "link",
 				league: true,
 				nonLeague: true,
 				commandPalette: true,
