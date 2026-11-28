@@ -16,7 +16,9 @@ const RETIRED = new Set(HONEST_ROLES.flatMap((h) => h.names));
 // The share of the reference set the engine must keep naming as the user does (main name, or the same skills)
 // (archskill, reading 29: of the players not labelled with a retired honest name, reading 28 named 36 of 99 this way and
 // reading 29 32: his labels predate the twelve new skills, which name some of them by a skill his label doesn't say)
-const FLOOR = 0.3;
+// (archaudit 2059: 0.29, one player lower: the audit's two-skill rule for low-ovr players names a second skill the older
+// reference labels leave out, Hunter Edwards and Michael McCoy)
+const FLOOR = 0.29;
 
 // (archfam: a label's skills as reading 28 says them: one per family (shooting, creation, perimeter D), and his defense
 // as one, whether a defensive word, the old defensive tag or 2-Way says it)

@@ -142,6 +142,13 @@ const FLAVOR = 0.05;
 export const SPECIAL_EDGE = 0.15;
 // archfam: 2-Way: his best defensive skill and his best offensive skill both at this standing
 export const TWO_WAY_BAR = 0.8;
+// archaudit 2059: 2-Way also needs real defense, perimeter or interior D itself at this standing (steals, help, post or
+// switch D alone gave the prefix to players whose best perimeter/interior D sat near the league median)
+export const TWO_WAY_CORE = 0.7;
+// archaudit 2059: a skill name names his second skill too when it is at this standing (lower of league and position; the
+// audit flagged 62nd+, and a name's word promises top 35%),
+// so a low-ovr player with two real skills isn't reduced to one noun
+export const PAIR_PCT = 0.65;
 // archfam: 3-Level: 3PT, mid-range and finishing all at this standing
 export const THREE_LEVEL_BAR = 0.78;
 // archskill (reading 29): a one-skill noun name ("Rebounder") over his position word ("Glass-Cleaning Big") that covers
@@ -325,7 +332,10 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	// archfam: 2-Way: his best defensive and best offensive skill both at TWO_WAY_BAR
 	const bestD = Math.max(...[...DEF_NOUNS].map((n) => pct[n]));
 	const bestO = Math.max(...[...OFFENSE].map((n) => pct[n]));
-	const twoWay = bestD >= TWO_WAY_BAR && bestO >= TWO_WAY_BAR;
+	const twoWay =
+		bestD >= TWO_WAY_BAR &&
+		bestO >= TWO_WAY_BAR &&
+		Math.max(pct.perimD, pct.rimD) >= TWO_WAY_CORE;
 	// archfam: 3-Level: 3PT, mid-range and finishing all at THREE_LEVEL_BAR
 	const threeLevel =
 		pct.three >= THREE_LEVEL_BAR &&
@@ -584,6 +594,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		traits: x.traits,
 		eliteOvr,
 		ovr: x.ovr ?? 0,
+		age: x.age,
 		best,
 	};
 	// (a name only an elite player may have: its test needs his elite ovr; over one anybody may, an elite name for an
@@ -1183,9 +1194,10 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		// (a second skill only when it may be named: its bar, SKILL_BAR, "two modest skills")
 		const pair =
 			f2 !== undefined &&
-			pct[f2.rep] >= coverBar(f2.rep) &&
-			w(f1!.p) + w(f2.p) - SECOND_COST >
-				w(f1!.p) - MISS_TOP2 * skillWeight(f2.p);
+			((pct[f2.rep] >= coverBar(f2.rep) &&
+				w(f1!.p) + w(f2.p) - SECOND_COST >
+					w(f1!.p) - MISS_TOP2 * skillWeight(f2.p)) ||
+				f2.p >= PAIR_PCT);
 		const modifier = athWord.find(
 			(a) => skillNounOf(a, skillCtx) === undefined,
 		);

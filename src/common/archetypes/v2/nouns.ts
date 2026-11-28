@@ -1437,6 +1437,7 @@ export type SpecialCtx = {
 	traits?: Record<string, number>;
 	eliteOvr: boolean;
 	ovr: number;
+	age?: number;
 	best: NounKey | undefined;
 };
 const subGe = (r: ArchetypeRatings, a: string, ...others: string[]) =>
@@ -1531,6 +1532,7 @@ export const CUSTOM_SPECIALS: {
 	...USER_SPECIALS_2(),
 	...USER_SPECIALS_3(),
 	...SKILL_SPECIALS(),
+	...GAP_SPECIALS(),
 	{
 		key: "sSlashMiddyF",
 		positions: ["SF", "F", "PF"],
@@ -1538,6 +1540,156 @@ export const CUSTOM_SPECIALS: {
 		test: ({ pct }) => pct.finish >= 0.7 && pct.handle >= 0.6 && pct.mid >= 0.7,
 	},
 ];
+// archaudit 2059 (new_archetypes.csv): names for the gaps the audit found: veterans whose skills outlasted their legs,
+// bigs the catalog had no plain name for, role names for several modest skills, non-elite words for real skills, and
+// trait-driven names
+
+const athAvg = (pct: Record<NounKey, number>) =>
+	(pct.speed + pct.jump + pct.strength) / 3;
+const trOf = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
+function GAP_SPECIALS(): {
+	key: string;
+	positions: readonly Pos[];
+	nouns: NounKey[];
+	anyBest?: true;
+	test: (c: SpecialCtx) => boolean;
+}[] {
+	return [
+		// Veterans whose athleticism is gone but whose skills are not
+		{
+			key: "sSavvyGeneral", // "Savvy Floor General"
+			positions: ["PG", "G", "SG"],
+			nouns: ["pass", "crafty"],
+			test: (c: SpecialCtx) =>
+				(c.age ?? 0) >= 29 &&
+				c.pct.pass >= 0.7 &&
+				c.pct.crafty >= 0.65 &&
+				athAvg(c.pct) <= 0.5 &&
+				trOf(c, "veteranSavvy") >= 45,
+		},
+		{
+			key: "sOldSchoolPost", // "Old-School Post Technician"
+			positions: ["PF", "FC", "C"],
+			nouns: ["post", "crafty"],
+			test: (c: SpecialCtx) =>
+				(c.age ?? 0) >= 29 &&
+				c.pct.post >= 0.75 &&
+				c.pct.crafty >= 0.55 &&
+				c.pct.jump <= 0.4,
+		},
+		{
+			key: "sBelowRimShotmaker", // "Below-the-Rim Shotmaker"
+			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF"],
+			nouns: ["mid", "three"],
+			test: (c: SpecialCtx) =>
+				c.pct.mid >= 0.7 &&
+				c.pct.three >= 0.6 &&
+				c.pct.crafty >= 0.6 &&
+				athAvg(c.pct) <= 0.45,
+		},
+		{
+			key: "sVeteranStopper", // "Veteran Stopper"
+			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"],
+			nouns: ["perimD"],
+			test: (c: SpecialCtx) =>
+				(c.age ?? 0) >= 29 &&
+				Math.max(c.pct.perimD, c.pct.rimD, c.pct.helpD) >= 0.8 &&
+				c.r.diq >= 60 &&
+				athAvg(c.pct) <= 0.5,
+		},
+		// Bigs the catalog has no plain name for
+		{
+			key: "sHubCenter", // "Hub Center"
+			positions: ["FC", "C"],
+			nouns: ["pass", "post"],
+			test: (c: SpecialCtx) =>
+				c.pct.pass >= 0.8 && Math.max(c.pct.post, c.pct.reb) >= 0.6,
+		},
+		{
+			key: "sFaceUpBig", // "Face-Up Big"
+			positions: ["PF", "FC", "C"],
+			nouns: ["handle", "mid"],
+			test: (c: SpecialCtx) => c.pct.handle >= 0.75 && c.pct.jump <= 0.5,
+		},
+		{
+			key: "sThreeDFour", // "3 & D Four"
+			positions: ["SF", "F", "PF", "FC"],
+			nouns: ["three", "perimD"],
+			test: (c: SpecialCtx) =>
+				c.pct.three >= 0.7 && Math.max(c.pct.perimD, c.pct.rimD) >= 0.75,
+		},
+		// Role names (no standout, several modest skills) — the non-elite, non-insulting middle
+		{
+			key: "sGlueForward", // "Glue Forward"
+			positions: ["SF", "F", "PF"],
+			nouns: ["perimD", "reb"],
+			anyBest: true,
+			test: (c: SpecialCtx) =>
+				c.pct.perimD >= 0.6 &&
+				c.pct.reb >= 0.6 &&
+				(c.ovrPct ?? 0) <= 0.75 &&
+				OLD_NOUNS.filter((n) => c.pct[n] >= 0.85).length === 0,
+		},
+		{
+			key: "sGlueBig", // "Glue Big"
+			positions: ["PF", "FC", "C"],
+			nouns: ["rimD", "reb"],
+			anyBest: true,
+			test: (c: SpecialCtx) =>
+				c.pct.rimD >= 0.6 &&
+				c.pct.reb >= 0.6 &&
+				c.pct.pass >= 0.5 &&
+				OLD_NOUNS.filter((n) => c.pct[n] >= 0.85).length <= 1,
+		},
+		{
+			key: "sConnectorF", // "Connector Forward"
+			positions: ["SF", "F", "PF"],
+			nouns: ["pass", "crafty"],
+			test: (c: SpecialCtx) => c.pct.pass >= 0.65 && c.pct.crafty >= 0.6,
+		},
+		// Non-elite words for real skills on lower-ovr players (the elite gate blocks Sniper / Sharpshooter / Lockdown)
+		{
+			key: "sFloorSpacer", // "Floor Spacer"
+			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF"],
+			nouns: ["three"],
+			test: (c: SpecialCtx) => c.pct.three >= 0.8 && !c.eliteOvr,
+		},
+		{
+			key: "sPoaStopper", // "Point-of-Attack Stopper"
+			positions: ["PG", "G", "SG", "GF"],
+			nouns: ["perimD"],
+			test: (c: SpecialCtx) => c.pct.perimD >= 0.8 && !c.eliteOvr,
+		},
+		{
+			key: "sSparkPlug", // "Spark Plug"
+			positions: ["PG", "G", "SG"],
+			nouns: ["handle", "speed"],
+			test: (c: SpecialCtx) =>
+				c.pct.speed >= 0.75 &&
+				Math.max(c.pct.handle, c.pct.three, c.pct.mid) >= 0.65 &&
+				(c.ovrPct ?? 0) <= 0.6,
+		},
+		// Trait-driven (traits shape the name, not just block words)
+		{
+			key: "sEnergyWing", // "Energy Wing"
+			positions: ["SG", "GF", "SF", "F"],
+			nouns: ["reb", "steal"],
+			anyBest: true,
+			test: (c: SpecialCtx) =>
+				Math.max(trOf(c, "hustle"), trOf(c, "motor")) >= 65 &&
+				athAvg(c.pct) >= 0.6,
+		},
+		{
+			key: "sClutchShotmaker", // "Clutch Shotmaker"
+			positions: ["PG", "G", "SG", "GF", "SF", "F"],
+			nouns: ["mid", "creator"],
+			test: (c: SpecialCtx) =>
+				trOf(c, "clutch") >= 70 &&
+				trOf(c, "lateGameIq") >= 55 &&
+				Math.max(c.pct.mid, c.pct.three) >= 0.7,
+		},
+	];
+}
 // The user's second list (archnouns2)
 function USER_SPECIALS_2(): {
 	key: string;
