@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PLAYER } from "../../common/constants.ts";
+import { TRAIT_DEFINITIONS } from "../../common/playerTraits/definitions.ts";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
@@ -24,6 +25,10 @@ export const exportPlayers = async (
 	abortSignal?: AbortSignal,
 ) => {
 	const filename = await toWorker("main", "getExportFilename", "players");
+	const traitsOn = __SPORT === "basketball" && !!local.getState().playerTraits;
+	const traitLeagueSeed = traitsOn
+		? await toWorker("main", "getTraitLeagueSeed", undefined)
+		: 0;
 
 	if (abortSignal?.aborted) {
 		return;
@@ -50,21 +55,29 @@ export const exportPlayers = async (
 				// archcov: his trait scores (0-100, what the game and the archetype labels read), next to the stored seeds, so
 				// an audit of the file uses the exact values. Score = clamp(round(50 + calibration offset + rating part
 				// (0.9 x weighted rating gaps) + age/experience part + 12 x seed)). Not read back on import
-				const row = p.ratings?.at(-1);
-				if (p.traits && row) {
+				// Every player gets them with the Player Traits setting on (missing seeds come from the league seed, as in the
+				// game), and traitValues has the same values by trait name ("Clutch": 72)
+				const row =
+					p.ratings?.find((r: any) => r.season === p.exportedSeason) ??
+					p.ratings?.at(-1);
+				if ((traitsOn || p.traits) && row) {
 					const season: number = row.season;
-					p.traitScores = traitScores(
-						row,
-						completeTraitSeeds(p.traits, 0, p.pid),
-						{
-							age: season - p.born.year,
-							experience: Math.max(0, season - (p.draft?.year ?? season)),
-							proSeasons: proSeasonsPlayed({
-								p,
-								season,
-								startingSeason: local.getState().startingSeason,
-							}),
-						},
+					// (the complete seeds go in the file too, so an imported player keeps these traits)
+					p.traits = completeTraitSeeds(p.traits, traitLeagueSeed, p.pid);
+					p.traitScores = traitScores(row, p.traits, {
+						age: season - p.born.year,
+						experience: Math.max(0, season - (p.draft?.year ?? season)),
+						proSeasons: proSeasonsPlayed({
+							p,
+							season,
+							startingSeason: local.getState().startingSeason,
+						}),
+					});
+					p.traitValues = Object.fromEntries(
+						Object.entries(p.traitScores).map(([key, value]) => [
+							(TRAIT_DEFINITIONS as any)[key]?.name ?? key,
+							value,
+						]),
 					);
 				}
 
