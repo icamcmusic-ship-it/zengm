@@ -709,7 +709,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
 				where:
 					"Draft Scouting → Scouts (Scouting Department), Pro Scouting, Staff Report",
 				toggle:
-					"Director & regions, consensus & flags always on; Scout Specialties & Assignments — off for new / on for existing",
+					"Director & regions, consensus & flags always on; Scout Specialties & Assignments — on for new / off for existing",
 				body: [
 					"Your scouting department has a Director, regional scouts with specialties and careers, and a Pro Scouting desk. Scouts disagree: see the consensus slot, the range and red/green flags. Three seasons after each draft, scouts' calls are graded in track records.",
 				],
@@ -779,7 +779,7 @@ export const MANUAL_SECTIONS: ManualSection[] = [
 			{
 				title: "Coach market & succession",
 				where: "Coaching Staff (Interest, Interview, Coach market panel)",
-				toggle: "Coach Market & Succession — off for new / on for existing",
+				toggle: "Coach Market & Succession — on for new / off for existing",
 				body: [
 					"Interview up to 3 coaches a season, make salary offers, name an interim or an associate head coach as heir.",
 				],
