@@ -50,6 +50,7 @@ import {
 	getTraitInjuryRateMultiplier,
 	initTraits,
 	setTraitScores,
+	getPersonalityTraitSeed,
 } from "./traits.ts";
 import genRandomFreeAgent from "./genRandomFreeAgent.ts";
 import genWeight from "./genWeight.ts";
@@ -131,6 +132,7 @@ export default {
 	getTraitInjuryRateMultiplier,
 	initTraits,
 	setTraitScores,
+	getPersonalityTraitSeed,
 	genWeight,
 	generate,
 	getLeaders,

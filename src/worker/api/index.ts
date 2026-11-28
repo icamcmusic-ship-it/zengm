@@ -1,4 +1,3 @@
-import { getPersonalityTraitSeed } from "../core/player/traits.ts";
 import { validateGameSimSettings } from "../../common/gameSimSettingsValidation.ts";
 import { csvFormat, csvFormatRows } from "d3-dsv";
 import type {
@@ -1892,7 +1891,7 @@ const exportPlayerGamesCsv = async (season: number | "all") => {
 };
 
 // Export Players: the league's trait seed, so players without stored trait seeds get the same scores the game gives them
-const getTraitLeagueSeed = async () => getPersonalityTraitSeed();
+const getTraitLeagueSeed = async () => player.getPersonalityTraitSeed();
 
 const getExportFilename = async (type: "league" | "players") => {
 	const leagueName = (await league.getName()).replace(/[^\da-z]/gi, "_");
