@@ -140,6 +140,9 @@ export const MAX_PARTS = 3;
 const FLAVOR = 0.05;
 // archfam: a special name (a catalog build, the user's own names, Jack) over a noun name that covers the same
 export const SPECIAL_EDGE = 0.15;
+// archaudit 2059: a gap name (nouns.ts GAP_SPECIALS) over the other candidates: its own test is its gate, and one of the
+// skills it names among his best is enough (it covers the rest a little, as a many-skills name does)
+export const GAP_EDGE = 0.35;
 // archfam: 2-Way: his best defensive skill and his best offensive skill both at this standing
 export const TWO_WAY_BAR = 0.8;
 // archaudit 2059: 2-Way also needs real defense, perimeter or interior D itself at this standing (steals, help, post or
@@ -607,8 +610,14 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			tw ? [DESC_BY_KEY.get("twoWay")!] : [],
 			GROUP_OF[pos],
 		);
+	// (archaudit 2059: a gap name claims only the skills it names that are among his best; its own test vouches for the
+	// combination, and every word still keeps its promise)
 	const customMain = (c: CustomSpecial) =>
-		c.anyBest ? [] : mainOfNouns(c.nouns, customName(c));
+		c.anyBest
+			? []
+			: c.gap
+				? mainOfNouns(c.nouns, customName(c)).filter((n) => listOk([n]))
+				: mainOfNouns(c.nouns, customName(c));
 	const customOk = (c: CustomSpecial, tw = false): boolean => {
 		if (!c.positions.includes(pos) || !c.test(customCtx)) {
 			return false;
@@ -628,14 +637,22 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				return false;
 			}
 		}
-		if (c.anyBest) {
+		if (c.gap) {
+			// (one of its skills, by family, among his best TOP_N + 1, or no real skill at all)
+			if (
+				nStrong > 0 &&
+				!c.nouns.some((n) => !ATH_KEYS.has(n) && windowIndex(n, tw) <= TOP_N)
+			) {
+				return false;
+			}
+		} else if (c.anyBest) {
 			if (!manyOk(eliteGated(c))) {
 				return false;
 			}
 		} else if (!listOk(customMain(c), { tw })) {
 			return false;
 		}
-		if (c.nouns.length <= 1 && ovr < ONE_NOUN_OVR && nStrong < 2) {
+		if (!c.gap && c.nouns.length <= 1 && ovr < ONE_NOUN_OVR && nStrong < 2) {
 			return false;
 		}
 		return okName(name, customMain(c), tw);
@@ -658,8 +675,8 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 					[DESC_BY_KEY.get("twoWay")!],
 					GROUP_OF[pos],
 				),
-				SPECIAL_EDGE,
-				0,
+				c.gap ? GAP_EDGE : SPECIAL_EDGE,
+				c.gap ? GENERIC_COVER : 0,
 				true,
 			);
 			return;
@@ -673,8 +690,8 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			},
 			main,
 			composedId(ROLE_BY_KEY.get(c.key)!, [], GROUP_OF[pos]),
-			SPECIAL_EDGE + (eliteGated(c) ? FLAVOR : 0),
-			c.anyBest ? (eliteGated(c) ? ELITE_COVER : GENERIC_COVER) : 0,
+			c.gap ? GAP_EDGE : SPECIAL_EDGE + (eliteGated(c) ? FLAVOR : 0),
+			c.gap || c.anyBest ? (eliteGated(c) ? ELITE_COVER : GENERIC_COVER) : 0,
 		);
 	};
 
@@ -1286,7 +1303,16 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			nStrong === 0 ||
 			(nStrong === 1 && ovr < ONE_NOUN_OVR && athWord.length === 0)
 		) {
-			return skillPick();
+			// (archaudit 2059: a gap name that fits him against his skill name; the better covering one)
+			const gaps = CUSTOM_SPECIALS.filter((c) => c.gap && customOk(c));
+			if (gaps.length === 0) {
+				return skillPick();
+			}
+			const sp = skillPick();
+			for (const c of gaps) {
+				pushCustom(c);
+			}
+			return bestOf(cands)?.pick ?? sp;
 		}
 		for (const c of CUSTOM_SPECIALS) {
 			if (customOk(c)) {

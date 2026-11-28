@@ -1112,6 +1112,7 @@ export type NameCtx = {
 	ovr: number;
 	// a young player with upside (honest.ts hasUpside)
 	upside: boolean;
+	age?: number;
 };
 type WordReq =
 	// each of these nouns: top 30% and among his three best
@@ -1267,10 +1268,20 @@ export const WORD_REQ: WordReq[] = [
 		why: "motor",
 	},
 	{
-		re: /Hustl|\bPest\b|Chaos|Junkyard|Energy|Pressure|Gritty|Grinder/,
+		re: /Hustl|\bPest\b|Chaos|Junkyard|Pressure|Gritty|Grinder/,
 		trait: "hustle",
 		min: 55,
 		why: "hustle",
+	},
+	// (archaudit 2059: Energy: hustle or motor with traits; without them, his athleticism, the Energy Wing's own test)
+	{
+		re: /Energy/,
+		check: (c) =>
+			c.traits
+				? Math.max(c.traits.hustle ?? -Infinity, c.traits.motor ?? -Infinity) >=
+					55
+				: (c.pct("speed") + c.pct("jump") + c.pct("strength")) / 3 >= 0.55,
+		why: "hustle or motor",
 	},
 	// (archskill: with traits, the trait; without them, the skill read from his ratings)
 	{
@@ -1310,10 +1321,13 @@ export const WORD_REQ: WordReq[] = [
 				: c.pct("roll") >= NEW_STRONG_BAR,
 		why: "screen setting",
 	},
+	// (archaudit 2059: with traits, the trait; without them, his age)
 	{
 		re: /Savvy|Veteran|Old Head/,
-		trait: "veteranSavvy",
-		min: 55,
+		check: (c) =>
+			c.traits
+				? (c.traits.veteranSavvy ?? -Infinity) >= 55
+				: (c.age ?? 0) >= 28,
 		why: "veteran savvy",
 	},
 	{ re: /Ruthless/, trait: "competitiveness", min: 55, why: "competitiveness" },
@@ -1455,6 +1469,8 @@ export const CUSTOM_SPECIALS: {
 	nouns: NounKey[];
 	// a name about many skills: it need not have his best one
 	anyBest?: true;
+	// archaudit 2059: a gap name (GAP_SPECIALS), read more loosely (cover.ts GAP_EDGE)
+	gap?: true;
 	test: (c: SpecialCtx) => boolean;
 }[] = [
 	{
@@ -1547,53 +1563,65 @@ export const CUSTOM_SPECIALS: {
 const athAvg = (pct: Record<NounKey, number>) =>
 	(pct.speed + pct.jump + pct.strength) / 3;
 const trOf = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
+// (a trait gate: with player traits off, the name is read from the ratings alone)
+const traitGate = (c: SpecialCtx, k: string, min: number) =>
+	c.traits === undefined || trOf(c, k) >= min;
+const GAP_VET_AGE = 28;
 function GAP_SPECIALS(): {
 	key: string;
 	positions: readonly Pos[];
 	nouns: NounKey[];
 	anyBest?: true;
+	gap?: true;
 	test: (c: SpecialCtx) => boolean;
 }[] {
+	// (gap: cover.ts reads these more loosely than other special names, GAP_EDGE: one of the skills it names among his best
+	// is enough, since the name is about the combination its own test checks)
 	return [
 		// Veterans whose athleticism is gone but whose skills are not
 		{
 			key: "sSavvyGeneral", // "Savvy Floor General"
 			positions: ["PG", "G", "SG"],
 			nouns: ["pass", "crafty"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				(c.age ?? 0) >= 29 &&
-				c.pct.pass >= 0.7 &&
-				c.pct.crafty >= 0.65 &&
-				athAvg(c.pct) <= 0.5 &&
-				trOf(c, "veteranSavvy") >= 45,
+				(c.age ?? 0) >= GAP_VET_AGE &&
+				c.pct.pass >= 0.6 &&
+				c.pct.crafty >= 0.55 &&
+				athAvg(c.pct) <= 0.55 &&
+				traitGate(c, "veteranSavvy", 55),
 		},
 		{
 			key: "sOldSchoolPost", // "Old-School Post Technician"
 			positions: ["PF", "FC", "C"],
 			nouns: ["post", "crafty"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				(c.age ?? 0) >= 29 &&
-				c.pct.post >= 0.75 &&
-				c.pct.crafty >= 0.55 &&
-				c.pct.jump <= 0.4,
+				(c.age ?? 0) >= GAP_VET_AGE &&
+				c.pct.post >= 0.65 &&
+				c.pct.crafty >= 0.45 &&
+				c.pct.jump <= 0.5,
 		},
 		{
 			key: "sBelowRimShotmaker", // "Below-the-Rim Shotmaker"
 			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF"],
 			nouns: ["mid", "three"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				c.pct.mid >= 0.7 &&
-				c.pct.three >= 0.6 &&
-				c.pct.crafty >= 0.6 &&
-				athAvg(c.pct) <= 0.45,
+				Math.max(c.pct.mid, c.pct.three) >= 0.65 &&
+				Math.min(c.pct.mid, c.pct.three) >= 0.5 &&
+				c.pct.crafty >= 0.5 &&
+				athAvg(c.pct) <= 0.5,
 		},
 		{
 			key: "sVeteranStopper", // "Veteran Stopper"
 			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"],
 			nouns: ["perimD"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				(c.age ?? 0) >= 29 &&
-				Math.max(c.pct.perimD, c.pct.rimD, c.pct.helpD) >= 0.8 &&
+				(c.age ?? 0) >= 30 &&
+				traitGate(c, "veteranSavvy", 55) &&
+				Math.max(c.pct.perimD, c.pct.rimD, c.pct.helpD) >= 0.78 &&
 				c.r.diq >= 60 &&
 				athAvg(c.pct) <= 0.5,
 		},
@@ -1602,91 +1630,109 @@ function GAP_SPECIALS(): {
 			key: "sHubCenter", // "Hub Center"
 			positions: ["FC", "C"],
 			nouns: ["pass", "post"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				c.pct.pass >= 0.8 && Math.max(c.pct.post, c.pct.reb) >= 0.6,
+				c.pct.pass >= 0.7 && Math.max(c.pct.post, c.pct.reb) >= 0.5,
 		},
 		{
 			key: "sFaceUpBig", // "Face-Up Big"
 			positions: ["PF", "FC", "C"],
 			nouns: ["handle", "mid"],
-			test: (c: SpecialCtx) => c.pct.handle >= 0.75 && c.pct.jump <= 0.5,
+			gap: true,
+			test: (c: SpecialCtx) =>
+				c.pct.handle >= 0.65 &&
+				Math.max(c.pct.mid, c.pct.three) >= 0.5 &&
+				c.pct.jump <= 0.6,
 		},
 		{
 			key: "sThreeDFour", // "3 & D Four"
 			positions: ["SF", "F", "PF", "FC"],
 			nouns: ["three", "perimD"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				c.pct.three >= 0.7 && Math.max(c.pct.perimD, c.pct.rimD) >= 0.75,
+				c.pct.three >= 0.65 && Math.max(c.pct.perimD, c.pct.rimD) >= 0.65,
 		},
-		// Role names (no standout, several modest skills) — the non-elite, non-insulting middle
+		// Role names (no standout, several modest skills): the non-elite, non-insulting middle
 		{
 			key: "sGlueForward", // "Glue Forward"
 			positions: ["SF", "F", "PF"],
 			nouns: ["perimD", "reb"],
 			anyBest: true,
+			gap: true,
 			test: (c: SpecialCtx) =>
-				c.pct.perimD >= 0.6 &&
-				c.pct.reb >= 0.6 &&
-				(c.ovrPct ?? 0) <= 0.75 &&
-				OLD_NOUNS.filter((n) => c.pct[n] >= 0.85).length === 0,
+				c.pct.perimD >= 0.45 &&
+				c.pct.reb >= 0.45 &&
+				(c.ovrPct ?? 0) <= 0.85 &&
+				OLD_NOUNS.filter((n) => c.pct[n] >= 0.85).length <= 1,
 		},
 		{
 			key: "sGlueBig", // "Glue Big"
 			positions: ["PF", "FC", "C"],
 			nouns: ["rimD", "reb"],
 			anyBest: true,
+			gap: true,
 			test: (c: SpecialCtx) =>
-				c.pct.rimD >= 0.6 &&
-				c.pct.reb >= 0.6 &&
-				c.pct.pass >= 0.5 &&
+				c.pct.rimD >= 0.45 &&
+				c.pct.reb >= 0.45 &&
+				c.pct.pass >= 0.35 &&
+				(c.ovrPct ?? 0) <= 0.85 &&
 				OLD_NOUNS.filter((n) => c.pct[n] >= 0.85).length <= 1,
 		},
 		{
 			key: "sConnectorF", // "Connector Forward"
 			positions: ["SF", "F", "PF"],
 			nouns: ["pass", "crafty"],
-			test: (c: SpecialCtx) => c.pct.pass >= 0.65 && c.pct.crafty >= 0.6,
+			gap: true,
+			test: (c: SpecialCtx) => c.pct.pass >= 0.6 && c.pct.crafty >= 0.5,
 		},
 		// Non-elite words for real skills on lower-ovr players (the elite gate blocks Sniper / Sharpshooter / Lockdown)
 		{
 			key: "sFloorSpacer", // "Floor Spacer"
 			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF"],
 			nouns: ["three"],
+			gap: true,
 			test: (c: SpecialCtx) => c.pct.three >= 0.8 && !c.eliteOvr,
 		},
 		{
 			key: "sPoaStopper", // "Point-of-Attack Stopper"
 			positions: ["PG", "G", "SG", "GF"],
 			nouns: ["perimD"],
-			test: (c: SpecialCtx) => c.pct.perimD >= 0.8 && !c.eliteOvr,
+			gap: true,
+			test: (c: SpecialCtx) => c.pct.perimD >= 0.7 && !c.eliteOvr,
 		},
 		{
 			key: "sSparkPlug", // "Spark Plug"
 			positions: ["PG", "G", "SG"],
 			nouns: ["handle", "speed"],
+			gap: true,
 			test: (c: SpecialCtx) =>
-				c.pct.speed >= 0.75 &&
-				Math.max(c.pct.handle, c.pct.three, c.pct.mid) >= 0.65 &&
-				(c.ovrPct ?? 0) <= 0.6,
+				c.pct.speed >= 0.65 &&
+				Math.max(c.pct.handle, c.pct.three, c.pct.mid) >= 0.55 &&
+				(c.ovrPct ?? 0) <= 0.7,
 		},
-		// Trait-driven (traits shape the name, not just block words)
+		// Trait-driven (traits shape the name, not just block words); with traits off, read from the ratings
 		{
 			key: "sEnergyWing", // "Energy Wing"
 			positions: ["SG", "GF", "SF", "F"],
 			nouns: ["reb", "steal"],
 			anyBest: true,
+			gap: true,
 			test: (c: SpecialCtx) =>
-				Math.max(trOf(c, "hustle"), trOf(c, "motor")) >= 65 &&
-				athAvg(c.pct) >= 0.6,
+				(c.traits === undefined
+					? Math.max(c.pct.reb, c.pct.steal) >= 0.6
+					: Math.max(trOf(c, "hustle"), trOf(c, "motor")) >= 55) &&
+				athAvg(c.pct) >= 0.55,
 		},
 		{
 			key: "sClutchShotmaker", // "Clutch Shotmaker"
 			positions: ["PG", "G", "SG", "GF", "SF", "F"],
 			nouns: ["mid", "creator"],
+			gap: true,
+			// (clutch is a trait: no name without traits)
 			test: (c: SpecialCtx) =>
-				trOf(c, "clutch") >= 70 &&
-				trOf(c, "lateGameIq") >= 55 &&
-				Math.max(c.pct.mid, c.pct.three) >= 0.7,
+				trOf(c, "clutch") >= 60 &&
+				trOf(c, "lateGameIq") >= 50 &&
+				Math.max(c.pct.mid, c.pct.three) >= 0.6,
 		},
 	];
 }
@@ -3427,6 +3473,8 @@ export type CoverCtx = {
 	mobile: boolean;
 	ovr: number;
 	upside: boolean;
+	// his age (archaudit 2059: the veteran words read it when traits are off)
+	age?: number;
 	crtPct?: number;
 };
 export const coverCtxOf = (x: NounInput): CoverCtx => {
@@ -3454,6 +3502,7 @@ export const coverCtxOf = (x: NounInput): CoverCtx => {
 		mobile: mobile(x.r, x.rq),
 		ovr: x.ovr ?? 99,
 		upside: hasUpside(x),
+		age: x.age,
 		...(crt === undefined ? {} : { crtPct: pctOf("drb", crt, x.rq) }),
 	};
 };
@@ -3549,6 +3598,7 @@ export const coverPromises = (
 		mobile: c.mobile,
 		ovr: c.ovr,
 		upside: c.upside,
+		age: c.age,
 	};
 	for (const w of WORD_REQ) {
 		if (!w.re.test(name) || "nouns" in w) {

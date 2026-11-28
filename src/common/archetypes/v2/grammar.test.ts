@@ -488,7 +488,8 @@ describe("archv2 grammar", () => {
 		test("one skill under the top tier: that skill's noun", () => {
 			const c = read({ tp: 72 }, { ovr: 44, age: 27, pot: 44 });
 			assert.notInclude(c.tags, "honest");
-			assert.match(c.name, /Shooter/);
+			// (archaudit 2059: Floor Spacer is the non-elite shooter's name)
+			assert.match(c.name, /Shooter|Floor Spacer/);
 			assert.notMatch(c.name, /Specialist|One-Trick|Gunner/);
 		});
 
