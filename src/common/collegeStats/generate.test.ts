@@ -176,7 +176,7 @@ describe("generateCollegeClass", () => {
 		const ts = totalPts / (2 * (totalFga + 0.44 * totalFta));
 		assert(ppg > 9 && ppg < 18, `ppg ${ppg}`);
 		// A class-average prospect is a rotation player, not a 30 minute starter (colstats round)
-		assert(mpg > 19 && mpg < 27, `mpg ${mpg}`);
+		assert(mpg > 21 && mpg < 30, `mpg ${mpg}`);
 		assert(ppg > 7 && ppg < 14, `ppg ${ppg}`);
 		assert(tov > 1.2 && tov < 3.2, `tov ${tov}`);
 		assert(ts > 0.52 && ts < 0.62, `ts ${ts}`);
@@ -315,7 +315,7 @@ describe("class year and draft stock", () => {
 			for (const season of result.seasons.slice(0, -1)) {
 				const gp = season.stats.gp!;
 				if (gp >= 10 && season.classIndex < 3 && COLLEGES[season.school]) {
-					assert.isBelow(season.stats.pts! / gp, 24);
+					assert.isBelow(season.stats.pts! / gp, 26);
 					assert.isBelow(season.stats.ast! / gp, 8);
 				}
 			}

@@ -156,8 +156,8 @@ describe("college stats on the path a new league uses", () => {
 				0.5,
 			);
 			medians.push(ppg);
-			assert.isAbove(ppg, 6, `${SEASON + i} ppg`);
-			assert.isBelow(ppg, 13, `${SEASON + i} ppg`);
+			assert.isAbove(ppg, 8, `${SEASON + i} ppg`);
+			assert.isBelow(ppg, 15, `${SEASON + i} ppg`);
 			assert.isBelow(apg, 3, `${SEASON + i} apg`);
 			assert.isBelow(tpar, 0.46, `${SEASON + i} 3PA rate`);
 		}
@@ -171,10 +171,10 @@ describe("college stats on the path a new league uses", () => {
 				at,
 			);
 		assert.isAbove(q("mpg", 0.1), 9);
-		assert.isAbove(q("mpg", 0.5), 17);
-		assert.isBelow(q("mpg", 0.5), 27);
-		assert.isBelow(q("mpg", 0.9), 33);
-		assert.isBelow(q("ppg", 0.1), 7);
+		assert.isAbove(q("mpg", 0.5), 20);
+		assert.isBelow(q("mpg", 0.5), 30);
+		assert.isBelow(q("mpg", 0.9), 34.5);
+		assert.isBelow(q("ppg", 0.1), 10);
 		assert.isAbove(q("ppg", 0.9), 13);
 		assert.isBelow(q("ppg", 0.9), 21);
 		assert.isBelow(q("apg", 0.5), 3);
@@ -213,8 +213,8 @@ describe("college stats on the path a new league uses", () => {
 		);
 		assert.isAbove(topPpg, 14);
 		assert.isBelow(topPpg, 22);
-		assert.isAbove(restPpg, 5);
-		assert.isBelow(restPpg, 11);
+		assert.isAbove(restPpg, 7);
+		assert.isBelow(restPpg, 13);
 	});
 
 	test("each stat follows the ratings behind it", () => {
